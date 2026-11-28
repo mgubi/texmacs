@@ -290,7 +290,7 @@
         (when (nin? b before)
           (buffer-pretend-saved b)
           (buffer-close b)))
-      (when (buffer-exists? old) (switch-to-buffer old))
+      (check-restore-buffer old)
       r)))
 
 (define (html-of-buffer body . opts)
@@ -2690,7 +2690,7 @@
       (lambda ()
         (for (b (buffer-list))
           (when (nin? b before) (buffer-close b)))
-        (when (buffer-exists? old) (switch-to-buffer old))))))
+        (check-restore-buffer old)))))
 
 (define (test-compress-tables)
   (check-group "compression tables")
@@ -2847,7 +2847,7 @@
           (end)
           (for (b (buffer-list))
             (when (nin? b before) (buffer-close b)))
-          (when (buffer-exists? old) (switch-to-buffer old)))))
+          (check-restore-buffer old))))
     ;; the answers of the translation process in <p> (#526)
     (test-translate-paragraphs)
     ;; the translation process, whose request cannot be launched (an engine
@@ -2884,7 +2884,7 @@
               (ai-abort-translate)
               (for (b (buffer-list))
                 (when (nin? b before) (buffer-close b)))
-              (when (buffer-exists? old) (switch-to-buffer old))))
+              (check-restore-buffer old)))
           (check-false (process-running? 'translate)))))
     (check= (compress-table-size "") default)))
 
@@ -3211,7 +3211,7 @@
         (export-buffer pdf)
         (for (b (buffer-list))
           (when (nin? b before) (buffer-close b)))
-        (when (buffer-exists? old) (switch-to-buffer old))
+        (check-restore-buffer old)
         (with s (if (url-exists? pdf) (string-load pdf) "")
           (define (has? what) (>= (string-search-forwards what 0 s) 0))
           (check-true (string-starts? s "%PDF-"))
@@ -3253,7 +3253,7 @@
         (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
         (for (b (buffer-list))
           (when (nin? b before) (buffer-close b)))
-        (when (buffer-exists? old) (switch-to-buffer old))
+        (check-restore-buffer old)
         (with s (if (url-exists? pdf) (string-load pdf) "")
           ;; (the writers differ by their spaces: none is compared)
           (define s* (string-replace
@@ -3328,7 +3328,7 @@
           (check-false (buffer-modified? tm)))
         (for (b (buffer-list))
           (when (nin? b before) (buffer-close b)))
-        (when (buffer-exists? old) (switch-to-buffer old))
+        (check-restore-buffer old)
         (with s (if (url-exists? pdf) (string-load pdf) "")
           (define s* (string-replace
                       (string-replace
@@ -3381,7 +3381,7 @@
         (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
         (for (b (buffer-list))
           (when (nin? b before) (buffer-close b)))
-        (when (buffer-exists? old) (switch-to-buffer old))
+        (check-restore-buffer old)
         (with s (if (url-exists? pdf) (string-load pdf) "")
           (define s* (string-replace
                       (string-replace
@@ -3415,7 +3415,7 @@
         (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
         (for (b (buffer-list))
           (when (nin? b before) (buffer-close b)))
-        (when (buffer-exists? old) (switch-to-buffer old))
+        (check-restore-buffer old)
         (with s (if (url-exists? pdf) (string-load pdf) "")
           (check-true (string-starts? s "%PDF-"))
           (check-false (>= (string-search-forwards "StructTreeRoot" 0 s) 0))))))
@@ -3440,7 +3440,7 @@
         (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
         (for (b (buffer-list))
           (when (nin? b before) (buffer-close b)))
-        (when (buffer-exists? old) (switch-to-buffer old))
+        (check-restore-buffer old)
         (check-true (url-exists? pdf))
         (check-true (< (url-size pdf) 1000000)))))
 
@@ -3591,7 +3591,7 @@
       (export sample "html-snippet")
       (check= (length (folder-files dir)) before))
     (buffer-close doc)
-    (when (buffer-exists? old) (switch-to-buffer old)))
+    (check-restore-buffer old))
   (check-group "the name of an image in LaTeX stays as it is")
   (check= (slashes-of-name "D:\\a\\b\\x.pdf") "D:/a/b/x.pdf")
   (check= (slashes-of-name "/a/b c/x.pdf") "/a/b c/x.pdf")
@@ -3711,7 +3711,7 @@
         (system-remove file))
       (buffer-pretend-saved u)
       (buffer-close u))
-    (when (buffer-exists? old) (switch-to-buffer old)))
+    (check-restore-buffer old))
   (check-group "export: the name of an image, as it is (#706)")
   ;; an absolute name with spaces and an accented letter, long enough for the
   ;; line to be wrapped: the text has it whole (not h{\'e}, nor on two lines)
@@ -3776,7 +3776,7 @@
             (clipboard-clear "mouse")
             (buffer-pretend-saved doc)
             (buffer-close doc)
-            (when (buffer-exists? old) (switch-to-buffer old))))))
+            (check-restore-buffer old)))))
   (check-group "export: a target which cannot be written is an error")
   (with-sample-buffer (embedded-image-sample)
     (lambda (name)

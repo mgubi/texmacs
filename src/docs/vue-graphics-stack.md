@@ -426,7 +426,74 @@ when the window is resized under an open menu.
   left to say where they had gone.
 
 * **Scrolling with the wheel** (`vue_gui.cpp`, `wheel_event`,
-  `wheel_step`): a trackpad and a mouse wheel ask for different things and
+  `wheel_step`). *On macOS, Linux and Windows* (not in a browser) the
+  wheel scrolls as in the Qt port since #971 (`wheel_like_qt`,
+  `wheel_event_qt`, and `Graphics/Gui/wheel_steps.hpp`, which the Cocoa
+  port uses too), at once, with no travel, glide or timing. *On Linux and
+  Windows* the delta of SDL is in notches, as the angle delta of Qt over
+  120, on every system (`qt_wheel_unit_angle`): Windows gives
+  `WM_MOUSEWHEEL` over 120 (high resolution wheels and precision touchpads
+  in fractions), X11 (XInput 2) the motion of a scroll valuator over its
+  increment (Qt the same times 120, truncated), Wayland `axis_value120`
+  over 120 for a wheel and a tenth of the pixels of the fingers (Qt 12
+  times them); so wheels and touchpads scroll alike, as in Qt, which does
+  not tell them apart for scrolling. A notch scrolls `wheelScrollLines`
+  single steps (3; on Windows the setting of the system,
+  `SPI_GETWHEELSCROLLLINES`; in a KDE session `WheelScrollLines` of
+  `kdeglobals`, as Qt's KDE theme); alt turns a vertical wheel into a
+  horizontal one, and under X11 and Wayland a horizontal one into a vertical
+  one (`qt_wheel_alt_swap`, Qt transposes); control alone zooms (Qt's pixel
+  delta on Wayland for the fingers, else the degrees; under X11 Qt also has
+  a pixel delta for a synaptics touchpad, whose increment SDL does not
+  give, so the degrees there). Guesses left as they are: a fractional delta
+  which is no whole number of eighths is taken for the fingers (for the
+  pixels of an editor capturing the wheel only), and the deltas of X11
+  reach us as floats. An editor capturing the wheel gets ten points a unit
+  for the fingers and the distance of a notch for a wheel, where Qt gives
+  no pixel delta (a graphics would not move: a deliberate deviation).
+  *On macOS*: whether
+  an event comes from a trackpad is read from its `NSEvent`, as the Qt port
+  does, with its deltas and scrolling deltas (which SDL rounds or drops)
+  and its phases (a cancelled gesture does not scroll, nor the end of one
+  which a momentum follows): a local monitor of the scroll events
+  (`vue_mac_wheel_monitor`, `vue_mac.mm`) keeps the one which AppKit is
+  handing to SDL, and an event watch of SDL (`wheel_watch`, installed with
+  the monitor at `SDL_Init`), called when SDL queues the
+  wheel event for it (all of it at once on the main thread), keeps it for
+  that event under a serial number which the event carries in its
+  `reserved` field (`vue_mac_wheel_attach`, `qt_wheel_queue`); the event
+  takes it when it is handled, before anything else, which drops the
+  records of older events (the serial numbers wrap around safely). As in
+  Qt, the end of a gesture which a momentum follows is dropped, a
+  cancelled gesture is a wheel of (0, 0) for an editor which captures it,
+  command alone zooms by the pixel delta of the `NSEvent` when the pointer
+  is over the editor which has the focus (only a `QTMWidget` zooms in Qt;
+  over another editor of the window it does not), and shift alone or
+  command otherwise page, a page a notch, an editor or a Clay container
+  (whose page is found when the wheel is applied, `clay_wheel_flush`),
+  with the modifiers of the gesture during its momentum (`qt_wheel_latch`),
+  which an editor capturing the wheel gets too. The deltas of SDL are not used: their formula
+  changed between versions of SDL (3.4.2 gives `deltaY`, 3.4.20 a tenth of
+  `scrollingDeltaY` for a trackpad). Only a scripted event, which has no
+  record (`wheel_scripted`), is classified by its deltas (SDL rounds those
+  of a mouse
+  wheel and leaves those of a trackpad fractional). A mouse wheel scrolls
+  at once three single steps (a sixteenth
+  of the view plus a point) per event, whatever the acceleration, as
+  `-[QNSView scrollWheel:]` gives 120 per event and `QScrollBar` scrolls
+  `wheelScrollLines` steps per 120; a trackpad gives an angle delta of
+  twice its scrolling delta, which scrolls as many single steps over 40,
+  the fractions carried,
+  at most a page per event, on the dominant axis only; the Clay containers
+  (menus, lists, dialogs) scroll by the single steps of a `QScrollArea`, 20
+  points (`qt_wheel_area_points`). An editor which captures the wheel gets
+  Qt's pixel delta: the scrolling delta, 20 points per line for a mouse
+  wheel. Unlike a `QTMWidget`, an editor at
+  the end of its document does not pass the wheel on to the Clay container
+  around it, nor drop the fraction of a step there (`scroll_bar`): it
+  clamps its position only after the layout which used the wheel. What
+  follows holds
+  on the other systems: a trackpad and a mouse wheel ask for different things and
   are answered differently. A swipe *drags* the view: its events carry the
   displacement of the fingers and are applied at once, so the page follows
   them. A notch *asks for a distance*: that distance is not jumped but

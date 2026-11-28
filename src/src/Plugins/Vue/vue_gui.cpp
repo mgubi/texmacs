@@ -33,6 +33,9 @@
 #include "editor.hpp"
 #include "new_view.hpp"      // get_current_editor()
 #include <time.h>            // clock_gettime (wheel_stamp_of_x)
+#include <stdio.h>           // fopen (wheel_kde_scroll_lines)
+#include <stdlib.h>          // atoi
+#include <string.h>          // strncmp
 #include "image_files.hpp"
 #include "boot.hpp"      // is_headless
 #include "tm_window.hpp"
@@ -3822,6 +3825,10 @@ update_display_points () {
   return density;
 }
 
+#ifdef OS_MACOS
+static bool wheel_watch (void* userdata, SDL_Event* event);
+#endif
+
 void gui_open (int& argc, char** argv) {
   // start the gui
 #if defined(__EMSCRIPTEN__)
@@ -3876,6 +3883,12 @@ void gui_open (int& argc, char** argv) {
     SDL_Log ("Unable to initialize SDL: %s", SDL_GetError ());
     exit (-1);
   }
+#ifdef OS_MACOS
+  // which wheel events come from a trackpad (see wheel_event_qt): from
+  // SDL_Init on, so that no wheel event is queued without its NSEvent
+  vue_mac_wheel_monitor ();
+  SDL_AddEventWatch (&wheel_watch, NULL);
+#endif
   // the shaders of the GPU renderer (Metal), compiled while TeXmacs boots
   vue_gpu_warm_up ();
 
@@ -4120,6 +4133,19 @@ static const time_t vue_repaint_dt= 16;
 * wheel_glides) the speed of the fingers is estimated from the events and,
 * when they stop above wheel_launch_speed, the view goes on with that
 * velocity, decaying exponentially with the time constant wheel_tau.
+*
+* All of the above now holds in a browser only. On macOS, Linux and Windows
+* the wheel scrolls as in the Qt port (wheel_like_qt, wheel_event_qt,
+* issue #971): a notch was travelled over 45 ms, and notches which came
+* fast were taken for a trackpad (#373), which made the wheel feel sluggish
+* beside the Qt port. Each event scrolls at once what QScrollBar scrolls in
+* the Qt port (wheel_steps.hpp), for the angle delta which Qt would have:
+* on macOS from the NSEvent behind the event (vue_mac.mm), a mouse wheel
+* 120 an event and a trackpad twice its scrolling delta in points; on Linux
+* and Windows 120 times the delta of SDL, whose unit is a notch there as
+* for Qt (qt_wheel_unit_angle), for wheels and touchpads alike, since Qt
+* does not tell them apart for scrolling either. No travel, no glide, no
+* timing.
 ******************************************************************************/
 
 static const double wheel_tau= 350.0;          // ms: the glide of a trackpad
@@ -4255,6 +4281,141 @@ static const bool wheel_bursts_are_swipes= true;
 static const bool wheel_bursts_are_swipes= false;
 #endif
 
+// does the wheel scroll as in the Qt port (see above)?
+#if !defined(__EMSCRIPTEN__)
+static const bool wheel_like_qt= true;
+#else
+static const bool wheel_like_qt= false;
+#endif
+
+#if !defined(OS_MACOS) && !defined(__EMSCRIPTEN__)
+// is the video driver of SDL the one of X11? (Qt truncates the angle delta
+// there, see qt_wheel_unit_angle)
+static bool
+wheel_x11_driver () {
+#if defined(_WIN32)
+  return false;
+#else
+  return wheel_x11 ();
+#endif
+}
+#endif
+
+#if !defined(OS_MACOS) && !defined(__EMSCRIPTEN__) && !defined(_WIN32)
+// QApplication::wheelScrollLines on Linux: 3, but in a session of Plasma
+// 5 or later, where Qt takes the theme of KDE (QKdeTheme, created when
+// detectDesktopEnvironment of qdesktopunixservices.cpp says KDE and
+// KDE_SESSION_VERSION is at least 5, qgenericunixthemes.cpp), the setting
+// WheelScrollLines of the group [KDE] of kdeglobals, in the first of the
+// configuration folders (XDG_CONFIG_HOME, ~/.config, then those of
+// XDG_CONFIG_DIRS, /etc/xdg) which has it. Read once: Qt reads it when its
+// theme is made and does not follow a change of it alone. Not done: the
+// prefixes of KDE 4 (KDEHOME...), and the DesktopNames of a session given
+// by the path of its .desktop file in DESKTOP_SESSION. A value of 0 or
+// which is no number is skipped (the next file, else 3), where Qt would
+// scroll nothing; at most 1000 lines. Simpler than QSettings too: the
+// first WheelScrollLines of the group counts (Qt takes the last), and a
+// value in quotes or followed by a ';' comment is no number here (it is
+// skipped); "+5" is 5, as for Qt
+
+// the value of WheelScrollLines in the group [KDE] of a file, or -1
+static int
+kde_wheel_lines_in (const string& file) {
+  c_string f (file);
+  FILE* in= fopen (f, "r");
+  if (in == NULL) return -1;
+  char* buf= NULL;
+  size_t cap= 0;
+  bool kde= false, first= true;
+  int r= -1;
+  // whole lines, however long (getline)
+  while (getline (&buf, &cap, in) >= 0) {
+    string line (buf);
+    // (a byte order mark of UTF-8 at the start of the file)
+    if (first && N(line) >= 3 && line (0, 3) == "\xEF\xBB\xBF")
+      line= line (3, N(line));
+    first= false;
+    line= trim_spaces (line);
+    if (N(line) > 0 && line[0] == '[') {
+      // the group is the text up to the first ']', as QSettings reads it:
+      // [KDE][$i] (a group locked by the kiosk) is [KDE]
+      int close= search_forwards ("]", line);
+      kde= close > 0 && trim_spaces (line (1, close)) == "KDE";
+      continue;
+    }
+    if (!kde) continue;
+    int eq= search_forwards ("=", line);
+    if (eq < 0 || trim_spaces (line (0, eq)) != "WheelScrollLines") continue;
+    c_string v (trim_spaces (line (eq + 1, N(line))));
+    char* end= NULL;
+    long n= strtol (v, &end, 10);
+    if (end != NULL && *end == '\0' && end != (char*) v && n >= 1)
+      r= (int) min (n, 1000L);
+    break;
+  }
+  free (buf);
+  fclose (in);
+  return r;
+}
+
+// is the session one of KDE, as detectDesktopEnvironment of Qt sees it?
+static bool
+wheel_kde_session () {
+  string desk= get_env ("XDG_CURRENT_DESKTOP");
+  if (desk != "") return upcase_all (desk) == "KDE";
+  if (get_env ("KDE_FULL_SESSION") != "") return true;
+  if (get_env ("GNOME_DESKTOP_SESSION_ID") != "") return false;
+  string ds= get_env ("DESKTOP_SESSION");
+  int slash= search_backwards ("/", ds);
+  if (slash >= 0) ds= ds (slash + 1, N(ds));
+  return ds == "kde";
+}
+
+static int
+wheel_kde_scroll_lines () {
+  static int lines= 0;
+  if (lines != 0) return lines;
+  lines= 3;
+  if (!wheel_kde_session ()) return lines;
+  string ver= get_env ("KDE_SESSION_VERSION");
+  if (!is_int (ver) || as_int (ver) < 5) return lines;
+  // (relative folders are ignored, as in qstandardpaths_unix.cpp)
+  string home= get_env ("XDG_CONFIG_HOME");
+  if (!starts (home, "/")) home= get_env ("HOME") * "/.config";
+  array<string> all;
+  all << home;
+  array<string> dirs= tokenize (get_env ("XDG_CONFIG_DIRS"), ":");
+  int n0= N(all);
+  for (int k= 0; k < N(dirs); k++)
+    if (starts (dirs[k], "/")) all << dirs[k];
+  if (N(all) == n0) all << string ("/etc/xdg");
+  for (int k= 0; k < N(all); k++) {
+    if (all[k] == "") continue;
+    int n= kde_wheel_lines_in (all[k] * "/kdeglobals");
+    if (n > 0) { lines= n; break; }
+  }
+  return lines;
+}
+#endif
+
+#ifdef _WIN32
+// QApplication::wheelScrollLines on Windows: SPI_GETWHEELSCROLLLINES (3 by
+// default; "a screen at a time", WHEEL_PAGESCROLL, is 3 in Qt too, see
+// qwindowstheme.cpp). Declared here rather than with windows.h, whose
+// macros clash with the names of TeXmacs
+extern "C" __declspec(dllimport) int __stdcall
+SystemParametersInfoW (unsigned int action, unsigned int param, void* pv,
+                       unsigned int win_ini);
+static int
+wheel_windows_scroll_lines () {
+  unsigned int n= 3;
+  if (SystemParametersInfoW (0x0068 /* SPI_GETWHEELSCROLLLINES */, 0, &n, 0) == 0)
+    return 3;
+  if (n == 0xffffffffu) return 3;
+  return (int) n;
+}
+#endif
+
 // does the view glide when the events of a trackpad stop? Not where the
 // system glides itself (macOS), and not in a browser at all: there a mouse
 // wheel may come as deltas in pixels, which are taken for a trackpad, and
@@ -4281,9 +4442,12 @@ wheel_glides (const vue_input_state& in) {
 // notch (wheel_units_are_notches), as the Qt port does on Wayland and
 // macOS with the pixels of the event. It is added up apart, each delta at
 // its scale, since a frame
-// may have both the travel of a notch and a trackpad
+// may have both the travel of a notch and a trackpad. kx, ky are the delta
+// for the Clay scroll containers (the same, but where the wheel scrolls as
+// in the Qt port: by the steps of a QScrollArea, see wheel_event_qt)
 static void
-push_wheel (vue_window win, double dx, double dy, double gx, double gy) {
+push_wheel (vue_window win, double dx, double dy, double gx, double gy,
+            double kx, double ky) {
   vue_input_state& in= win->input;
   if (in.mouse_action == "wheel" && N(in.mouse_data) == 2) {
     in.mouse_data[0] += dx; // several deltas in the same frame add up
@@ -4300,7 +4464,7 @@ push_wheel (vue_window win, double dx, double dy, double gx, double gy) {
   with_window frame (win);
   Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
   // a bar which only scrolls sideways takes the wheel sideways
-  double cx= dx, cy= dy;
+  double cx= kx, cy= ky;
   vue_wheel_axes (cx, cy);
   // Clay scrolls its containers by ten pixels per unit of delta. The deltas
   // are applied once, before the next layout (clay_wheel_flush): each call
@@ -4312,8 +4476,31 @@ push_wheel (vue_window win, double dx, double dy, double gx, double gy) {
 }
 
 static void
+push_wheel (vue_window win, double dx, double dy, double gx, double gy) {
+  push_wheel (win, dx, dy, gx, gy, dx, dy);
+}
+
+static void
 push_wheel (vue_window win, double dx, double dy) {
-  push_wheel (win, dx, dy, dx, dy);
+  push_wheel (win, dx, dy, dx, dy, dx, dy);
+}
+
+// the Clay container which the wheel scrolls (as Clay_UpdateScrollContainers
+// chooses it: the innermost under the pointer which can scroll), after
+// Clay_SetPointerState
+static bool
+clay_wheel_target (Clay_ScrollContainerData& c) {
+  Clay_ElementIdArray ids= Clay_GetPointerOverIds ();
+  for (int i= ids.length - 1; i >= 0; i--) {
+    c= Clay_GetScrollContainerData (ids.internalArray[i]);
+    if (!c.found) continue;
+    if ((c.config.vertical &&
+         c.contentDimensions.height > c.scrollContainerDimensions.height) ||
+        (c.config.horizontal &&
+         c.contentDimensions.width > c.scrollContainerDimensions.width))
+      return true;
+  }
+  return false;
 }
 
 // the wheel of the frame to the Clay scroll containers of the window, as
@@ -4326,14 +4513,27 @@ clay_wheel_flush (vue_window_rep* win) {
   vue_input_state& in= win->input;
   bool taken= in.wheel_taken;
   in.wheel_taken= false;
-  if (in.clay_wheel_x == 0 && in.clay_wheel_y == 0) return;
+  if (in.clay_wheel_x == 0 && in.clay_wheel_y == 0 &&
+      in.clay_page_x == 0 && in.clay_page_y == 0) return;
   if (!taken) {
     Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
-    Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) in.clay_wheel_x,
-                                                        (float) in.clay_wheel_y }, 0.01f);
-    gui_needs_relayout= true; // shown at once, by another layout
+    double ux= in.clay_wheel_x, uy= in.clay_wheel_y;
+    Clay_ScrollContainerData c;
+    if ((in.clay_page_x != 0 || in.clay_page_y != 0) && clay_wheel_target (c)) {
+      // a page an event, scaled by the delta (scrollByDelta with control
+      // or shift), in units of Clay (ten pixels)
+      double pw= c.scrollContainerDimensions.width;
+      double ph= c.scrollContainerDimensions.height;
+      ux += max (-pw, min (pw, (double) (int) (in.clay_page_x * pw))) / 10;
+      uy += max (-ph, min (ph, (double) (int) (in.clay_page_y * ph))) / 10;
+    }
+    if (ux != 0 || uy != 0) {
+      Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) ux, (float) uy }, 0.01f);
+      gui_needs_relayout= true; // shown at once, by another layout
+    }
   }
   in.clay_wheel_x= in.clay_wheel_y= 0;
+  in.clay_page_x= in.clay_page_y= 0;
 }
 
 // is a timestamp given by SDL a time of the X server in ms? SDL counts the
@@ -4393,6 +4593,193 @@ wheel_interval (vue_input_state& in, uint64_t stamp) {
   return dt;
 }
 
+// the NSEvent of the wheel event being handled (vue_mac_wheel_take), or
+// NULL (a scripted event, another system)
+static const qt_wheel_record* wheel_record= NULL;
+// a script is pushing a wheel event (see wheel_watch)
+static bool wheel_scripted= false;
+// the modifiers of the wheel event being handled, as Qt has them on macOS
+// (qt_wheel_latch: those of the gesture during its momentum)
+static qt_wheel_latch wheel_latch;
+static int wheel_mods= 0;
+
+// the modifiers of SDL as those of Qt (on macOS command is control and
+// control is meta)
+static int
+wheel_sdl_mods () {
+  SDL_Keymod m= SDL_GetModState ();
+#ifdef OS_MACOS
+  return ((m & SDL_KMOD_SHIFT) ? QT_WHEEL_SHIFT : 0) |
+         ((m & SDL_KMOD_GUI) ? QT_WHEEL_CONTROL : 0) |
+         ((m & SDL_KMOD_ALT) ? QT_WHEEL_ALT : 0) |
+         ((m & SDL_KMOD_CTRL) ? QT_WHEEL_META : 0);
+#else
+  return ((m & SDL_KMOD_SHIFT) ? QT_WHEEL_SHIFT : 0) |
+         ((m & SDL_KMOD_CTRL) ? QT_WHEEL_CONTROL : 0) |
+         ((m & SDL_KMOD_ALT) ? QT_WHEEL_ALT : 0) |
+         ((m & SDL_KMOD_GUI) ? QT_WHEEL_META : 0);
+#endif
+}
+
+#ifdef OS_MACOS
+// the NSEvent which SDL is turning into a wheel event (wheel_event_qt): its
+// serial number goes into the reserved field of the event, which SDL
+// copies into its queue after the watches (SDL_PushEvent) and does not
+// use; 0 for the events of scripts, which have no NSEvent behind them.
+// The serial numbers wrap around after 2^32 events, which the comparisons
+// allow (qt_wheel_serial_before)
+static bool
+wheel_watch (void* userdata, SDL_Event* event) {
+  (void) userdata;
+  if (event->type == SDL_EVENT_MOUSE_WHEEL)
+    event->wheel.reserved= wheel_scripted ? 0 : vue_mac_wheel_attach ();
+  return true;
+}
+#endif
+
+// a wheel event as in the Qt port (wheel_like_qt, see above). The NSEvent
+// it came from (wheel_record) gives what -[QNSView scrollWheel:] reads:
+// whether its deltas are precise (a swipe of a trackpad may open with
+// whole deltas, which scrolled as notches, six times too far), its deltas
+// and scrolling deltas, which SDL rounds or drops, and whether it scrolls
+// at all (a cancelled phase, an ended one which a momentum follows).
+// Without it (a scripted event) the deltas x, y of SDL are taken: whole
+// numbers of lines for a mouse wheel (the delta of the NSEvent rounded
+// away from zero), the delta of the NSEvent for a trackpad (a tenth of its
+// scrolling delta in points); a stream with a fractional delta is then a
+// trackpad, whole deltas which open a stream a wheel. The view is the one
+// of the window less its bars, as in wheel_notch_step_of. (An editor at
+// the end of its document does not pass the wheel on to the Clay
+// container around it, as a QTMWidget passes it to its parent: the editor
+// clamps its position after the layout which used the wheel, see
+// vue_widget.cpp)
+static void
+wheel_event_qt (vue_window win, double x, double y) {
+  vue_input_state& in= win->input;
+  in.wheel_ambiguous= false;
+  in.wheel_over_x= in.wheel_over_y= 0;
+  in.wheel_est_x= in.wheel_est_y= 0; // the system glides, not us
+  const qt_wheel_record* rec= wheel_record;
+  int ax, ay;          // the angle delta of Qt
+  int lines= 3;        // QApplication::wheelScrollLines
+  // the pixel delta of Qt, which an editor capturing the wheel gets, in
+  // points; for a notch where Qt has none, see below
+  double gpx= 0, gpy= 0;
+  bool notch_pixels= false;
+#ifdef OS_MACOS
+  bool precise;
+  // the deltas (lines) and scrolling deltas (points) of the NSEvent, with
+  // the signs of SDL (x is minus deltaX)
+  double lx, ly, px, py;
+  if (rec != NULL) {
+    if (rec->ignored) return;
+    // a cancelled gesture: Qt zeroes its deltas, and an editor which
+    // captures the wheel gets a wheel of (0, 0)
+    if (rec->cancelled) { push_wheel (win, 0, 0, 0, 0, 0, 0); return; }
+    precise= in.wheel_precise= rec->precise;
+    lx= - rec->dx; ly= rec->dy; px= - rec->sx; py= rec->sy;
+  }
+  else {
+    if (x != floor (x) || y != floor (y)) in.wheel_precise= true;
+    precise= in.wheel_precise; // for the rest of the stream
+    lx= x; ly= y; px= 10.0 * x; py= 10.0 * y;
+  }
+  ax= qt_wheel_mac_angle (px, lx, precise);
+  ay= qt_wheel_mac_angle (py, ly, precise);
+  // the scrolling delta truncated, 20 points a line for a mouse wheel
+  // (without the NSEvent, the delta of SDL is taken for the line)
+  if (rec != NULL || precise) {
+    gpx= qt_wheel_mac_pixels (px, precise);
+    gpy= qt_wheel_mac_pixels (py, precise);
+  }
+  else {
+    gpx= qt_wheel_mac_pixels (x, false);
+    gpy= qt_wheel_mac_pixels (y, false);
+  }
+#elif !defined(__EMSCRIPTEN__)
+  (void) rec;
+  // Linux and Windows: the delta of SDL is in notches on every system, as
+  // the angle delta of Qt over 120 (qt_wheel_unit_angle); Qt truncates it
+  // under X11, rounds it elsewhere
+  bool x11= wheel_x11_driver ();
+  ax= qt_wheel_unit_angle (x, x11);
+  ay= qt_wheel_unit_angle (y, x11);
+  // with alt, Qt turns a vertical wheel into a horizontal one, and under
+  // xcb and Wayland a horizontal one into a vertical one (qt_wheel_alt_swap;
+  // the deltas of SDL follow, for an editor capturing the wheel)
+  if ((wheel_mods & QT_WHEEL_ALT) != 0) {
+#ifdef _WIN32
+    const bool windows= true;
+#else
+    const bool windows= false;
+#endif
+    qt_wheel_alt_swap (ax, ay, windows);
+    qt_wheel_alt_swap (x, y, windows);
+  }
+#ifdef _WIN32
+  lines= wheel_windows_scroll_lines ();
+#else
+  lines= wheel_kde_scroll_lines ();
+#endif
+  // the pixel delta: Qt has one for the fingers on Wayland (their pixels,
+  // ten a unit of SDL) and under X11 for a touchpad whose increment is
+  // above 15 (synaptics: the motion of the valuator, which SDL divides by
+  // the increment, which it does not give), none for a wheel, nor for
+  // libinput under X11, nor on Windows. Here the fingers (a fractional
+  // delta which is no whole number of eighths, wheel_in_eighths: a guess;
+  // a precision touchpad on Windows and a wheel of high resolution in
+  // eighths go the other way) get ten points a unit on every system, and a
+  // notch the distance it scrolls (Qt gives an editor capturing the wheel
+  // nothing then, and a graphics would not move: a deliberate deviation)
+  bool fingers= (x != floor (x) && !wheel_in_eighths (x)) ||
+                (y != floor (y) && !wheel_in_eighths (y));
+  if (fingers) { gpx= 10.0 * x; gpy= 10.0 * y; }
+  else notch_pixels= true;
+#else
+  // (not in a browser: wheel_like_qt)
+  (void) rec;
+  ax= ay= 0;
+#endif
+  SI w, h;
+  win->get_size (w, h);
+  int vw= (int) max (100.0, ((double) w) / PIXEL);
+  int vh= (int) max (100.0, ((double) h) / PIXEL - 120.0);
+  // the bar of the dominant axis scrolls (QAbstractScrollArea::wheelEvent)
+  double dx= 0, dy= 0;
+  // (with command or shift, a page an event: QAbstractSliderPrivate::
+  // scrollByDelta; not in the Clay containers, whose page is not known here)
+  bool paging= qt_wheel_pages (wheel_mods);
+  if (qt_wheel_horizontal (ax, ay))
+    dx= in.wheel_qt_x.scroll (ax, qt_wheel_single_step (vw), vw, paging,
+                              lines);
+  else if (ay != 0)
+    dy= in.wheel_qt_y.scroll (ay, qt_wheel_single_step (vh), vh, paging,
+                              lines);
+  // the scroll containers of Clay (menus, lists, dialogs) scroll as a
+  // QScrollArea: single steps of 20 points, of which a float is enough
+  // (with command or shift a page an event, when the container is known:
+  // clay_page_x/y, see clay_wheel_flush)
+  double kx= 0, ky= 0;
+  if (paging) {
+    if (qt_wheel_horizontal (ax, ay)) in.clay_page_x += ax / 120.0;
+    else in.clay_page_y += ay / 120.0;
+  }
+  else if (qt_wheel_horizontal (ax, ay)) kx= qt_wheel_area_points (ax, lines);
+  else ky= qt_wheel_area_points (ay, lines);
+  // an editor which captures the wheel gets the pixel delta of the Qt port
+  if (notch_pixels) {
+    gpx= ax / 120.0 * lines * qt_wheel_single_step (vw);
+    gpy= ay / 120.0 * lines * qt_wheel_single_step (vh);
+  }
+  double gx= gpx * win->density, gy= gpy * win->density;
+  dx *= win->density; dy *= win->density;
+  kx *= win->density; ky *= win->density;
+  in.wheel_event_time= texmacs_time ();
+  if (dx != 0 || dy != 0 || gx != 0 || gy != 0 || kx != 0 || ky != 0 ||
+      paging)
+    push_wheel (win, dx, dy, gx, gy, kx, ky);
+}
+
 // a wheel event: scroll and update the estimated speed of the wheel
 // (x, y are the deltas as reported by SDL, in wheel units; stamp is the
 // timestamp SDL gave the event, in ns, or in ms of the X server (see
@@ -4414,6 +4801,7 @@ wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
     // is then a few pixels)
     in.wheel_pend_g= 1.0;
   }
+  if (wheel_like_qt) { wheel_event_qt (win, x, y); return; }
   // fractional deltas are a trackpad; so is a second event which follows
   // the opening one too soon for a wheel to have turned twice (see above)
   bool precise= ((x != floor (x) && !wheel_in_eighths (x)) ||
@@ -4782,6 +5170,10 @@ headless_loop () {
       for (; !is_nil (l); l= l->next) l->item->apply ();
     }
     if (the_interpose_handler != NULL) the_interpose_handler ();
+    // the steps of a test of the driver (gui-test-run), as in the loop
+    // with a display: the tests of the windows which need no drawing
+    // run headless (tests/Plugins/Vue/close-refused.scm)
+    if (script_pump) call ("gui-test-pump");
     usleep (10000);
   }
 }
@@ -5639,7 +6031,10 @@ script_exec (string line) {
     ev.wheel.mouse_y= wy;
     ev.wheel.x= as_double (a[3]);
     ev.wheel.y= as_double (a[4]);
+    // (no NSEvent behind it: see event_filter)
+    wheel_scripted= true;
     SDL_PushEvent (&ev);
+    wheel_scripted= false;
   }
   else if (cmd == "key" && N(a) > 1) {
     // "key [S-][C-][A-][M-]<SDL key name>": the prefixes are the shift,
@@ -5886,6 +6281,7 @@ gui_test_busy () {
   // events, keys still to be given one per turn (a text committed at once),
   // or an animation (a menu which slides in: the places of its items change
   // until it ends)
+  if (is_headless ()) return N(pending_keys) > 0; // (no SDL)
   return SDL_PollEvent (NULL) || N(pending_keys) > 0 || transitions_running ();
 }
 
@@ -6381,18 +6777,69 @@ vue_web_tab_document (int id) {
 // window is. Returns true if the event was used; not when the editor
 // captures the wheel.
 static bool
-wheel_zooms (vue_window win, double y) {
+wheel_zooms (vue_window win, double y, const qt_wheel_record* rec,
+             double px, double py) {
 #ifdef OS_MACOS
   const SDL_Keymod zoom_mod= SDL_KMOD_GUI;
 #else
   const SDL_Keymod zoom_mod= SDL_KMOD_CTRL;
 #endif
+#if !defined(__EMSCRIPTEN__)
+  // control alone (command on macOS), as Qt has it (during a gesture and
+  // its momentum on macOS)
+  (void) zoom_mod;
+  if (!qt_wheel_zooms (wheel_mods)) return false;
+  // and over the editor, as in Qt only a QTMWidget zooms: elsewhere (a
+  // menu, a list, a dialog: a QScrollArea in Qt) command pages
+  if (vue_simple_widget_rep* ed=
+        dynamic_cast<vue_simple_widget_rep*> (win->kbd_focus.rep)) {
+    with_window frame (win);
+    Clay_SetPointerState ((Clay_Vector2) { (float) px, (float) py }, false);
+    if (!Clay_PointerOver (CLAY_IDI ("simple_widget", ed->id))) return false;
+  }
+#else
+  (void) px; (void) py;
   const SDL_Keymod all= SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI;
   SDL_Keymod mods= SDL_GetModState () & all;
   if (mods == 0 || (mods & ~zoom_mod) != 0) return false;
+#endif
   if (dynamic_cast<vue_simple_widget_rep*> (win->kbd_focus.rep) == NULL) return false;
   // as in Qt, the editor gets the wheel when it captures it (graphics)
   if (as_bool (call ("wheel-capture?"))) return false;
+  if (rec != NULL) {
+    // as QTMWidget::wheelEvent with the deltas of -[QNSView scrollWheel:]
+    // (those of a cancelled gesture are zeroes), as the Cocoa port does
+    double f= 0;
+    if (!rec->cancelled)
+      f= qt_wheel_zoom (qt_wheel_mac_pixels (rec->sx, rec->precise),
+                        qt_wheel_mac_pixels (rec->sy, rec->precise),
+                        qt_wheel_mac_angle (rec->sx, rec->dx, rec->precise),
+                        qt_wheel_mac_angle (rec->sy, rec->dy, rec->precise));
+    if (f == 0 || fabs (f) <= 1.0) return true;
+    string cmd= (f > 0 ? "(zoom-in " : "(zoom-out ") * as_string (fabs (f)) * ")";
+    exec_delayed (scheme_cmd (cmd));
+    return true;
+  }
+#if !defined(OS_MACOS) && !defined(__EMSCRIPTEN__)
+  {
+    // Linux and Windows, as QTMWidget::wheelEvent: by the pixel delta, which
+    // Qt has for the fingers on Wayland (their pixels, ten a unit of SDL)
+    // and under X11 for a touchpad of synaptics (its increment above 15),
+    // which SDL does not let us know: there by the degrees, as for the
+    // others, else by the angle delta in degrees
+    bool x11= wheel_x11_driver ();
+    const char* d= SDL_GetCurrentVideoDriver ();
+    bool wayland= (d != NULL && strcmp (d, "wayland") == 0);
+    int pix= 0;
+    if (wayland && y != floor (y) && !wheel_in_eighths (y))
+      pix= (int) (10.0 * y + (y >= 0 ? 0.5 : -0.5));
+    double f= qt_wheel_zoom (0, pix, 0, qt_wheel_unit_angle (y, x11));
+    if (f == 0 || fabs (f) <= 1.0) return true;
+    string cmd= (f > 0 ? "(zoom-in " : "(zoom-out ") * as_string (fabs (f)) * ")";
+    exec_delayed (scheme_cmd (cmd));
+    return true;
+  }
+#endif
   if (y == 0) return true; // a sideways wheel does not scroll either
   // (where a unit of a trackpad is a notch, its fractions zoom as a wheel)
   double m= (y == floor (y) || wheel_units_are_notches ()) ? 15.0 * fabs (y)
@@ -6685,7 +7132,29 @@ process_event (SDL_Event *event) {
     } // case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_WHEEL:
     {
+      // the NSEvent of the wheel event, taken before anything returns, so
+      // that no record outlives its event (see qt_wheel_queue)
+      qt_wheel_record rec;
+      bool has_rec= false;
+#ifdef OS_MACOS
+      has_rec= vue_mac_wheel_take (event->wheel.reserved, rec);
+#endif
       update_mouse_state ();
+      // nor does any widget see an event which Qt drops (the end of a
+      // gesture which a momentum follows), also no zoom
+      if (has_rec && rec.ignored) break;
+      wheel_mods= wheel_latch.update (has_rec ? rec.mods : wheel_sdl_mods (),
+                                      has_rec && rec.momentum);
+#ifdef OS_MACOS
+      // the modifiers which an editor capturing the wheel gets, as Qt's
+      // wheel_state (QTMWidget.cpp) reads those of the event: the latched
+      // ones (command is control for Qt, GUI for SDL)
+      mouse_state= mouse_bits (mouse_buttons (), (SDL_Keymod)
+        (((wheel_mods & QT_WHEEL_SHIFT) ? SDL_KMOD_SHIFT : 0) |
+         ((wheel_mods & QT_WHEEL_CONTROL) ? SDL_KMOD_GUI : 0) |
+         ((wheel_mods & QT_WHEEL_ALT) ? SDL_KMOD_ALT : 0) |
+         ((wheel_mods & QT_WHEEL_META) ? SDL_KMOD_CTRL : 0)));
+#endif
       if (DEBUG_VUE_EVENTS)
         SDL_Log ("Window %d got wheel event %f %f (stamp %llu%s)",
                  event->wheel.windowID, event->wheel.x, event->wheel.y,
@@ -6695,14 +7164,17 @@ process_event (SDL_Event *event) {
       float wx= event->wheel.mouse_x, wy= event->wheel.mouse_y;
       win= under_tooltip (win, wx, wy);
       win= route_pointer (win, wx, wy, 3);
-      if (win && wheel_zooms (win, event->wheel.y)) break;
+      if (win && wheel_zooms (win, event->wheel.y, has_rec ? &rec : NULL,
+                              wx * win->density, wy * win->density)) break;
       if (win) {
         vue_input_state& in= win->input;
         in.mouse_time= texmacs_time();
         in.mouse_x= (int) (wx * win->density);
         in.mouse_y= (int) (wy * win->density);
+        wheel_record= has_rec ? &rec : NULL;
         wheel_event (win, event->wheel.x, event->wheel.y, in.mouse_time,
                      event->wheel.timestamp); // see "Scrolling with the wheel"
+        wheel_record= NULL;
       }
       break;
     } // case SDL_EVENT_MOUSE_WHEEL:

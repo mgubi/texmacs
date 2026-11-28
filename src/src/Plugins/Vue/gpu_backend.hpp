@@ -100,6 +100,10 @@ public:
   virtual string description () = 0;     // the device, once attached
   virtual void begin_screen (int dw, int dh) = 0;
   virtual void present (SDL_Window* w) = 0;
+  // present the layer attached last with the Core Animation transaction of
+  // the thread (a frame of the Cocoa port caused by a scroll, which moves the
+  // view in that transaction), else as present
+  virtual void present_in_transaction () { present (NULL); }
   // whether the window (or layer) attached last can be presented without
   // waiting for the screen (false: the compositor still holds the frames
   // presented before, and the window is better drawn a little later)

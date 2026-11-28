@@ -39,7 +39,7 @@ mupdf_protected_call (const char* what, void (*f) (void*), void* data) {
 }
 
 fz_image*
-mupdf_image_from_file (const char* path) {
+mupdf_image_from_file (const char* path, bool quiet) {
   fz_context* ctx= mupdf_context ();
   fz_image* im= NULL;
   fz_var (im);
@@ -48,7 +48,7 @@ mupdf_image_from_file (const char* path) {
   }
   fz_catch (ctx) {
     im= NULL;
-    cout << "TeXmacs] MuPDF cannot load image " << path << ": "
+    if (!quiet) cout << "TeXmacs] MuPDF cannot load image " << path << ": "
          << fz_caught_message (ctx) << LF;
   }
   return im;
@@ -192,6 +192,24 @@ mupdf_image_size (url u, int& w, int& h) {
   if (im == NULL) return false;
   w= im->w; h= im->h; // a point per pixel, as the other loaders
   fz_drop_image (ctx, im);
+  return w > 0 && h > 0;
+}
+
+bool
+mupdf_native_image_size (url u, int& w, int& h) {
+  // the size of a bitmap in pixels (that of the fz_image); false for the
+  // formats without a pixel grid, and for XPM, which MuPDF does not read
+  // (mupdf_image_size gives the points of the icon beside it). Quiet: on
+  // a failure, image_size, the fallback, loads the file again and tells.
+  string suf= locase_all (suffix (u));
+  if (suf == "pdf" || suf == "svg" || suf == "ps" || suf == "eps" ||
+      suf == "xpm")
+    return false;
+  c_string path (concretize (u));
+  fz_image* im= mupdf_image_from_file (path, true);
+  if (im == NULL) return false;
+  w= im->w; h= im->h;
+  fz_drop_image (mupdf_context (), im);
   return w > 0 && h > 0;
 }
 

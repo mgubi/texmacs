@@ -91,7 +91,7 @@
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 (define (stree x)
   ;; a tree, or a list holding trees, as an stree

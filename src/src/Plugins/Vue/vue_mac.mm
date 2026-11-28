@@ -58,3 +58,67 @@ vue_mac_document_state (void* ns_window) {
   }
   return buf;
 }
+
+/******************************************************************************
+* The precise deltas and the phases of the scroll events (issue #971)
+******************************************************************************/
+
+static qt_wheel_queue wheel_queue;
+static qt_wheel_record wheel_last;    // of the NSEvent being handled
+static bool wheel_last_valid= false;
+static bool wheel_last_ended= false;  // its phase is NSEventPhaseEnded
+static unsigned wheel_serial= 0;
+static id wheel_monitor= nil;
+
+void
+vue_mac_wheel_monitor () {
+  if (wheel_monitor != nil) return;
+  wheel_monitor=
+    [NSEvent addLocalMonitorForEventsMatchingMask: NSEventMaskScrollWheel
+                                          handler: ^NSEvent* (NSEvent* e) {
+      qt_wheel_record r;
+      r.dx= [e deltaX]; r.dy= [e deltaY];
+      r.sx= [e scrollingDeltaX]; r.sy= [e scrollingDeltaY];
+      r.precise= [e hasPreciseScrollingDeltas];
+      NSEventModifierFlags f= [e modifierFlags];
+      r.mods= ((f & NSEventModifierFlagShift) ? QT_WHEEL_SHIFT : 0) |
+              ((f & NSEventModifierFlagCommand) ? QT_WHEEL_CONTROL : 0) |
+              ((f & NSEventModifierFlagOption) ? QT_WHEEL_ALT : 0) |
+              ((f & NSEventModifierFlagControl) ? QT_WHEEL_META : 0);
+      r.momentum= ([e momentumPhase] != NSEventPhaseNone);
+      r.cancelled= ([e phase] == NSEventPhaseCancelled);
+      r.ignored= false;
+      wheel_last= r;
+      wheel_last_valid= true;
+      wheel_last_ended= ([e phase] == NSEventPhaseEnded);
+      return e;
+    }];
+}
+
+unsigned
+vue_mac_wheel_attach () {
+  if (!wheel_last_valid) return 0;
+  wheel_last_valid= false;
+  qt_wheel_record r= wheel_last;
+  // -[QNSView scrollWheel:]: an ended phase which a momentum follows does
+  // not scroll (what the queue has now: this is called while AppKit hands
+  // the ended event to SDL)
+  if (wheel_last_ended) {
+    NSEvent* n= [NSApp nextEventMatchingMask: NSEventMaskScrollWheel
+                                   untilDate: [NSDate distantPast]
+                                      inMode: @"TMMomentumEventSearchMode"
+                                     dequeue: NO];
+    if (n != nil && [n momentumPhase] == NSEventPhaseBegan) r.ignored= true;
+  }
+  if (++wheel_serial == 0) wheel_serial= 1;
+  wheel_queue.push (wheel_serial, r);
+  return wheel_serial;
+}
+
+bool
+vue_mac_wheel_take (unsigned id, qt_wheel_record& r) {
+  // (0: a scripted event; a number not given yet: an event of another
+  // origin, whose reserved field is not ours)
+  if (id == 0 || qt_wheel_serial_before (wheel_serial, id)) return false;
+  return wheel_queue.take (id, r);
+}

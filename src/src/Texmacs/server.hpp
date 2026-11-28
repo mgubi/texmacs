@@ -124,6 +124,7 @@ public:
 };
 
 int cpu_idle_time ();
+void delete_deferred_widgets ();
 extern bool rescue_mode;
 scheme_tree menu_merge (scheme_tree m1, scheme_tree m2);
 server get_server ();

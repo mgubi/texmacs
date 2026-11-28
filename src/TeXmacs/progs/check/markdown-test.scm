@@ -822,7 +822,7 @@
     (if (url-exists? to) (system-remove to))
     (system-rmdir dir)
     (buffer-close u)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The style markdown
@@ -1223,7 +1223,7 @@
       (system-rmdir dir)
       (buffer-pretend-saved u)
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; After the fourth audit

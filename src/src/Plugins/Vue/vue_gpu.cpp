@@ -69,8 +69,8 @@ bool gpu_draw_picture_scaled (renderer r, picture p, SI x, SI y, double s, int a
   (void) r; (void) p; (void) x; (void) y; (void) s; (void) a; return false; }
 bool is_gpu_renderer (renderer r) { (void) r; return false; }
 bool gpu_layers_enabled () { return false; }
-bool gpu_show_picture (void* l, picture p, int dw, int dh) {
-  (void) l; (void) p; (void) dw; (void) dh; return false; }
+bool gpu_show_picture (void* l, picture p, int dw, int dh, bool t) {
+  (void) l; (void) p; (void) dw; (void) dh; (void) t; return false; }
 bool gpu_read_picture (picture p, unsigned char* rgba) {
   (void) p; (void) rgba; return false; }
 
@@ -1879,7 +1879,7 @@ gpu_layers_enabled () {
 }
 
 bool
-gpu_show_picture (void* layer, picture p, int dw, int dh) {
+gpu_show_picture (void* layer, picture p, int dw, int dh, bool in_transaction) {
   gpu_picture_rep* g= as_gpu (p);
   if (g == NULL || !G.started || dw <= 0 || dh <= 0) return false;
   if (!ensure_target (&g->t)) return false;
@@ -1888,7 +1888,8 @@ gpu_show_picture (void* layer, picture p, int dw, int dh) {
   G.B->begin_screen (dw, dh);
   G.B->copy (g->t.tex, g->t.w, g->t.h, 0, 0, g->t.w, g->t.h,
              NULL, dw, dh, 0, 0, dw, dh);
-  G.B->present (NULL);
+  if (in_transaction) G.B->present_in_transaction ();
+  else G.B->present (NULL);
   return true;
 }
 

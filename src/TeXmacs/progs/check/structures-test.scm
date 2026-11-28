@@ -664,7 +664,7 @@
         (check-report #f "the buffer" (object->string r)))
       (for (b (buffer-list))
         (when (nin? b before) (buffer-close b)))
-      (when (buffer-exists? old) (switch-to-buffer old)))))
+      (check-restore-buffer old))))
 
 (define (test-paths-in-buffer)
   (with-buffer-body '(document "abc" (strong "de"))

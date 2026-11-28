@@ -55,7 +55,7 @@
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old))
+      (check-restore-buffer old)
       r)))
 
 (define (body) (tree->stree (buffer-get-body (current-buffer))))
@@ -1677,6 +1677,7 @@
   (check-group "deleting the view of a window")
   (let* ((win (current-window))
          (old (current-buffer))
+         (old-views (buffer->views old))
          (b (new-buffer))
          (before (window-list)))
     (switch-to-buffer old)
@@ -1701,6 +1702,8 @@
         (kill-window (car l))))
     (window-focus win)
     (when (buffer-exists? b) (buffer-close b))
+    ;; the new view the window showed (one of old) stays when it is killed
+    (check-delete-new-views old old-views)
     (check= (current-buffer) old)))
 
 ;; A change of the initial environment made in the clone is in the window

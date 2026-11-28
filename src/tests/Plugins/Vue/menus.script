@@ -15,6 +15,15 @@ snapshot m2
 # a menu taller than the window scrolls with the wheel
 move 600 100
 wait 200
-wheel 600 100 0 -5
+# (one event per notch: on macOS an event scrolls one notch whatever its
+# delta, as in the Qt port since #971, 60 points in a menu, a list or a
+# bar; these 7 events go at least as far as one event of -5 did)
+wheel 600 100 0 -1
+wheel 600 100 0 -1
+wheel 600 100 0 -1
+wheel 600 100 0 -1
+wheel 600 100 0 -1
+wheel 600 100 0 -1
+wheel 600 100 0 -1
 wait 500
 snapshot m3

@@ -44,7 +44,30 @@ file types), the color picker, printing (the PDF written by TeXmacs with
 PDFHummus, handed to the print panel of the system; PostScript only through
 Ghostscript), the clipboard (text, HTML, TeXmacs, images, both ways),
 drag and drop, trackpad gestures (pinch, rotate, swipe) and the wheel
-(command-wheel zooms). The keys are named as in Qt (`space`, `S-tab`,
+(command-wheel zooms; the wheel and the trackpad scroll the distances of
+the Qt port, `-[TMView scrollLikeQt:]` and `Graphics/Gui/wheel_steps.hpp`:
+three single steps of a sixteenth of the view plus a point per notch,
+at once, and for a trackpad an angle delta of twice its scrolling delta
+in points, as `-[QNSView scrollWheel:]` and `QScrollBar` do, #971; an
+editor at its end passes the event to the views around it, as Qt passes
+an event which the scroll bar ignores to the parent widget, and the scroll
+views of widgets, `TMScrollAreaView`, scroll by the single steps of a
+`QScrollArea`, 20 points; a canvas which is not the document of a scroll
+view of its own, a box widget say, passes the event on to them; as in Qt,
+the end of a gesture which a momentum follows is dropped, and a cancelled
+gesture is a wheel of (0, 0) for an editor which captures it; command
+alone zooms an editor by the pixel delta as `QTMWidget::wheelEvent`;
+shift alone, command with other keys, and command alone over a scroll bar
+or a scroll area page, a page a notch (`scrollByDelta`); the modifiers are
+those of the gesture during its momentum (one latch for all windows,
+where Qt has one a window); over a scroll bar, a legacy one beside the
+view or an overlay one over it (which owns its strip at the edge whenever
+it has a range, as the transient bars of Qt), the wheel scrolls that bar
+as `QScrollBar`, a vertical wheel also a horizontal bar, with no zoom nor
+capture, and the square between two legacy bars passes it on. A deliberate deviation from Qt: over the margins
+beside a centered page, where Qt does nothing (only the surface gets the
+wheel), the document scrolls as over the page, which is more natural;
+`ns_wheel_margins_scroll` in `TMView.mm` is the switch). The keys are named as in Qt (`space`, `S-tab`,
 `enter`, `<` and `>`, the cork names of the other characters; Option with a
 letter gives `A-<letter>` when it is bound, the composed character
 otherwise); an input method gets all the keys while it composes. Only the
@@ -190,6 +213,11 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   screen", followed at once);
 * `TEXMACS_NS_GPU=0`: the canvases drawn by Core Graphics, as before the
   GPU renderer (see "Drawn by the GPU" below);
+* `TEXMACS_NS_SCROLL_SYNC=0`: the frame of a scroll drawn by the GPU is
+  presented at the next refresh, as the other repaints, and not with the
+  transaction which moves the view (see "Drawn by the GPU": a flicker);
+* `TEXMACS_NS_WHEEL=native`: the wheel scrolls as `NSScrollView` does (a
+  line of 10 points per notch), not as the Qt port;
 * `TEXMACS_NS_GLYPH_BOLD=<pixels>`: how much bolder the outlines are made
   (they are stroked too, that wide), instead of the preference
   `gpu glyph boldness` (0.22 by default: the weight of the bitmaps of
@@ -486,7 +514,22 @@ wait for the screen: a layer has three drawables, which the compositor
 gives back once it has shown them, and more repaints than refreshes
 blocked in `nextDrawable` (2 to 9 ms a step, depending on the pacing of
 the display); AppKit likewise draws the views marked as needing display
-once a refresh. `TEXMACS_NS_DEBUG_DRAW` prints the presents.
+once a refresh. `TEXMACS_NS_DEBUG_DRAW` prints the presents. A scroll
+is the exception (#971): it moves the view in the Core Animation
+transaction of its event (`-[TMDocView scrolled:]`), and its frame,
+presented at the next refresh, came a refresh or so after the move, so
+that the old pixels showed for a moment at the new place of the view, a
+flicker. `scrolled:` marks the canvas (`gpu_sync`), and its next frame,
+the one of the update which `scrolled:` forces or, for a scroll made by an
+update (the cursor kept visible), the one which ends that update, is
+presented at once with the transaction
+(`metal_backend::present_in_transaction`: `presentsWithTransaction`, the
+commands committed and scheduled, the drawable presented by the main
+thread), at most one a refresh of the screen (0.9 of
+`minimumRefreshInterval` of its `NSScreen`, a frame closer to the last
+one goes to the link); the mark is used up by that frame; the property is
+cleared by the
+next present of the link. `TEXMACS_NS_SCROLL_SYNC=0` turns it off.
 
 `TEXMACS_NS_BENCH=1` on the FAQ (Apple M4, retina_factor 2, ms a step;
 two runs of each):

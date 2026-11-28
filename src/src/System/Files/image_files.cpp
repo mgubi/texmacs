@@ -42,6 +42,7 @@
 // in Plugins/MuPDF/mupdf_picture.cpp (declared here: this file is compiled
 // without the headers of MuPDF)
 bool mupdf_image_size (url u, int& w, int& h);
+bool mupdf_native_image_size (url u, int& w, int& h);
 // in Plugins/MuPDF/mupdf_pdf_renderer.cpp
 bool mupdf_pdf_to_svg (url pdf, url svg);
 #endif
@@ -811,7 +812,17 @@ native_image_size (url image, int& w, int& h) {
 #ifdef QTTEXMACS
   if (qt_native_image_size (image, w, h)) return;
 #endif
-  // Scale to 300 dpi
+  // the pixels of a bitmap without Qt (#969): image_size gives points,
+  // pixels x 72 / dpi on macOS and a point per pixel with MuPDF
+#if defined(MACOSX_EXTENSIONS) && \
+  (!defined(QTTEXMACS) || \
+   !defined(AC_QT_MAJOR_VERSION) || AC_QT_MAJOR_VERSION < 6)
+  if (mac_native_image_size (image, w, h)) return;
+#endif
+#ifdef MUPDF_RENDERER
+  if (mupdf_native_image_size (image, w, h)) return;
+#endif
+  // Scale to 300 dpi (the formats without a pixel grid: EPS, PDF...)
   image_size (image, w, h);
   double scale= 30000.0 / (2834 * 2.54);
   w= (int) round (scale * w);

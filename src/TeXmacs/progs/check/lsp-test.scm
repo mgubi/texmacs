@@ -784,7 +784,7 @@
         (test-actions))
       (test-blocks)
       (buffer-close u)
-      (when (buffer-exists? old) (switch-to-buffer old))))
+      (check-restore-buffer old)))
   (system-rmdir-recursive (system->url lsp-dir)))
 
 (define (test-lines-of-buffer u)
@@ -1126,6 +1126,19 @@
 (define (cursor-rel)
   (list-tail (cursor-path) (length (buffer-path))))
 
+;; back to @u from a page of the server, which open-auxiliary shows in a
+;; window of its own: the window is closed when @u is shown in another one.
+;; Else it stays open after the suite, and each buffer closed in it gives a
+;; new view to another buffer, as the one where the suite started
+(define (leave-page u)
+  (let ((w (current-window))
+        (ws (map view->window-url (buffer->views u))))
+    (if (and (nin? w ws) (list-or (map (lambda (x) (not (url-none? x))) ws)))
+        (begin
+          (kill-window w)
+          (check-restore-buffer u))
+        (switch-to-buffer u))))
+
 (define (test-editor)
   (check-group "editor")
   (let* ((path (lsp-file "proj/src/edit.cpp"))
@@ -1181,7 +1194,7 @@
           (with t (object->string (tree->stree (buffer-get-body aux)))
             (check-true (string-contains? t "clangd ("))
             (check-true (string-contains? t "stderr: ")))
-          (switch-to-buffer u)
+          (leave-page u)
           ;; the page follows the log (after a pause, or at once here)
           (lsp-request-wait c "textDocument/hover"
                             (lsp-object "textDocument" (lsp-object "uri" uri)
@@ -1475,7 +1488,7 @@
         (check-true (string-contains?
                      (object->string (tree->stree (buffer-get-body page)))
                      "twicee"))
-        (switch-to-buffer u)
+        (leave-page u)
         (buffer-close page))
       ;; the status in the focus bar: the server, ready, and its errors
       ;; the keys of the servers are those of the followed buffers (mode
@@ -1521,7 +1534,7 @@
           (check-true (string-contains? s "3 places"))
           (check-true (string-contains? s "src/actions.cpp"))
           (check-true (string-contains? s "twice (a)")))
-        (switch-to-buffer u)
+        (leave-page u)
         (buffer-close page))
       (lsp-outline)
       (with page (current-buffer)
@@ -1530,7 +1543,7 @@
           (check-true (string-contains? s "function"))
           (check-true (string-contains? s "twice"))
           (check-true (string-contains? s "main")))
-        (switch-to-buffer u)
+        (leave-page u)
         (buffer-close page))
       ;; the uses of twice, highlighted (three places)
       (go-to-path (append (buffer-path) '(0 8)))
@@ -1557,7 +1570,7 @@
         (with s (object->string (tree->stree (buffer-get-body page)))
           (check-true (string-contains? s "twice"))
           (check-true (string-contains? s "src/actions.cpp")))
-        (switch-to-buffer u)
+        (leave-page u)
         (buffer-close page))
       (go-to-path (append (buffer-path) '(0 8)))
       (lsp-call-hierarchy)
@@ -1566,7 +1579,7 @@
         (with s (object->string (tree->stree (buffer-get-body page)))
           (check-true (string-contains? s "Called by"))
           (check-true (string-contains? s "main")))
-        (switch-to-buffer u)
+        (leave-page u)
         (buffer-close page))
       ;; the colours of the server: twice is a function (and the hint of
       ;; its parameter v, when clangd gives inlay hints)

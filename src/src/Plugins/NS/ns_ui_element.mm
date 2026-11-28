@@ -540,7 +540,7 @@ responsive_tabs_view (array<url> icons, array<widget> tabs,
                               initWithFrame: NSMakeRect (0, 0, fs.width, fs.height)] autorelease];
     [rows setFrame: NSMakeRect (0, 0, fs.width, fs.height)];
     [doc addSubview: rows];
-    NSScrollView* sc= [[[NSScrollView alloc] init] autorelease];
+    NSScrollView* sc= [[[TMScrollAreaView alloc] init] autorelease];
     [sc setDocumentView: doc];
     [sc setHasVerticalScroller: YES];
     [sc setAutohidesScrollers: YES];
@@ -1627,7 +1627,7 @@ ns_ui_element_rep::make_nsview () {
              [[(NSStackView*) inner arrangedSubviews] count] == 1)
         inner= [[(NSStackView*) inner arrangedSubviews] firstObject];
       if (!v || [inner isKindOfClass: [NSScrollView class]]) return v;
-      NSScrollView* sv= [[[NSScrollView alloc] init] autorelease];
+      NSScrollView* sv= [[[TMScrollAreaView alloc] init] autorelease];
       [sv setHasVerticalScroller: YES];
       [sv setDrawsBackground: NO];
       NSView* doc= [[[TMFlippedDocView alloc] init] autorelease];

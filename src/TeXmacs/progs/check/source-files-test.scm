@@ -125,7 +125,7 @@
     (load-buffer u)
     (proc)
     (buffer-close u)
-    (when (buffer-exists? old) (switch-to-buffer old))))
+    (check-restore-buffer old)))
 
 (define (test-indentation)
   (check-group "indentation")

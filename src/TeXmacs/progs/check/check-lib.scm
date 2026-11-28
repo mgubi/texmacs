@@ -143,7 +143,8 @@
   ;; the output is flushed, so that a crash shows the group it was in
   (set! check-group-name name)
   (display* "  group " name "\n")
-  (force-output))
+  (force-output)
+  (check-free-closed-views))
 
 (tm-define (check-report ok? what detail)
   (:synopsis "Count a check of @what, a failure with @detail unless @ok?")
@@ -218,6 +219,45 @@
                  (or (< (car n) 2) (and (== (car n) 2) (< (cadr n) 32))))
         (display* "  warning: Git older than 2.32 reads the global "
                   "configuration of the user\n")))))
+
+;; The widget of a view which a window no longer shows (a buffer closed,
+;; another buffer shown) is deleted by Qt once its event loop runs again,
+;; and keeps the editor of the view alive until then, with its boxes and its
+;; history (about 1 MB each). The suites run before the event loop starts:
+;; without this, each buffer they open stays in memory, and a run of all
+;; the suites in one process goes over 2 GB (#967)
+(tm-define (check-free-closed-views)
+  (:synopsis "Delete the widgets of the views which were closed")
+  (delete-deferred-widgets))
+
+;; The buffer which was current before a check opened its own: buffer-close
+;; of the check's buffer already shows the most recent view of another one
+;; in the window, often that of @buf, and switch-to-buffer to the buffer
+;; shown makes a second view and hides the first (#925); switch-to-buffer*
+;; does nothing for the current buffer, goes to the window of a buffer
+;; shown elsewhere, and otherwise shows a view of @buf not in a window.
+(tm-define (check-restore-buffer buf)
+  (:synopsis "Make @buf current again without giving it a new view")
+  (when (buffer-exists? buf) (switch-to-buffer* buf))
+  (check-free-closed-views))
+
+;; The views of a buffer, to compare before and after a suite: a suite
+;; leaves the buffer where it started with the views it had
+(tm-define (check-buffer-views buf)
+  (:synopsis "The views of @buf, as sorted strings")
+  (if (buffer-exists? buf)
+      (sort (map url->string (buffer->views buf)) string<?)
+      '()))
+
+;; A window which is killed keeps its views, hidden: a check which made one
+;; of @buf (a new window, or the deletion of a view, which shows another
+;; buffer) deletes it afterwards
+(tm-define (check-delete-new-views buf views)
+  (:synopsis "Delete the views of @buf not among @views and not in a window")
+  (when (buffer-exists? buf)
+    (for (v (buffer->views buf))
+      (when (and (nin? v views) (url-none? (view->window-url v)))
+        (view-delete v)))))
 
 (tm-define (check-end)
   (:synopsis "End the test suite and return its number of failures")
