@@ -78,6 +78,9 @@ void* gpu_new_layer () { return NULL; }
 void gpu_forget_layer (void* l) { (void) l; }
 bool gpu_layer_pixels (void* l, int w, int h, unsigned char* rgba, int& n) {
   (void) l; (void) w; (void) h; (void) rgba; n= 0; return false; }
+bool gpu_layer_geometry (void* l, int& pw, int& ph, double& sc, double& bw,
+                         double& bh) {
+  (void) l; pw= ph= 0; sc= bw= bh= 0; return false; }
 
 #else
 
@@ -1926,6 +1929,14 @@ gpu_new_layer () {
 void
 gpu_forget_layer (void* layer) {
   if (G.B != NULL && layer != NULL) G.B->forget_layer (layer);
+}
+
+bool
+gpu_layer_geometry (void* layer, int& pw, int& ph, double& sc, double& bw,
+                    double& bh) {
+  pw= ph= 0; sc= bw= bh= 0;
+  if (G.B == NULL || !G.started || layer == NULL) return false;
+  return G.B->layer_geometry (layer, pw, ph, sc, bw, bh);
 }
 
 bool

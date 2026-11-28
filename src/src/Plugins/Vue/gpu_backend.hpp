@@ -133,6 +133,11 @@ public:
   virtual bool layer_pixels (void* layer, int w, int h, unsigned char* rgba,
                              int& surfaces) {
     (void) layer; (void) w; (void) h; (void) rgba; surfaces= 0; return false; }
+  // the pixels of the surface shown by such a layer, its contentsScale and
+  // its bounds (points)
+  virtual bool layer_geometry (void* layer, int& pw, int& ph, double& scale,
+                               double& bw, double& bh) {
+    (void) layer; pw= ph= 0; scale= bw= bh= 0; return false; }
 
   // textures: data has rows from the top, without padding (or is NULL: zeros)
   virtual gpu_texture new_texture (int w, int h, gpu_format f, bool linear,

@@ -25,7 +25,10 @@ have the details, and the problems go to the
   frames shown at once and frames shown one to three refreshes later. The
   Vue application no longer paces its frames, nor puts a repaint off while
   events are queued. `TEXMACS_NS_PRESENT=metal` and
-  `TEXMACS_VUE_PRESENT=metal` go back to the old way, to compare.
+  `TEXMACS_VUE_PRESENT=metal` go back to the old way, to compare. The
+  Cocoa application also draws at the pixels of a Retina screen when it
+  is started from a terminal on an external screen of 1x (it drew at 1x
+  and its windows on the Retina screen were blurred).
 - **Builds with femtolisp** (`--with-scheme=femtolisp`) work again: since
   the Chez backend (21 November) the compiler flags of the vendored
   femtolisp were set only in Chez builds, and `fl_core.c` did not find

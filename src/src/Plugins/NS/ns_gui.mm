@@ -69,7 +69,15 @@ ns_gui_rep::ns_gui_rep (int& argc, char** argv)
   
   if (!retina_manual) {
     retina_manual= true;
+    // the largest scale of the screens, not that of [NSScreen mainScreen]
+    // (mac_screen_scale_factor), which is the screen of the window with the
+    // keyboard focus: TeXmacs started from a terminal on a screen of 1x had
+    // a retina_factor of 1, and its windows on a Retina screen showed
+    // their canvases scaled up, blurred (#989). A store of 2x on a screen
+    // of 1x is scaled down by the GPU, which stays sharp
     double mac_hidpi = mac_screen_scale_factor();
+    for (NSScreen* s in [NSScreen screens])
+      if ([s backingScaleFactor] > mac_hidpi) mac_hidpi= [s backingScaleFactor];
     if (DEBUG_STD)
       debug_boot << "Mac Screen scale factor: " << mac_hidpi <<  "\n";
     

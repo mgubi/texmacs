@@ -138,6 +138,32 @@ test_scaled () {
 }
 
 static void
+test_geometry () {
+  if (!ready ()) SKIP ("no Metal, or TEXMACS_NS_PRESENT/TEXMACS_VUE_PRESENT=metal");
+  // the contents have the pixels of the bounds times the contentsScale: a
+  // store presented at twice its pixels on a layer of 64 x 32 points (a
+  // Retina screen) shows 2 pixels a point, not 1 stretched (#989)
+  CHECK (gpu_show_picture (layer, store, 128, 64));
+  spin ();
+  int pw= 0, ph= 0;
+  double sc= 0, bw= 0, bh= 0;
+  CHECK (gpu_layer_geometry (layer, pw, ph, sc, bw, bh));
+  CHECK_EQ (pw, 128);
+  CHECK_EQ (ph, 64);
+  CHECK_EQ (bw, 64.0);
+  CHECK_EQ (bh, 32.0);
+  CHECK_EQ (sc, 2.0);
+  CHECK_EQ ((int) (bw * sc + 0.5), pw);
+  CHECK_EQ ((int) (bh * sc + 0.5), ph);
+  // and back to one pixel a point
+  CHECK (gpu_show_picture (layer, store, 64, 32));
+  spin ();
+  CHECK (gpu_layer_geometry (layer, pw, ph, sc, bw, bh));
+  CHECK_EQ (pw, 64);
+  CHECK_EQ (sc, 1.0);
+}
+
+static void
 test_uncommitted () {
   if (!ready ()) SKIP ("no Metal, or TEXMACS_NS_PRESENT/TEXMACS_VUE_PRESENT=metal");
   // two presents before the transaction is committed (two repaints in one
@@ -226,6 +252,7 @@ main () {
   RUN (test_present);
   RUN (test_ring);
   RUN (test_scaled);
+  RUN (test_geometry);
   RUN (test_uncommitted);
   RUN (test_screen);
   RUN (test_timing);

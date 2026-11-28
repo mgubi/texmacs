@@ -556,6 +556,14 @@ over it. A change of size or of screen allocates surfaces of the new size
 (the one shown stays until replaced); occluded windows present as the
 others, which no longer blocks anything. The snapshots still read the store
 back. A canvas which is deleted releases its surfaces (`gpu_forget_layer`).
+`retina_factor` (the pixels of the stores per point) is 2 when any screen
+is Retina: it was that of `[NSScreen mainScreen]`, the screen of the window
+with the keyboard focus, so that TeXmacs started from a terminal on an
+external screen of 1x drew stores of 1x, which a window on the Retina
+screen showed scaled up, blurred; a store of 2x on a screen of 1x is scaled
+down, sharp. `TEXMACS_NS_DEBUG_DRAW` prints the pixels of the store and of
+the screen when they change (`CANVAS`, with `(scaled up)` when the store has
+fewer), and the scale and bounds of the layer in the `SURFACE` lines.
 Should three IOSurfaces in a row fail to be made, TeXmacs says so and goes
 back to the drawables (`metal_backend::surface_failed`; the layer of a
 canvas is replaced by a `CAMetalLayer`; a frame which could not be shown is

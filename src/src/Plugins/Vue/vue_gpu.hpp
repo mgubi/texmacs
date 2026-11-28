@@ -106,5 +106,8 @@ void gpu_forget_layer (void* layer);
 // as Core Animation draws it, and how many surfaces it has (the tests)
 bool gpu_layer_pixels (void* layer, int w, int h, unsigned char* rgba,
                        int& surfaces);
+// the pixels of the surface which it shows, its contentsScale and bounds
+bool gpu_layer_geometry (void* layer, int& pw, int& ph, double& scale,
+                         double& bw, double& bh);
 
 #endif // defined VUE_GPU_HPP

@@ -446,6 +446,21 @@ ns_simple_widget_rep::present_gpu_store (bool in_transaction) {
   if ([l contentsScale] != sc) [l setContentsScale: sc];
   NSSize sz= [view bounds].size;
   int dw= (int) ceil (sz.width * sc), dh= (int) ceil (sz.height * sc);
+  // (TEXMACS_NS_DEBUG_DRAW: the pixels of the store and of the screen, when
+  // they change: a store of fewer pixels is scaled up, blurred)
+  static int dbg= -1;
+  if (dbg < 0) dbg= (getenv ("TEXMACS_NS_DEBUG_DRAW") != NULL);
+  if (dbg) {
+    static int lw= -1, lh= -1, ldw= -1, ldh= -1;
+    int sw= gpu_store->get_width (), sh= gpu_store->get_height ();
+    if (sw != lw || sh != lh || dw != ldw || dh != ldh) {
+      lw= sw; lh= sh; ldw= dw; ldh= dh;
+      fprintf (stderr, "CANVAS store %dx%d retina_factor %d view %.1fx%.1f "
+               "backing %.1f screen %dx%d%s\n", sw, sh, retina_factor,
+               sz.width, sz.height, sc, dw, dh,
+               (sw < dw || sh < dh) ? " (scaled up)" : "");
+    }
+  }
   // (a failure is not tried again before the next repaint)
   // (by IOSurfaces before this present: a third failure in it turns them
   // off, and its frame is then to be presented again, by drawables)

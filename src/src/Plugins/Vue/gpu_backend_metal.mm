@@ -338,6 +338,8 @@ public:
   void* new_layer ();
   void forget_layer (void* layer);
   bool layer_pixels (void* layer, int w, int h, unsigned char* rgba, int& n);
+  bool layer_geometry (void* layer, int& pw, int& ph, double& scale,
+                       double& bw, double& bh);
 
   gpu_texture new_texture (int w, int h, gpu_format f, bool linear, bool repeat,
                            const void* data);
@@ -1060,6 +1062,12 @@ metal_backend::present_surface () {
     if (r.host.contentsScale != r.follow.contentsScale)
       r.host.contentsScale= r.follow.contentsScale;
   }
+  else if (r.host.bounds.size.width > 0) {
+    // (the pixels of the surface per point of the layer: the contents
+    // are stretched over the bounds anyway, kCAGravityResize)
+    CGFloat sc= n.w / r.host.bounds.size.width;
+    if (fabs (r.host.contentsScale - sc) > 1e-3) r.host.contentsScale= sc;
+  }
   // the surface shown is in use until it is replaced (as in Qt), and the
   // one it replaces until the transaction which replaces it is committed:
   // in the Cocoa port that is at the end of the pass of the run loop, and
@@ -1090,8 +1098,11 @@ metal_backend::present_surface () {
   double t2= media_ms ();
   if (debug_surfaces ()) {
     fprintf (stderr, "SURFACE %.3f wait %.2f set %.2f surfaces %d made %d "
-             "%dx%d layer %p\n", t1, t1 - t0, t2 - t1, (int) r.s.size (),
-             r.made, n.w, n.h, (__bridge void*) r.host);
+             "%dx%d layer %p scale %.2f bounds %.1fx%.1f\n", t1, t1 - t0,
+             t2 - t1, (int) r.s.size (), r.made, n.w, n.h,
+             (__bridge void*) r.host, (double) r.host.contentsScale,
+             (double) r.host.bounds.size.width,
+             (double) r.host.bounds.size.height);
     if (old >= 0) {
       // when the compositor lets go of the frame before (polled)
       IOSurfaceRef o= r.s[old].s;
@@ -1139,6 +1150,22 @@ metal_backend::new_layer () {
 void
 metal_backend::forget_layer (void* lp) {
   drop_ring (lp);
+}
+
+bool
+metal_backend::layer_geometry (void* lp, int& pw, int& ph, double& scale,
+                               double& bw, double& bh) {
+  pw= ph= 0; scale= bw= bh= 0;
+  if (lp == NULL) return false;
+  CALayer* l= (__bridge CALayer*) lp;
+  scale= l.contentsScale;
+  bw= l.bounds.size.width; bh= l.bounds.size.height;
+  id c= l.contents;
+  if (c == nil || CFGetTypeID ((__bridge CFTypeRef) c) != IOSurfaceGetTypeID ())
+    return false;
+  IOSurfaceRef s= (__bridge IOSurfaceRef) c;
+  pw= (int) IOSurfaceGetWidth (s); ph= (int) IOSurfaceGetHeight (s);
+  return true;
 }
 
 bool
