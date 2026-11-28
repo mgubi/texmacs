@@ -273,7 +273,7 @@ void VM::init_options() {
         iterator<string> it = iterate(counts);
         while (it->busy()) {
             string k = it->next();
-            r = cons(cons(make_string(std::string_view(&k[0], N(k))), make_uinteger(counts[k])), r);
+            r = cons(cons(make_string(string(&k[0], N(k))), make_uinteger(counts[k])), r);
         }
         return r;
     });

@@ -2,10 +2,9 @@
 
 #include <cstdint>
 #include "guile_cpp/compat.hpp"
+#include "guile_cpp/tm_string.hpp"
 #include <cstddef>
 #include <cstring>
-#include <string>
-#include <string_view>
 #include <utility>
 #include <algorithm>
 #include <cmath>
@@ -404,9 +403,9 @@ public:
     static bool to_be_bytes(BigIntView a, uint8_t* out, size_t len) noexcept;
 
     // Base conversion (radix 2..36; negative radix => uppercase digits, matching GMP)
-    static std::string to_string(BigIntView a, int radix = 10);
+    static string to_string(BigIntView a, int radix = 10);
     // Parses unsigned digits in radix 2..36 (returns false on invalid char or empty string)
-    static bool from_string_unsigned(std::string_view s, int radix, BigInt& out);
+    static bool from_string_unsigned(const char* s, size_t n, int radix, BigInt& out);
 };
 
 // Exact arbitrary-precision rational (replaces mpq_t).
@@ -434,4 +433,10 @@ struct BigRat {
     static double to_double_exact(BigIntView num, BigIntView den);
 };
 
+
+// (TeXmacs: N and gcpp_data as for arrays, for the code converted from
+// std::vector)
+inline int N(const BigInt& b) { return static_cast<int>(b.size()); }
+inline uint64_t* gcpp_data(BigInt& b) { return b.data(); }
+inline const uint64_t* gcpp_data(const BigInt& b) { return b.data(); }
 } // namespace guile

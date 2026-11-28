@@ -12,14 +12,14 @@ bool is_delimiter(int c) {
            c == '"' || c == ';';
 }
 
-[[noreturn]] void read_error(PortObj* p, const std::string& msg, SCM args = SCM_EOL) {
-    std::string loc = p->filename.empty() ? "unknown file" : p->filename;
-    std::string full = loc + ":" + std::to_string(p->line + 1) + ":" + std::to_string(p->column + 1) + ": " + msg;
+[[noreturn]] void read_error(PortObj* p, string msg, SCM args = SCM_EOL) {
+    string loc = (N(p->filename) == 0) ? "unknown file" : p->filename;
+    string full = loc * ":" * as_string(p->line + 1) * ":" * as_string(p->column + 1) * ": " * msg;
     vm().error(vm().sym_read_error, "scm_lreadr", full, args, SCM_BOOL_F);
 }
 
 inline SCM port_filename_scm(PortObj* p) {
-    if (p->filename.empty()) return SCM_BOOL_F;
+    if ((N(p->filename) == 0)) return SCM_BOOL_F;
     if (p->filename_scm.is_false()) {
         p->filename_scm = vm().make_string(p->filename);
     }
@@ -70,9 +70,9 @@ void skip_whitespace_and_comments(PortObj* p) {
     }
 }
 
-std::string read_token(PortObj* p) {
-    std::string tok;
-    tok.reserve(24);
+string read_token(PortObj* p) {
+    string tok;
+    (void) 0;
     while (true) {
         int c = port_getc_fast(p);
         if (c == EOF) break;
@@ -80,7 +80,7 @@ std::string read_token(PortObj* p) {
             port_ungetc_fast(p, c);
             break;
         }
-        tok.push_back(static_cast<char>(c));
+        (tok << static_cast<char>(c));
     }
     return tok;
 }
@@ -88,8 +88,8 @@ std::string read_token(PortObj* p) {
 SCM read_expr(PortObj* p, SCM port_scm);
 
 SCM read_string(PortObj* p) {
-    std::string s;
-    s.reserve(32);
+    string s;
+    (void) 0;
     while (true) {
         int c = port_getc_fast(p);
         if (c == EOF) read_error(p, "end of file in string constant");
@@ -98,15 +98,15 @@ SCM read_string(PortObj* p) {
             int esc = port_getc_fast(p);
             if (esc == EOF) read_error(p, "end of file in string escape");
             switch (esc) {
-            case 'n': s.push_back('\n'); break;
-            case 't': s.push_back('\t'); break;
-            case 'r': s.push_back('\r'); break;
-            case 'f': s.push_back('\f'); break;
-            case 'b': s.push_back('\b'); break;
-            case 'a': s.push_back('\a'); break;
-            case 'v': s.push_back('\v'); break;
-            case '\\': s.push_back('\\'); break;
-            case '"': s.push_back('"'); break;
+            case 'n': (s << '\n'); break;
+            case 't': (s << '\t'); break;
+            case 'r': (s << '\r'); break;
+            case 'f': (s << '\f'); break;
+            case 'b': (s << '\b'); break;
+            case 'a': (s << '\a'); break;
+            case 'v': (s << '\v'); break;
+            case '\\': (s << '\\'); break;
+            case '"': (s << '"'); break;
             case '\n': break; // line continuation
             case '0': case '1': case '2': case '3':
             case '4': case '5': case '6': case '7': {
@@ -118,7 +118,7 @@ SCM read_string(PortObj* p) {
                         val = (val << 3) | (nx - '0');
                     } else break;
                 }
-                s.push_back(static_cast<char>(val & 0xFF));
+                (s << (static_cast<char>(val & 0xFF)));
                 break;
             }
             case 'x': {
@@ -132,17 +132,17 @@ SCM read_string(PortObj* p) {
                 };
                 int d1 = hex(h1), d2 = hex(h2);
                 if (d1 < 0 || d2 < 0) read_error(p, "illegal character in escape sequence: ~S", vm().list1(SCM::from_char(static_cast<uint32_t>(d1 < 0 ? h1 : h2))));
-                s.push_back(static_cast<char>((d1 << 4) | d2));
+                (s << (static_cast<char>((d1 << 4) | d2)));
                 break;
             }
             default:
                 read_error(p, "illegal character in escape sequence: ~S", vm().list1(SCM::from_char(static_cast<uint32_t>(esc))));
             }
         } else {
-            s.push_back(static_cast<char>(c));
+            (s << static_cast<char>(c));
         }
     }
-    return vm().make_string(std::move(s));
+    return vm().make_string_owned(s);
 }
 
 SCM read_list(PortObj* p, SCM port_scm, char close_ch, long start_line, long start_col) {
@@ -212,9 +212,9 @@ SCM read_char_literal(PortObj* p) {
     if (is_delimiter(next)) {
         return SCM::from_char(static_cast<uint32_t>(c));
     }
-    std::string name;
-    name.push_back(static_cast<char>(c));
-    name += read_token(p);
+    string name;
+    (name << static_cast<char>(c));
+    name << read_token(p);
     int ch = name_to_char(name);
     if (ch < 0) read_error(p, "unknown character name ~A", vm().list1(vm().make_string(name)));
     return SCM::from_char(static_cast<uint32_t>(ch));
@@ -237,14 +237,14 @@ SCM read_sharp(PortObj* p, SCM port_scm) {
     switch (c) {
     case 't': case 'T': {
         if (is_delimiter(port_peekc(p))) return SCM_BOOL_T;
-        std::string rest = read_token(p);
+        string rest = read_token(p);
         if (rest == "rue") return SCM_BOOL_T;
         read_error(p, "Unknown # object: ~S", vm().list1(SCM::from_char(static_cast<uint32_t>(c))));
     }
     case 'f': case 'F': {
         if (is_delimiter(port_peekc(p))) return SCM_BOOL_F;
         // Could be #f32(...) or #f64(...) SRFI-4 uniform vector!
-        std::string rest = read_token(p);
+        string rest = read_token(p);
         if (rest == "alse") return SCM_BOOL_F;
         if (rest == "32" && port_peekc(p) == '(') {
             long sl = p->line, sc = p->column;
@@ -265,13 +265,13 @@ SCM read_sharp(PortObj* p, SCM port_scm) {
     case '(': {
         long sl = p->line, sc = p->column;
         SCM lst = read_list(p, port_scm, ')', sl, sc);
-        std::vector<SCM> elts;
-        while (is_pair(lst)) { elts.push_back(car(lst)); lst = cdr(lst); }
+        array<SCM> elts;
+        while (is_pair(lst)) { (elts << car(lst)); lst = cdr(lst); }
         return vm().heap().alloc_scm<VectorObj>(std::move(elts));
     }
     case ':': {
         // Keyword #:name
-        std::string tok = read_token(p);
+        string tok = read_token(p);
         if (vm().read_opts.case_insensitive) {
             for (char& ch : tok) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
         }
@@ -284,9 +284,9 @@ SCM read_sharp(PortObj* p, SCM port_scm) {
     }
     case '*': {
         // Bitvector #*010110
-        std::string bits = read_token(p);
-        auto* bv = vm().heap().alloc<BitVectorObj>(bits.size(), false);
-        for (size_t i = 0; i < bits.size(); ++i) {
+        string bits = read_token(p);
+        auto* bv = vm().heap().alloc<BitVectorObj>(static_cast<size_t>(N(bits)), false);
+        for (size_t i = 0; i < static_cast<size_t>(N(bits)); ++i) {
             if (bits[i] == '1') bv->set(i, true);
             else if (bits[i] != '0') read_error(p, "invalid bitvector digit");
         }
@@ -294,19 +294,19 @@ SCM read_sharp(PortObj* p, SCM port_scm) {
     }
     case '{': {
         // Guile extended symbol syntax #{foo bar}#
-        std::string sym;
+        string sym;
         while (true) {
             int ch = port_getc(p);
             if (ch == EOF) read_error(p, "unterminated #{...}# symbol");
             if (ch == '\\') {
                 int esc = port_getc(p);
                 if (esc == EOF) read_error(p, "unterminated escape in #{...}#");
-                sym.push_back(static_cast<char>(esc));
+                (sym << static_cast<char>(esc));
             } else if (ch == '}' && port_peekc(p) == '#') {
                 port_getc(p);
                 break;
             } else {
-                sym.push_back(static_cast<char>(ch));
+                (sym << static_cast<char>(ch));
             }
         }
         return vm().make_symbol(sym);
@@ -328,18 +328,18 @@ SCM read_sharp(PortObj* p, SCM port_scm) {
     case 'x': case 'X':
     case 'e': case 'E':
     case 'i': case 'I': {
-        std::string tok = "#";
-        tok.push_back(static_cast<char>(c));
-        tok += read_token(p);
+        string tok = "#";
+        (tok << static_cast<char>(c));
+        tok << read_token(p);
         SCM num = scm_string_to_number(tok, 10);
-        if (num.is_false()) read_error(p, "invalid number: " + tok);
+        if (num.is_false()) read_error(p, "invalid number: " * tok);
         return num;
     }
     case 'u': case 's': case 'c': {
         // SRFI-4 uniform vector: #u8(...), #s16(...), #c32(...), etc.
-        std::string tok;
-        tok.push_back(static_cast<char>(c));
-        tok += read_token(p);
+        string tok;
+        (tok << static_cast<char>(c));
+        tok << read_token(p);
         if (port_peekc(p) == '(') {
             long sl = p->line, sc = p->column;
             port_getc(p);
@@ -360,53 +360,53 @@ SCM read_sharp(PortObj* p, SCM port_scm) {
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9': {
         // Array syntax #2((1 2) (3 4)) or #2u8(...) or #2u32@2@7((1 2) (3 4)) or #0(x)
-        std::string tok;
-        tok.push_back(static_cast<char>(c));
-        tok += read_token(p);
+        string tok;
+        (tok << static_cast<char>(c));
+        tok << read_token(p);
         size_t pos = 0;
-        while (pos < tok.size() && std::isdigit(static_cast<unsigned char>(tok[pos]))) ++pos;
-        int rank = std::stoi(tok.substr(0, pos));
-        std::string rest = tok.substr(pos);
+        while (pos < static_cast<size_t>(N(tok)) && std::isdigit(static_cast<unsigned char>(tok[pos]))) ++pos;
+        int rank = gcpp_stoi(str_sub(tok, 0, pos));
+        string rest = str_sub(tok, pos);
         // Split optional @lbnd and :len suffixes
-        std::vector<int64_t> lbnds;
-        size_t spec_pos = rest.find_first_of("@:");
-        std::string tag = (spec_pos == std::string::npos) ? rest : rest.substr(0, spec_pos);
-        if (spec_pos != std::string::npos) {
+        array<int64_t> lbnds;
+        size_t spec_pos = str_find_first_of(rest, "@:");
+        string tag = (spec_pos == static_cast<size_t>(-1)) ? rest : str_sub(rest, 0, spec_pos);
+        if (spec_pos != static_cast<size_t>(-1)) {
             size_t i = spec_pos;
-            while (i < rest.size() && (rest[i] == '@' || rest[i] == ':')) {
+            while (i < static_cast<size_t>(N(rest)) && (rest[i] == '@' || rest[i] == ':')) {
                 int64_t lb = 0;
                 if (rest[i] == '@') {
                     ++i;
                     size_t j = i;
-                    if (j < rest.size() && (rest[j] == '+' || rest[j] == '-')) ++j;
-                    while (j < rest.size() && std::isdigit(static_cast<unsigned char>(rest[j]))) ++j;
+                    if (j < static_cast<size_t>(N(rest)) && (rest[j] == '+' || rest[j] == '-')) ++j;
+                    while (j < static_cast<size_t>(N(rest)) && std::isdigit(static_cast<unsigned char>(rest[j]))) ++j;
                     if (j == i) read_error(p, "invalid array lower bound");
-                    lb = std::stoll(rest.substr(i, j - i));
+                    lb = gcpp_stoll(str_sub(rest, i, j - i));
                     i = j;
                 }
-                if (i < rest.size() && rest[i] == ':') {
+                if (i < static_cast<size_t>(N(rest)) && rest[i] == ':') {
                     ++i;
                     size_t j = i;
-                    if (j < rest.size() && (rest[j] == '+' || rest[j] == '-')) ++j;
-                    while (j < rest.size() && std::isdigit(static_cast<unsigned char>(rest[j]))) ++j;
+                    if (j < static_cast<size_t>(N(rest)) && (rest[j] == '+' || rest[j] == '-')) ++j;
+                    while (j < static_cast<size_t>(N(rest)) && std::isdigit(static_cast<unsigned char>(rest[j]))) ++j;
                     if (j == i) read_error(p, "invalid array length");
-                    int64_t len = std::stoll(rest.substr(i, j - i));
+                    int64_t len = gcpp_stoll(str_sub(rest, i, j - i));
                     if (len < 0) read_error(p, "array length must be non-negative");
                     i = j;
                 }
-                lbnds.push_back(lb);
+                (lbnds << lb);
             }
         }
         SCM body = read_expr(p, port_scm);
-        SCM type_sym = tag.empty() ? SCM_BOOL_T : vm().make_symbol(tag);
+        SCM type_sym = (N(tag) == 0) ? SCM_BOOL_T : vm().make_symbol(tag);
         // Delegate to list->typed-array
         SCM var = vm().lookup("list->typed-array");
         if (is_variable(var) && !as_obj<VariableObj>(var)->value.is_undefined()) {
             SCM arr = vm().call3(as_obj<VariableObj>(var)->value, type_sym, vm().make_integer(rank), body);
-            if (!lbnds.empty()) {
+            if (!(N(lbnds) == 0)) {
                 if (is_array(arr)) {
                     auto* ar = as_obj<ArrayObj>(arr);
-                    for (size_t d = 0; d < lbnds.size() && d < ar->dims.size(); ++d) {
+                    for (size_t d = 0; d < static_cast<size_t>(N(lbnds)) && d < static_cast<size_t>(N(ar->dims)); ++d) {
                         int64_t len = ar->dims[d].ubnd - ar->dims[d].lbnd + 1;
                         ar->dims[d].lbnd = lbnds[d];
                         ar->dims[d].ubnd = lbnds[d] + len - 1;
@@ -415,11 +415,11 @@ SCM read_sharp(PortObj* p, SCM port_scm) {
                     auto* ar = vm().heap().alloc<ArrayObj>();
                     ar->base_vec = arr;
                     ar->base_offset = 0;
-                    size_t len = is_vector(arr) ? as_obj<VectorObj>(arr)->elts.size()
+                    size_t len = is_vector(arr) ? static_cast<size_t>(N(as_obj<VectorObj>(arr)->elts))
                                : is_uniform_vector(arr) ? as_obj<UniformVectorObj>(arr)->length
                                : is_bitvector(arr) ? as_obj<BitVectorObj>(arr)->length
                                : as_obj<StringObj>(arr)->len;
-                    ar->dims.push_back({lbnds[0], lbnds[0] + static_cast<int64_t>(len) - 1, 1});
+                    (ar->dims << (ArrayDim{lbnds[0], lbnds[0] + static_cast<int64_t>(len) - 1, 1}));
                     arr = SCM::from_obj(ar);
                 }
             }
@@ -479,24 +479,24 @@ SCM read_expr(PortObj* p, SCM port_scm) {
     case '#':
         return read_sharp(p, port_scm);
     default: {
-        std::string tok;
-        tok.push_back(static_cast<char>(c));
-        tok += read_token(p);
+        string tok;
+        (tok << static_cast<char>(c));
+        tok << read_token(p);
 
         // Try parsing as number first
         SCM num = scm_string_to_number(tok, 10);
         if (num.is_true()) return num;
 
         // Check keyword read option ('prefix or 'postfix)
-        if (vm().read_opts.keywords == vm().sym_prefix && tok.size() > 1 && tok[0] == ':') {
-            std::string kw = tok.substr(1);
+        if (vm().read_opts.keywords == vm().sym_prefix && static_cast<size_t>(N(tok)) > 1 && tok[0] == ':') {
+            string kw = str_sub(tok, 1);
             if (vm().read_opts.case_insensitive) {
                 for (char& ch : kw) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
             }
             return vm().make_keyword(vm().make_symbol(kw));
         }
-        if (vm().read_opts.keywords == vm().sym_postfix && tok.size() > 1 && tok.back() == ':') {
-            std::string kw = tok.substr(0, tok.size() - 1);
+        if (vm().read_opts.keywords == vm().sym_postfix && static_cast<size_t>(N(tok)) > 1 && tok[N(tok) - 1] == ':') {
+            string kw = str_sub(tok, 0, static_cast<size_t>(N(tok)) - 1);
             if (vm().read_opts.case_insensitive) {
                 for (char& ch : kw) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
             }
@@ -519,8 +519,8 @@ SCM VM::read_from_port(SCM port) {
     return read_expr(as_obj<PortObj>(port), port);
 }
 
-SCM VM::read_from_string(std::string_view s) {
-    SCM p = make_input_string_port(std::string(s));
+SCM VM::read_from_string(string s) {
+    SCM p = make_input_string_port(string(s));
     return read_from_port(p);
 }
 

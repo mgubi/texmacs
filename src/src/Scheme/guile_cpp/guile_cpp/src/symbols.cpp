@@ -3,32 +3,20 @@
 namespace guile {
 
 // (TeXmacs: the lookup shares the name, without allocation; only a new
-// symbol copies it, as the key of the table and its name)
+// symbol copies it, as the key of the table and its name, never changed)
 SCM VM::make_symbol(string name) {
     SCM* found = symbol_table->find(name);
     if (found != nullptr) return *found;
     string key = copy(name);
-    std::string_view sv(N(key) > 0 ? &key[0] : "", N(key));
-    SCM sym = heap_.alloc_scm<SymbolObj>(std::string(sv), scm_hash_string(sv), true);
+    SCM sym = heap_.alloc_scm<SymbolObj>(key, scm_hash_string(key), true);
     symbol_table(key) = sym;
     interned_symbols << sym;
     return sym;
 }
 
-SCM VM::make_symbol(std::string_view name) {
-    string key(name.data(), static_cast<int>(name.size()));
-    SCM* found = symbol_table->find(key);
-    if (found != nullptr) return *found;
-    uint64_t h = scm_hash_string(name);
-    SCM sym = heap_.alloc_scm<SymbolObj>(std::string(name), h, true);
-    symbol_table(key) = sym;
-    interned_symbols << sym;
-    return sym;
-}
-
-SCM VM::make_uninterned_symbol(std::string_view name) {
-    uint64_t h = scm_hash_string(name);
-    return heap_.alloc_scm<SymbolObj>(std::string(name), h, false);
+SCM VM::make_uninterned_symbol(string name) {
+    string key = copy(name);
+    return heap_.alloc_scm<SymbolObj>(key, scm_hash_string(key), false);
 }
 
 SCM VM::make_keyword(SCM sym) {
@@ -40,7 +28,7 @@ SCM VM::make_keyword(SCM sym) {
     return so->keyword;
 }
 
-SCM VM::make_keyword(std::string_view name) {
+SCM VM::make_keyword(string name) {
     return make_keyword(make_symbol(name));
 }
 
@@ -56,7 +44,7 @@ void VM::init_symbols() {
 
     define_proc("make-symbol", 1, 0, false, [this](const SCM* args, size_t) -> SCM {
         if (!is_string(args[0])) wrong_type_arg("make-symbol", 1, args[0], "string");
-        return make_uninterned_symbol(as_obj<StringObj>(args[0])->view());
+        return make_uninterned_symbol(as_obj<StringObj>(args[0])->str());
     });
 
     define_proc("symbol->string", 1, 0, false, [this](const SCM* args, size_t) -> SCM {
@@ -66,14 +54,14 @@ void VM::init_symbols() {
 
     define_proc("string->symbol", 1, 0, false, [this](const SCM* args, size_t) -> SCM {
         if (!is_string(args[0])) wrong_type_arg("string->symbol", 1, args[0], "string");
-        return make_symbol(as_obj<StringObj>(args[0])->view());
+        return make_symbol(as_obj<StringObj>(args[0])->str());
     });
 
     define_proc("string-ci->symbol", 1, 0, false, [this](const SCM* args, size_t) -> SCM {
         if (!is_string(args[0])) wrong_type_arg("string-ci->symbol", 1, args[0], "string");
-        std::string s = as_obj<StringObj>(args[0])->to_std_string();
+        string s = as_obj<StringObj>(args[0])->str();  // (a copy, changed)
         if (read_opts.case_insensitive) {
-            for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            for (int i = 0; i < N(s); i++) s[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(s[i])));
         }
         return make_symbol(s);
     });
@@ -84,22 +72,22 @@ void VM::init_symbols() {
     });
 
     define_proc("gensym", 0, 1, false, [this](const SCM* args, size_t nargs) -> SCM {
-        std::string prefix = " g";
+        string prefix = " g";
         if (nargs >= 1 && !args[0].is_undefined()) {
             if (!is_string(args[0])) wrong_type_arg("gensym", 1, args[0], "string");
-            prefix = as_obj<StringObj>(args[0])->to_std_string();
+            prefix = as_obj<StringObj>(args[0])->str();
         }
-        std::string name = prefix + std::to_string(++gensym_counter);
+        string name = prefix * as_string(static_cast<long long>(++gensym_counter));
         return make_symbol(name);
     });
 
     define_proc("symbol-append", 0, 0, true, [this](const SCM* args, size_t nargs) -> SCM {
-        std::string res;
+        string res;  // (fresh)
         SCM lst = nargs > 0 ? args[0] : SCM_EOL;
         while (is_pair(lst)) {
             SCM s = car(lst);
             if (!is_symbol(s)) wrong_type_arg("symbol-append", 1, s, "symbol");
-            res += as_obj<SymbolObj>(s)->name;
+            res << as_obj<SymbolObj>(s)->name;
             lst = cdr(lst);
         }
         return make_symbol(res);
@@ -138,11 +126,11 @@ void VM::init_symbols() {
     });
     define_proc("make-keyword-from-dash-symbol", 1, 0, false, [this](const SCM* args, size_t) -> SCM {
         if (!is_symbol(args[0])) wrong_type_arg("make-keyword-from-dash-symbol", 1, args[0], "symbol");
-        const std::string& nm = as_obj<SymbolObj>(args[0])->name;
-        if (nm.empty() || nm[0] != '-') {
+        string nm = as_obj<SymbolObj>(args[0])->name;
+        if (N(nm) == 0 || nm[0] != '-') {
             misc_error("make-keyword-from-dash-symbol", "symbol does not start with '-': ~S", list1(args[0]));
         }
-        return make_keyword(make_symbol(nm.substr(1)));
+        return make_keyword(make_symbol(str_sub(nm, 1)));
     });
 }
 

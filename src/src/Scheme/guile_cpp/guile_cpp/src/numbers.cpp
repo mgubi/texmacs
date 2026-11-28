@@ -2,8 +2,6 @@
 #include <cmath>
 #include <complex>
 #include <limits>
-#include <sstream>
-#include <iomanip>
 #include <algorithm>
 #include <cctype>
 
@@ -95,11 +93,11 @@ SCM VM::make_fraction(SCM num, SCM den) {
         d.abs_inplace();
     }
     BigInt g = BigInt::gcd(n, d);
-    if (g.size() > 1 || g.low_u64() > 1) {
+    if (static_cast<size_t>(N(g)) > 1 || g.low_u64() > 1) {
         n = BigInt::divexact(n, g);
         d = BigInt::divexact(d, g);
     }
-    if (d.size() == 1 && d.data()[0] == 1) {
+    if (static_cast<size_t>(N(d)) == 1 && gcpp_data(d)[0] == 1) {
         return scm_from_bigint(std::move(n));
     }
     SCM sn = scm_from_bigint(std::move(n));
@@ -257,7 +255,7 @@ static BigRat scm_to_bigrat(SCM x, const char* subr) {
 // Convert already-canonical BigRat (den > 0, gcd(|num|, den) == 1) to SCM without redundant GCD
 static SCM scm_from_bigrat_reduced(BigRat&& q) {
     if (q.num.is_zero()) return SCM::from_fixnum(0);
-    if (q.den.size() == 1 && q.den.data()[0] == 1) {
+    if (static_cast<size_t>(N(q.den)) == 1 && gcpp_data(q.den)[0] == 1) {
         return scm_from_bigint(std::move(q.num));
     }
     SCM n = scm_from_bigint(std::move(q.num));
@@ -700,13 +698,13 @@ SCM scm_ash(SCM n, SCM count) {
 // String <-> Number Parsing & Formatting (Full R5RS + Guile 1.8.8)
 // ============================================================================
 
-static SCM parse_ureal(std::string_view s, int radix, int exactness, bool negative) {
-    if (s.empty()) return SCM_BOOL_F;
+static SCM parse_ureal(string s, int radix, int exactness, bool negative) {
+    if ((N(s) == 0)) return SCM_BOOL_F;
 
     // Special IEEE values (+inf.0, -inf.0, +nan.0, -nan.0)
-    auto lower_eq = [](std::string_view a, const char* b) {
-        if (a.size() != std::strlen(b)) return false;
-        for (size_t i = 0; i < a.size(); ++i)
+    auto lower_eq = [](string a, const char* b) {
+        if (static_cast<size_t>(N(a)) != std::strlen(b)) return false;
+        for (size_t i = 0; i < static_cast<size_t>(N(a)); ++i)
             if (std::tolower(static_cast<unsigned char>(a[i])) != b[i]) return false;
         return true;
     };
@@ -721,29 +719,29 @@ static SCM parse_ureal(std::string_view s, int radix, int exactness, bool negati
     }
 
     // Helper: parse unsigned integer with optional trailing '#' wildcards (using fast BigInt::from_string_unsigned)
-    auto parse_uint_fast = [&](std::string_view p, BigInt& out, bool& local_hash) -> bool {
-        if (p.empty()) return false;
-        size_t hash_pos = p.find('#');
-        if (hash_pos == std::string_view::npos) {
-            return BigInt::from_string_unsigned(p, radix, out);
+    auto parse_uint_fast = [&](string p, BigInt& out, bool& local_hash) -> bool {
+        if ((N(p) == 0)) return false;
+        size_t hash_pos = str_find(p, '#');
+        if (hash_pos == static_cast<size_t>(-1)) {
+            return BigInt::from_string_unsigned(str_data(p), N(p), radix, out);
         }
         if (hash_pos == 0) return false;
         // All characters from hash_pos onward must be '#'
-        for (size_t k = hash_pos; k < p.size(); ++k) {
+        for (size_t k = hash_pos; k < static_cast<size_t>(N(p)); ++k) {
             if (p[k] != '#') return false;
         }
         local_hash = true;
-        std::string replaced(p);
-        for (size_t k = hash_pos; k < replaced.size(); ++k) replaced[k] = '0';
-        return BigInt::from_string_unsigned(replaced, radix, out);
+        string replaced(p);
+        for (size_t k = hash_pos; k < static_cast<size_t>(N(replaced)); ++k) replaced[k] = '0';
+        return BigInt::from_string_unsigned(str_data(replaced), N(replaced), radix, out);
     };
 
     // Check for fraction: uint / uint
-    auto slash = s.find('/');
-    if (slash != std::string_view::npos) {
-        auto lhs = s.substr(0, slash);
-        auto rhs = s.substr(slash + 1);
-        if (lhs.empty() || rhs.empty()) return SCM_BOOL_F;
+    auto slash = str_find(s, '/');
+    if (slash != static_cast<size_t>(-1)) {
+        auto lhs = str_sub(s, 0, slash);
+        auto rhs = str_sub(s, slash + 1);
+        if ((N(lhs) == 0) || (N(rhs) == 0)) return SCM_BOOL_F;
         bool has_hash = false;
         BigInt zn, zd;
         if (!parse_uint_fast(lhs, zn, has_hash) || !parse_uint_fast(rhs, zd, has_hash) || zd.is_zero()) {
@@ -776,70 +774,70 @@ static SCM parse_ureal(std::string_view s, int radix, int exactness, bool negati
         bool seen_digit = false;
         bool seen_dot = false;
         bool seen_hash = false;
-        std::string norm;
-        if (negative) norm.push_back('-');
+        string norm;
+        if (negative) (norm << '-');
 
-        while (i < s.size()) {
+        while (i < static_cast<size_t>(N(s))) {
             char c = s[i];
             if (c >= '0' && c <= '9') {
                 if (seen_hash) return SCM_BOOL_F;
                 seen_digit = true;
-                norm.push_back(c);
+                (norm << c);
                 ++i;
             } else if (c == '#') {
                 if (!seen_digit) return SCM_BOOL_F;
                 seen_hash = true;
                 has_hash = true;
-                norm.push_back('0');
+                (norm << '0');
                 ++i;
             } else if (c == '.') {
                 if (seen_dot) return SCM_BOOL_F;
                 seen_dot = true;
-                norm.push_back('.');
+                (norm << '.');
                 ++i;
             } else if (c == 'e' || c == 'E' || c == 's' || c == 'S' ||
                        c == 'f' || c == 'F' || c == 'd' || c == 'D' ||
                        c == 'l' || c == 'L') {
                 if (!seen_digit) return SCM_BOOL_F;
-                norm.push_back('e');
+                (norm << 'e');
                 ++i;
-                if (i < s.size() && (s[i] == '+' || s[i] == '-')) {
-                    norm.push_back(s[i++]);
+                if (i < static_cast<size_t>(N(s)) && (s[i] == '+' || s[i] == '-')) {
+                    (norm << s[i++]);
                 }
                 bool exp_digits = false;
-                while (i < s.size() && s[i] >= '0' && s[i] <= '9') {
+                while (i < static_cast<size_t>(N(s)) && s[i] >= '0' && s[i] <= '9') {
                     exp_digits = true;
-                    norm.push_back(s[i++]);
+                    (norm << s[i++]);
                 }
-                if (!exp_digits || i != s.size()) return SCM_BOOL_F;
+                if (!exp_digits || i != static_cast<size_t>(N(s))) return SCM_BOOL_F;
                 break;
             } else {
                 return SCM_BOOL_F;
             }
         }
-        if (!seen_digit || i != s.size()) return SCM_BOOL_F;
+        if (!seen_digit || i != static_cast<size_t>(N(s))) return SCM_BOOL_F;
 
         if (exactness == 1) {
             // Exact decimal: parse exact rational m * 10^e!
-            std::string_view nv = norm;
+            string nv = norm;
             bool neg2 = false;
-            if (!nv.empty() && nv[0] == '-') { neg2 = true; nv.remove_prefix(1); }
+            if (!(N(nv) == 0) && nv[0] == '-') { neg2 = true; nv = str_sub(nv, 1); }
             int64_t exp10 = 0;
-            auto epos = nv.find('e');
-            std::string_view mant_sv = (epos == std::string_view::npos) ? nv : nv.substr(0, epos);
-            if (epos != std::string_view::npos) {
-                try { exp10 = std::stoll(std::string(nv.substr(epos + 1))); } catch (...) { return SCM_BOOL_F; }
+            auto epos = str_find(nv, 'e');
+            string mant_sv = (epos == static_cast<size_t>(-1)) ? nv : str_sub(nv, 0, epos);
+            if (epos != static_cast<size_t>(-1)) {
+                try { exp10 = gcpp_stoll(string(str_sub(nv, epos + 1))); } catch (...) { return SCM_BOOL_F; }
             }
-            std::string digits_only;
-            digits_only.reserve(mant_sv.size());
+            string digits_only;
+            (void) 0;
             bool after_dot = false;
             for (char c : mant_sv) {
                 if (c == '.') { after_dot = true; continue; }
-                digits_only.push_back(c);
+                (digits_only << c);
                 if (after_dot) --exp10;
             }
             BigInt num, den(int64_t(1));
-            if (!BigInt::from_string_unsigned(digits_only, 10, num)) return SCM_BOOL_F;
+            if (!BigInt::from_string_unsigned(str_data(digits_only), N(digits_only), 10, num)) return SCM_BOOL_F;
             if (neg2) num.negate();
             if (exp10 > 0) {
                 num = BigInt::mul(num, BigInt::ui_pow_ui(10, static_cast<uint64_t>(exp10)));
@@ -850,8 +848,8 @@ static SCM parse_ureal(std::string_view s, int radix, int exactness, bool negati
         }
         errno = 0;
         char* endp = nullptr;
-        double d = std::strtod(norm.c_str(), &endp);
-        if (endp != norm.c_str() + norm.size()) return SCM_BOOL_F;
+        double d = std::strtod(((char*) c_string(norm)), &endp);
+        if (endp != ((char*) c_string(norm)) + static_cast<size_t>(N(norm))) return SCM_BOOL_F;
         if (errno == ERANGE && std::isinf(d)) {
             vm().out_of_range("string->number", vm().make_string(s));
         }
@@ -869,14 +867,14 @@ static SCM parse_ureal(std::string_view s, int radix, int exactness, bool negati
     return res;
 }
 
-static SCM parse_real(std::string_view s, int radix, int exactness) {
-    if (s.empty()) return SCM_BOOL_F;
+static SCM parse_real(string s, int radix, int exactness) {
+    if ((N(s) == 0)) return SCM_BOOL_F;
     bool neg = false;
     bool has_sign = false;
-    if (s[0] == '+') { has_sign = true; s.remove_prefix(1); }
-    else if (s[0] == '-') { has_sign = true; neg = true; s.remove_prefix(1); }
+    if (s[0] == '+') { has_sign = true; s = str_sub(s, 1); }
+    else if (s[0] == '-') { has_sign = true; neg = true; s = str_sub(s, 1); }
     // inf.0 and nan.0 require explicit sign in R5RS/Guile!
-    if (!has_sign && s.size() == 5 &&
+    if (!has_sign && static_cast<size_t>(N(s)) == 5 &&
         (std::tolower(static_cast<unsigned char>(s[0])) == 'i' ||
          std::tolower(static_cast<unsigned char>(s[0])) == 'n')) {
         return SCM_BOOL_F;
@@ -884,15 +882,15 @@ static SCM parse_real(std::string_view s, int radix, int exactness) {
     return parse_ureal(s, radix, exactness, neg);
 }
 
-SCM scm_string_to_number(std::string_view s, int radix) {
-    if (s.empty()) return SCM_BOOL_F;
+SCM scm_string_to_number(string s, int radix) {
+    if ((N(s) == 0)) return SCM_BOOL_F;
     int exactness = 0; // 0 = unspecified, 1 = exact (#e), 2 = inexact (#i)
     bool seen_radix = false;
     bool seen_exact = false;
 
-    while (s.size() >= 2 && s[0] == '#') {
+    while (static_cast<size_t>(N(s)) >= 2 && s[0] == '#') {
         char c = static_cast<char>(std::tolower(static_cast<unsigned char>(s[1])));
-        s.remove_prefix(2);
+        s = str_sub(s, 2);
         if (c == 'b') { if (seen_radix) return SCM_BOOL_F; seen_radix = true; radix = 2; }
         else if (c == 'o') { if (seen_radix) return SCM_BOOL_F; seen_radix = true; radix = 8; }
         else if (c == 'd') { if (seen_radix) return SCM_BOOL_F; seen_radix = true; radix = 10; }
@@ -901,13 +899,13 @@ SCM scm_string_to_number(std::string_view s, int radix) {
         else if (c == 'i') { if (seen_exact) return SCM_BOOL_F; seen_exact = true; exactness = 2; }
         else return SCM_BOOL_F;
     }
-    if (s.empty()) return SCM_BOOL_F;
+    if ((N(s) == 0)) return SCM_BOOL_F;
 
     // Polar complex: real@real
-    auto at = s.find('@');
-    if (at != std::string_view::npos) {
-        SCM r = parse_real(s.substr(0, at), radix, exactness == 1 ? 0 : exactness);
-        SCM th = parse_real(s.substr(at + 1), radix, exactness == 1 ? 0 : exactness);
+    auto at = str_find(s, '@');
+    if (at != static_cast<size_t>(-1)) {
+        SCM r = parse_real(str_sub(s, 0, at), radix, exactness == 1 ? 0 : exactness);
+        SCM th = parse_real(str_sub(s, at + 1), radix, exactness == 1 ? 0 : exactness);
         if (r.is_false() || th.is_false()) return SCM_BOOL_F;
         double mag = scm_to_double(r, "string->number");
         double ang = scm_to_double(th, "string->number");
@@ -916,13 +914,13 @@ SCM scm_string_to_number(std::string_view s, int radix) {
     }
 
     // Rectangular complex ending in 'i' or 'I'
-    if (s.back() == 'i' || s.back() == 'I') {
-        std::string_view body = s.substr(0, s.size() - 1);
+    if (s[N(s) - 1] == 'i' || s[N(s) - 1] == 'I') {
+        string body = str_sub(s, 0, static_cast<size_t>(N(s)) - 1);
         if (body == "+") return vm().make_complex(0.0, 1.0);
         if (body == "-") return vm().make_complex(0.0, -1.0);
         // Find last '+' or '-' not preceded by exponent marker (only in radix 10)
-        size_t split = std::string_view::npos;
-        for (size_t i = body.size(); i > 0; --i) {
+        size_t split = static_cast<size_t>(-1);
+        for (size_t i = static_cast<size_t>(N(body)); i > 0; --i) {
             char c = body[i - 1];
             if (c == '+' || c == '-') {
                 if (i - 1 == 0) {
@@ -939,13 +937,13 @@ SCM scm_string_to_number(std::string_view s, int radix) {
                 break;
             }
         }
-        if (split == std::string_view::npos) return SCM_BOOL_F;
+        if (split == static_cast<size_t>(-1)) return SCM_BOOL_F;
         SCM rp = SCM::from_fixnum(0);
         if (split > 0) {
-            rp = parse_real(body.substr(0, split), radix, exactness == 1 ? 0 : exactness);
+            rp = parse_real(str_sub(body, 0, split), radix, exactness == 1 ? 0 : exactness);
             if (rp.is_false()) return SCM_BOOL_F;
         }
-        std::string_view imag_sv = body.substr(split);
+        string imag_sv = str_sub(body, split);
         double iv = 0.0;
         if (imag_sv == "+") iv = 1.0;
         else if (imag_sv == "-") iv = -1.0;
@@ -966,20 +964,20 @@ SCM scm_string_to_number(std::string_view s, int radix) {
     return parse_real(s, radix, exactness);
 }
 
-static std::string double_to_string(double d) {
+static string double_to_string(double d) {
     if (std::isnan(d)) return "+nan.0";
     if (std::isinf(d)) return d > 0 ? "+inf.0" : "-inf.0";
     if (d == 0.0) return std::signbit(d) ? "-0.0" : "0.0";
     char buf[64];
     std::snprintf(buf, sizeof(buf), "%.15g", d);
-    std::string s(buf);
-    if (s.find('.') == std::string::npos && s.find('e') == std::string::npos && s.find('E') == std::string::npos) {
-        s += ".0";
+    string s(buf);
+    if (str_find(s, '.') == static_cast<size_t>(-1) && str_find(s, 'e') == static_cast<size_t>(-1) && str_find(s, 'E') == static_cast<size_t>(-1)) {
+        s << ".0";
     }
     return s;
 }
 
-static std::string double_to_string_radix(double d, int radix) {
+static string double_to_string_radix(double d, int radix) {
     if (radix == 10) return double_to_string(d);
     if (std::isnan(d)) return "+nan.0";
     if (std::isinf(d)) return d > 0 ? "+inf.0" : "-inf.0";
@@ -989,27 +987,27 @@ static std::string double_to_string_radix(double d, int radix) {
     BigRat q = BigRat::from_double(ad);
     BigInt ip, rem;
     BigInt::tdiv_qr(q.num, q.den, ip, rem);
-    std::string res = neg ? "-" : "";
-    res += BigInt::to_string(ip, -radix); // negative radix => uppercase
-    res.push_back('.');
+    string res = neg ? "-" : "";
+    res << BigInt::to_string(ip, -radix); // negative radix => uppercase
+    (res << '.');
     if (rem.is_zero()) {
-        res.push_back('0');
+        (res << '0');
     } else {
         int max_frac = 54;
         for (int i = 0; i < max_frac && !rem.is_zero(); ++i) {
             rem = BigInt::mul_ui(rem, static_cast<uint64_t>(radix));
             BigInt dig;
             BigInt::tdiv_qr(rem, q.den, dig, rem);
-            res.push_back(digits[dig.low_u64()]);
+            (res << digits[dig.low_u64()]);
         }
     }
     return res;
 }
 
-std::string scm_number_to_string(SCM n, int radix) {
+string scm_number_to_string(SCM n, int radix) {
     if (n.is_fixnum()) {
         int64_t v = n.to_fixnum();
-        if (radix == 10) return std::to_string(v);
+        if (radix == 10) return as_string(v);
         SmallIntView sv(v);
         return BigInt::to_string(sv, radix);
     }
@@ -1018,17 +1016,17 @@ std::string scm_number_to_string(SCM n, int radix) {
     }
     if (is_fraction(n)) {
         auto* f = as_obj<FractionObj>(n);
-        return scm_number_to_string(f->num, radix) + "/" + scm_number_to_string(f->den, radix);
+        return scm_number_to_string(f->num, radix) * "/" * scm_number_to_string(f->den, radix);
     }
     if (is_real_obj(n)) {
         return double_to_string_radix(as_obj<RealObj>(n)->val, radix);
     }
     if (is_complex_obj(n)) {
         auto* c = as_obj<ComplexObj>(n);
-        std::string rs = double_to_string_radix(c->real, radix);
-        std::string is = double_to_string_radix(c->imag, radix);
-        if (!is.empty() && is[0] != '+' && is[0] != '-') rs += '+';
-        return rs + is + 'i';
+        string rs = double_to_string_radix(c->real, radix);
+        string is = double_to_string_radix(c->imag, radix);
+        if (!(N(is) == 0) && is[0] != '+' && is[0] != '-') rs << '+';
+        return rs * is * "i";
     }
     vm().wrong_type_arg("number->string", 1, n, "number");
 }

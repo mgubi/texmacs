@@ -1,6 +1,5 @@
 #include "guile_cpp/vm.hpp"
 #include <regex.h>
-#include <vector>
 
 namespace guile {
 
@@ -28,13 +27,13 @@ void VM::init_regex() {
             }
         }
         auto* rx = heap_.alloc<RegexpObj>();
-        auto psv = as_obj<StringObj>(a[0])->view();
-        if (psv.find('\0') != std::string_view::npos) {
+        StringObj* psv_o = as_obj<StringObj>(a[0]); const char* psv = psv_o->chars(); size_t psv_n = psv_o->len;
+        if (view_find(psv, psv_n, '\0') != static_cast<size_t>(-1)) {
             misc_error("make-regexp", "string contains #\\nul character: ~S", list1(a[0]));
         }
-        rx->pattern = std::string(psv);
+        rx->pattern = string(psv);
         rx->flags = flags;
-        int rc = ::regcomp(&rx->rx, rx->pattern.c_str(), flags);
+        int rc = ::regcomp(&rx->rx, ((char*) c_string(rx->pattern)), flags);
         if (rc != 0) {
             char errbuf[256];
             ::regerror(rc, &rx->rx, errbuf, sizeof(errbuf));
@@ -48,18 +47,18 @@ void VM::init_regex() {
         if (!is_regexp(a[0])) wrong_type_arg("regexp-exec", 1, a[0], "regexp");
         if (!is_string(a[1])) wrong_type_arg("regexp-exec", 2, a[1], "string");
         auto* rx = as_obj<RegexpObj>(a[0]);
-        auto sv = as_obj<StringObj>(a[1])->view();
-        if (sv.find('\0') != std::string_view::npos) {
+        StringObj* sv_o = as_obj<StringObj>(a[1]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len;
+        if (view_find(sv, sv_n, '\0') != static_cast<size_t>(-1)) {
             misc_error("regexp-exec", "string contains #\\nul character: ~S", list1(a[1]));
         }
         int64_t start = (nargs >= 3 && !a[2].is_undefined()) ? scm_to_int64(a[2], "regexp-exec", 3) : 0;
         int eflags = (nargs >= 4 && !a[3].is_undefined()) ? static_cast<int>(scm_to_int64(a[3], "regexp-exec", 4)) : 0;
-        if (start < 0 || static_cast<size_t>(start) > sv.size()) out_of_range("regexp-exec", a[2]);
+        if (start < 0 || static_cast<size_t>(start) > sv_n) out_of_range("regexp-exec", a[2]);
 
-        std::string sub(sv.substr(static_cast<size_t>(start)));
+        string sub(view_sub(sv, sv_n, static_cast<size_t>(start)));
         size_t nmatch = rx->rx.re_nsub + 1;
-        std::vector<regmatch_t> matches(nmatch);
-        int rc = ::regexec(&rx->rx, sub.c_str(), nmatch, matches.data(), eflags);
+        array<regmatch_t> matches(nmatch);
+        int rc = ::regexec(&rx->rx, ((char*) c_string(sub)), nmatch, gcpp_data(matches), eflags);
         if (rc == REG_NOMATCH) return SCM_BOOL_F;
         if (rc != 0) {
             char errbuf[256];

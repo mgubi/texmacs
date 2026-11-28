@@ -17,9 +17,9 @@ PortObj::~PortObj() {
             pclose(pipe_fp);
             pipe_fp = nullptr;
         } else if (kind == PortKind::File && owns_fd && fd >= 3) {
-            if (is_output && !write_buf.empty()) {
-                (void)::write(fd, write_buf.data(), write_buf.size());
-                write_buf.clear();
+            if (is_output && !(N(write_buf) == 0)) {
+                (void)::write(fd, gcpp_data(write_buf), static_cast<size_t>(N(write_buf)));
+                gcpp_clear(write_buf);
             }
             ::close(fd);
             fd = -1;
@@ -31,30 +31,30 @@ PortObj::~PortObj() {
 void port_flush(PortObj* p) {
     if (!p || p->closed || !p->is_output) return;
     if (p->kind == PortKind::File) {
-        if (!p->write_buf.empty() && p->fd >= 0) {
+        if (!(N(p->write_buf) == 0) && p->fd >= 0) {
             size_t off = 0;
-            while (off < p->write_buf.size()) {
-                ssize_t n = ::write(p->fd, p->write_buf.data() + off, p->write_buf.size() - off);
+            while (off < static_cast<size_t>(N(p->write_buf))) {
+                ssize_t n = ::write(p->fd, gcpp_data(p->write_buf) + off, static_cast<size_t>(N(p->write_buf)) - off);
                 if (n < 0) {
                     if (errno == EINTR) continue;
                     vm().syserror("force-output", errno);
                 }
                 off += static_cast<size_t>(n);
             }
-            p->write_buf.clear();
+            gcpp_clear(p->write_buf);
         }
     } else if (p->kind == PortKind::Pipe) {
         if (p->pipe_fp) {
-            if (!p->write_buf.empty()) {
-                std::fwrite(p->write_buf.data(), 1, p->write_buf.size(), p->pipe_fp);
-                p->write_buf.clear();
+            if (!(N(p->write_buf) == 0)) {
+                std::fwrite(gcpp_data(p->write_buf), 1, static_cast<size_t>(N(p->write_buf)), p->pipe_fp);
+                gcpp_clear(p->write_buf);
             }
             std::fflush(p->pipe_fp);
         }
     } else if (p->kind == PortKind::Soft) {
         if (is_vector(p->soft_vec)) {
             auto* v = as_obj<VectorObj>(p->soft_vec);
-            if (v->elts.size() >= 3 && v->elts[2].is_true()) {
+            if (static_cast<size_t>(N(v->elts)) >= 3 && v->elts[2].is_true()) {
                 vm().call0(v->elts[2]);
             }
         }
@@ -79,7 +79,7 @@ void port_close(PortObj* p) {
     } else if (p->kind == PortKind::Soft) {
         if (is_vector(p->soft_vec)) {
             auto* v = as_obj<VectorObj>(p->soft_vec);
-            if (v->elts.size() >= 5 && v->elts[4].is_true()) {
+            if (static_cast<size_t>(N(v->elts)) >= 5 && v->elts[4].is_true()) {
                 vm().call0(v->elts[4]);
             }
         }
@@ -103,62 +103,62 @@ void port_putc(PortObj* p, char c) {
     advance_port_pos(p, static_cast<unsigned char>(c));
 
     if (p->kind == PortKind::String) {
-        if (p->str_pos > p->str_buf.size()) {
-            p->str_buf.resize(p->str_pos, '\0');
+        if (p->str_pos > static_cast<size_t>(N(p->str_buf))) {
+            gcpp_resize(p->str_buf, p->str_pos, '\0');
         }
-        if (p->str_pos == p->str_buf.size()) {
-            p->str_buf.push_back(c);
+        if (p->str_pos == static_cast<size_t>(N(p->str_buf))) {
+            (p->str_buf << c);
         } else {
             p->str_buf[p->str_pos] = c;
         }
         ++p->str_pos;
     } else if (p->kind == PortKind::File) {
-        p->write_buf.push_back(c);
-        if (p->buf_mode == _IONBF || (p->buf_mode == _IOLBF && c == '\n') || p->write_buf.size() >= 4096) {
+        (p->write_buf << c);
+        if (p->buf_mode == _IONBF || (p->buf_mode == _IOLBF && c == '\n') || static_cast<size_t>(N(p->write_buf)) >= 4096) {
             port_flush(p);
         }
     } else if (p->kind == PortKind::Pipe) {
-        p->write_buf.push_back(c);
-        if (p->buf_mode == _IONBF || (p->buf_mode == _IOLBF && c == '\n') || p->write_buf.size() >= 4096) {
+        (p->write_buf << c);
+        if (p->buf_mode == _IONBF || (p->buf_mode == _IOLBF && c == '\n') || static_cast<size_t>(N(p->write_buf)) >= 4096) {
             port_flush(p);
         }
     } else if (p->kind == PortKind::Soft) {
         if (is_vector(p->soft_vec)) {
             auto* v = as_obj<VectorObj>(p->soft_vec);
-            if (v->elts.size() >= 1 && v->elts[0].is_true()) {
+            if (static_cast<size_t>(N(v->elts)) >= 1 && v->elts[0].is_true()) {
                 vm().call1(v->elts[0], SCM::from_char(static_cast<unsigned char>(c)));
             }
         }
     }
 }
 
-void port_puts(PortObj* p, std::string_view s) {
+void port_puts(PortObj* p, const char* sp, size_t sn) {
     if (!p) return;
     if (p->closed) vm().wrong_type_arg("display", 1, SCM::from_obj(p), "open output port");
     if (!p->is_output) vm().wrong_type_arg("display", 1, SCM::from_obj(p), "output port");
     if (p->kind == PortKind::String) {
-        if (p->str_pos == p->str_buf.size()) {
-            p->str_buf.append(s);
-            p->str_pos += s.size();
+        if (p->str_pos == static_cast<size_t>(N(p->str_buf))) {
+            str_append(p->str_buf, sp, sn);
+            p->str_pos += sn;
         } else {
-            if (p->str_pos + s.size() > p->str_buf.size()) {
-                p->str_buf.resize(p->str_pos + s.size(), '\0');
+            if (p->str_pos + sn > static_cast<size_t>(N(p->str_buf))) {
+                gcpp_resize(p->str_buf, p->str_pos + sn, '\0');
             }
-            std::memcpy(p->str_buf.data() + p->str_pos, s.data(), s.size());
-            p->str_pos += s.size();
+            std::memcpy(gcpp_data(p->str_buf) + p->str_pos, sp, sn);
+            p->str_pos += sn;
         }
-        for (char c : s) advance_port_pos(p, static_cast<unsigned char>(c));
+        for (size_t si = 0; si < sn; si++) advance_port_pos(p, static_cast<unsigned char>(sp[si]));
         return;
     }
     if (p->kind == PortKind::Soft && is_vector(p->soft_vec)) {
         auto* v = as_obj<VectorObj>(p->soft_vec);
-        if (v->elts.size() >= 2 && v->elts[1].is_true()) {
-            vm().call1(v->elts[1], vm().make_string(s));
-            for (char c : s) advance_port_pos(p, static_cast<unsigned char>(c));
+        if (static_cast<size_t>(N(v->elts)) >= 2 && v->elts[1].is_true()) {
+            vm().call1(v->elts[1], vm().make_string(sp, sn));
+            for (size_t si = 0; si < sn; si++) advance_port_pos(p, static_cast<unsigned char>(sp[si]));
             return;
         }
     }
-    for (char c : s) port_putc(p, c);
+    for (size_t si = 0; si < sn; si++) port_putc(p, sp[si]);
 }
 
 int port_getc(PortObj* p) {
@@ -167,23 +167,23 @@ int port_getc(PortObj* p) {
     if (!p->is_input) vm().wrong_type_arg("read-char", 1, SCM::from_obj(p), "input port");
 
     int c = EOF;
-    if (!p->unread_buf.empty()) {
-        c = static_cast<unsigned char>(p->unread_buf.back());
-        p->unread_buf.pop_back();
+    if (!(N(p->unread_buf) == 0)) {
+        c = static_cast<unsigned char>(p->unread_buf[N(p->unread_buf) - 1]);
+        p->unread_buf->resize(N(p->unread_buf) - 1);
     } else if (p->kind == PortKind::String) {
-        if (p->str_pos < p->str_buf.size()) {
+        if (p->str_pos < static_cast<size_t>(N(p->str_buf))) {
             c = static_cast<unsigned char>(p->str_buf[p->str_pos++]);
         }
     } else if (p->kind == PortKind::File) {
-        if (p->read_pos >= p->read_buf.size()) {
-            p->read_buf.resize(16384);
+        if (p->read_pos >= static_cast<size_t>(N(p->read_buf))) {
+            gcpp_resize(p->read_buf, 16384);
             ssize_t n;
             do {
-                n = ::read(p->fd, p->read_buf.data(), p->read_buf.size());
+                n = ::read(p->fd, gcpp_data(p->read_buf), static_cast<size_t>(N(p->read_buf)));
             } while (n < 0 && errno == EINTR);
-            if (n < 0) { p->read_buf.clear(); vm().syserror("read-char", errno); }
-            if (n == 0) { p->read_buf.clear(); return EOF; }
-            p->read_buf.resize(static_cast<size_t>(n));
+            if (n < 0) { gcpp_clear(p->read_buf); vm().syserror("read-char", errno); }
+            if (n == 0) { gcpp_clear(p->read_buf); return EOF; }
+            gcpp_resize(p->read_buf, static_cast<size_t>(n));
             p->read_pos = 0;
         }
         c = static_cast<unsigned char>(p->read_buf[p->read_pos++]);
@@ -194,7 +194,7 @@ int port_getc(PortObj* p) {
     } else if (p->kind == PortKind::Soft) {
         if (is_vector(p->soft_vec)) {
             auto* v = as_obj<VectorObj>(p->soft_vec);
-            if (v->elts.size() >= 4 && v->elts[3].is_true()) {
+            if (static_cast<size_t>(N(v->elts)) >= 4 && v->elts[3].is_true()) {
                 SCM res = vm().call0(v->elts[3]);
                 if (res.is_char()) c = static_cast<int>(res.to_char());
                 else if (res.is_eof() || res.is_false()) c = EOF;
@@ -210,7 +210,7 @@ int port_getc(PortObj* p) {
 
 void port_ungetc(PortObj* p, int c) {
     if (!p || c == EOF) return;
-    p->unread_buf.push_back(static_cast<char>(c));
+    (p->unread_buf << static_cast<char>(c));
     if (c == '\n') {
         if (p->line > 0) --p->line;
     } else {
@@ -218,8 +218,8 @@ void port_ungetc(PortObj* p, int c) {
     }
 }
 
-void port_ungets(PortObj* p, std::string_view s) {
-    for (size_t i = s.size(); i > 0; --i) {
+void port_ungets(PortObj* p, string s) {
+    for (size_t i = static_cast<size_t>(N(s)); i > 0; --i) {
         port_ungetc(p, static_cast<unsigned char>(s[i - 1]));
     }
 }
@@ -230,13 +230,13 @@ int port_peekc(PortObj* p) {
     return c;
 }
 
-SCM make_file_port(int fd, std::string_view filename, std::string_view mode, bool owns_fd) {
+SCM make_file_port(int fd, string filename, string mode, bool owns_fd) {
     auto* p = vm().heap().alloc<PortObj>();
     p->kind = PortKind::File;
     p->fd = fd;
     p->owns_fd = owns_fd;
-    p->filename = std::string(filename);
-    p->mode_str = std::string(mode);
+    p->filename = string(filename);
+    p->mode_str = string(mode);
     for (char c : mode) {
         if (c == 'r') p->is_input = true;
         else if (c == 'w' || c == 'a') p->is_output = true;
@@ -248,13 +248,13 @@ SCM make_file_port(int fd, std::string_view filename, std::string_view mode, boo
     return SCM::from_obj(p);
 }
 
-SCM make_input_string_port(std::string s) {
+SCM make_input_string_port(string s) {
     auto* p = vm().heap().alloc<PortObj>();
     p->kind = PortKind::String;
     p->is_input = true;
     p->is_output = false;
     p->mode_str = "r";
-    p->str_buf = std::move(s);
+    p->str_buf = copy(s);  // (owned: seek and truncate change it)
     p->str_pos = 0;
     return SCM::from_obj(p);
 }
@@ -276,11 +276,11 @@ void flush_all_ports() {
     }
 }
 
-void simple_format_to_port(SCM port, std::string_view fmt, SCM args) {
+void simple_format_to_port(SCM port, string fmt, SCM args) {
     auto* p = as_obj<PortObj>(port);
     SCM cur = args;
-    for (size_t i = 0; i < fmt.size(); ++i) {
-        if (fmt[i] == '~' && i + 1 < fmt.size()) {
+    for (size_t i = 0; i < static_cast<size_t>(N(fmt)); ++i) {
+        if (fmt[i] == '~' && i + 1 < static_cast<size_t>(N(fmt))) {
             char spec = fmt[++i];
             if (spec == '~') {
                 port_putc(p, '~');
@@ -327,7 +327,7 @@ SCM VM::set_current_error_port(SCM p) {
     return old;
 }
 
-static int parse_open_flags(std::string_view mode) {
+static int parse_open_flags(string mode) {
     bool r = false, w = false, a = false, plus = false;
     for (char c : mode) {
         if (c == 'r') r = true;
@@ -375,31 +375,31 @@ void VM::init_ports() {
     define_proc("open-file", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("open-file", 1, a[0], "string");
         if (!is_string(a[1])) wrong_type_arg("open-file", 2, a[1], "string");
-        std::string fname = as_obj<StringObj>(a[0])->to_std_string();
-        std::string mode = as_obj<StringObj>(a[1])->to_std_string();
+        StringObj* fname_o = as_obj<StringObj>(a[0]); const char* fname = fname_o->chars(); size_t fname_n = fname_o->len;
+        StringObj* mode_o = as_obj<StringObj>(a[1]); const char* mode = mode_o->chars(); size_t mode_n = mode_o->len;
         int flags = parse_open_flags(mode);
-        int fd = ::open(fname.c_str(), flags, 0666);
+        int fd = ::open(((char*) c_string(fname)), flags, 0666);
         if (fd < 0) syserror("open-file", errno, fname);
-        return make_file_port(fd, fname, mode, true);
+        return make_file_port(fd, string(fname, static_cast<int>(fname_n)), string(mode, static_cast<int>(mode_n)), true);
     });
     define_proc("open-input-file", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("open-input-file", 1, a[0], "string");
-        std::string fname = as_obj<StringObj>(a[0])->to_std_string();
-        int fd = ::open(fname.c_str(), O_RDONLY);
+        StringObj* fname_o = as_obj<StringObj>(a[0]); const char* fname = fname_o->chars(); size_t fname_n = fname_o->len;
+        int fd = ::open(((char*) c_string(fname)), O_RDONLY);
         if (fd < 0) syserror("open-input-file", errno, fname);
-        return make_file_port(fd, fname, "r", true);
+        return make_file_port(fd, string(fname, static_cast<int>(fname_n)), "r", true);
     });
     define_proc("open-output-file", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("open-output-file", 1, a[0], "string");
-        std::string fname = as_obj<StringObj>(a[0])->to_std_string();
-        int fd = ::open(fname.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        StringObj* fname_o = as_obj<StringObj>(a[0]); const char* fname = fname_o->chars(); size_t fname_n = fname_o->len;
+        int fd = ::open(((char*) c_string(fname)), O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (fd < 0) syserror("open-output-file", errno, fname);
-        return make_file_port(fd, fname, "w", true);
+        return make_file_port(fd, string(fname, static_cast<int>(fname_n)), "w", true);
     });
     define_proc("fdopen", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         int fd = static_cast<int>(scm_to_int64(a[0], "fdopen", 1));
         if (!is_string(a[1])) wrong_type_arg("fdopen", 2, a[1], "string");
-        return make_file_port(fd, "", as_obj<StringObj>(a[1])->view(), true);
+        return make_file_port(fd, "", as_obj<StringObj>(a[1])->str(), true);
     });
     define_proc("fdes->inport", 1, 0, false, [](const SCM* a, size_t) -> SCM {
         int fd = static_cast<int>(scm_to_int64(a[0], "fdes->inport", 1));
@@ -464,7 +464,7 @@ void VM::init_ports() {
     // String ports
     define_proc("open-input-string", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("open-input-string", 1, a[0], "string");
-        return make_input_string_port(as_obj<StringObj>(a[0])->to_std_string());
+        return make_input_string_port(as_obj<StringObj>(a[0])->str());
     });
     define_proc("open-output-string", 0, 0, false, [](const SCM*, size_t) -> SCM {
         return make_output_string_port();
@@ -478,7 +478,7 @@ void VM::init_ports() {
     });
     define_proc("call-with-input-string", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("call-with-input-string", 1, a[0], "string");
-        SCM p = make_input_string_port(as_obj<StringObj>(a[0])->to_std_string());
+        SCM p = make_input_string_port(as_obj<StringObj>(a[0])->str());
         return call1(a[1], p);
     });
     define_proc("call-with-output-string", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
@@ -491,16 +491,16 @@ void VM::init_ports() {
 
     // Soft ports
     define_proc("make-soft-port", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
-        if (!is_vector(a[0]) || as_obj<VectorObj>(a[0])->elts.size() < 5) {
+        if (!is_vector(a[0]) || static_cast<size_t>(N(as_obj<VectorObj>(a[0])->elts)) < 5) {
             wrong_type_arg("make-soft-port", 1, a[0], "vector of length 5");
         }
         if (!is_string(a[1])) wrong_type_arg("make-soft-port", 2, a[1], "string");
         auto* p = heap_.alloc<PortObj>();
         p->kind = PortKind::Soft;
         p->soft_vec = a[0];
-        std::string mode = as_obj<StringObj>(a[1])->to_std_string();
-        p->mode_str = mode;
-        for (char c : mode) {
+        StringObj* mode_o = as_obj<StringObj>(a[1]); const char* mode = mode_o->chars(); size_t mode_n = mode_o->len;
+        p->mode_str = string(mode, static_cast<int>(mode_n));
+        for (const char* mode_it = mode; mode_it < mode + mode_n; mode_it++) for (char c = *mode_it, mode_once = 1; mode_once; mode_once = 0) {
             if (c == 'r') p->is_input = true;
             else if (c == 'w') p->is_output = true;
             else if (c == '+') { p->is_input = true; p->is_output = true; }
@@ -523,9 +523,9 @@ void VM::init_ports() {
         auto* p = heap_.alloc<PortObj>();
         p->kind = PortKind::Soft;
         p->soft_vec = vec;
-        std::string mode = as_obj<StringObj>(a[0])->to_std_string();
-        p->mode_str = mode;
-        for (char c : mode) {
+        StringObj* mode_o = as_obj<StringObj>(a[0]); const char* mode = mode_o->chars(); size_t mode_n = mode_o->len;
+        p->mode_str = string(mode, static_cast<int>(mode_n));
+        for (const char* mode_it = mode; mode_it < mode + mode_n; mode_it++) for (char c = *mode_it, mode_once = 1; mode_once; mode_once = 0) {
             if (c == 'r') p->is_input = true;
             else if (c == 'w' || c == 'a') p->is_output = true;
             else if (c == '+') { p->is_input = true; p->is_output = true; }
@@ -556,7 +556,7 @@ void VM::init_ports() {
     define_proc("unread-string", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("unread-string", 1, a[0], "string");
         if (!is_port(a[1])) wrong_type_arg("unread-string", 2, a[1], "input port");
-        port_ungets(as_obj<PortObj>(a[1]), as_obj<StringObj>(a[0])->view());
+        port_ungets(as_obj<PortObj>(a[1]), as_obj<StringObj>(a[0])->str());
         return a[0];
     });
     define_proc("write-char", 1, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
@@ -579,22 +579,22 @@ void VM::init_ports() {
     define_proc("drain-input", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_port(a[0])) wrong_type_arg("drain-input", 1, a[0], "input port");
         auto* p = as_obj<PortObj>(a[0]);
-        std::string out;
-        while (!p->unread_buf.empty()) {
-            out.push_back(p->unread_buf.back());
-            p->unread_buf.pop_back();
+        string out;
+        while (!(N(p->unread_buf) == 0)) {
+            (out << (p->unread_buf[N(p->unread_buf) - 1]));
+            p->unread_buf->resize(N(p->unread_buf) - 1);
         }
-        if (p->read_pos < p->read_buf.size()) {
-            out.append(p->read_buf.substr(p->read_pos));
-            p->read_pos = p->read_buf.size();
+        if (p->read_pos < static_cast<size_t>(N(p->read_buf))) {
+            str_append(out, str_sub(p->read_buf, p->read_pos));
+            p->read_pos = static_cast<size_t>(N(p->read_buf));
         }
-        return make_string(std::move(out));
+        return make_string_owned(out);
     });
     define_proc("char-ready?", 0, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
         SCM port = (nargs >= 1 && !a[0].is_undefined()) ? a[0] : current_input_port();
         if (!is_port(port)) wrong_type_arg("char-ready?", 1, port, "input port");
         auto* p = as_obj<PortObj>(port);
-        if (!p->unread_buf.empty() || p->read_pos < p->read_buf.size()) return SCM_BOOL_T;
+        if (!(N(p->unread_buf) == 0) || p->read_pos < static_cast<size_t>(N(p->read_buf))) return SCM_BOOL_T;
         if (p->kind == PortKind::String) return SCM_BOOL_T;
         if (p->kind == PortKind::File && p->fd >= 0) {
             fd_set rfds;
@@ -610,12 +610,12 @@ void VM::init_ports() {
     define_proc("port-filename", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_port(a[0])) wrong_type_arg("port-filename", 1, a[0], "port");
         auto* p = as_obj<PortObj>(a[0]);
-        return p->filename.empty() ? SCM_BOOL_F : make_string(p->filename);
+        return (N(p->filename) == 0) ? SCM_BOOL_F : make_string(p->filename);
     });
     define_proc("set-port-filename!", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_port(a[0])) wrong_type_arg("set-port-filename!", 1, a[0], "port");
         auto* p = as_obj<PortObj>(a[0]);
-        p->filename = is_string(a[1]) ? as_obj<StringObj>(a[1])->to_std_string() : "";
+        p->filename = is_string(a[1]) ? as_obj<StringObj>(a[1])->str() : "";
         p->filename_scm = is_string(a[1]) ? a[1] : SCM_BOOL_F;
         return SCM_UNSPECIFIED;
     });
@@ -652,19 +652,19 @@ void VM::init_ports() {
             // Special case: (seek port 0 SEEK_CUR) is ftell — MUST NOT discard unread_buf or read_buf!
             if (whence == SEEK_CUR && offset == 0) {
                 if (p->kind == PortKind::String) {
-                    int64_t pos = static_cast<int64_t>(p->str_pos) - static_cast<int64_t>(p->unread_buf.size());
+                    int64_t pos = static_cast<int64_t>(p->str_pos) - static_cast<int64_t>(static_cast<size_t>(N(p->unread_buf)));
                     return make_integer(pos);
                 }
                 if (p->is_output) port_flush(p);
                 off_t r = ::lseek(p->fd, 0, SEEK_CUR);
                 if (r < 0) syserror("seek", errno);
-                r -= static_cast<off_t>((p->read_buf.size() - p->read_pos) + p->unread_buf.size());
+                r -= static_cast<off_t>((static_cast<size_t>(N(p->read_buf)) - p->read_pos) + static_cast<size_t>(N(p->unread_buf)));
                 return make_integer(static_cast<int64_t>(r));
             }
             if (p->kind == PortKind::String) {
-                int64_t cur_pos = static_cast<int64_t>(p->str_pos) - static_cast<int64_t>(p->unread_buf.size());
-                p->unread_buf.clear();
-                int64_t base = (whence == SEEK_SET) ? 0 : (whence == SEEK_CUR ? cur_pos : static_cast<int64_t>(p->str_buf.size()));
+                int64_t cur_pos = static_cast<int64_t>(p->str_pos) - static_cast<int64_t>(static_cast<size_t>(N(p->unread_buf)));
+                gcpp_clear(p->unread_buf);
+                int64_t base = (whence == SEEK_SET) ? 0 : (whence == SEEK_CUR ? cur_pos : static_cast<int64_t>(static_cast<size_t>(N(p->str_buf))));
                 int64_t np = base + offset;
                 if (np < 0) out_of_range("seek", a[1]);
                 p->str_pos = static_cast<size_t>(np);
@@ -672,10 +672,10 @@ void VM::init_ports() {
             }
             if (p->is_output) port_flush(p);
             if (whence == SEEK_CUR) {
-                offset -= static_cast<int64_t>((p->read_buf.size() - p->read_pos) + p->unread_buf.size());
+                offset -= static_cast<int64_t>((static_cast<size_t>(N(p->read_buf)) - p->read_pos) + static_cast<size_t>(N(p->unread_buf)));
             }
-            p->unread_buf.clear();
-            p->read_buf.clear(); p->read_pos = 0;
+            gcpp_clear(p->unread_buf);
+            gcpp_clear(p->read_buf); p->read_pos = 0;
             off_t r = ::lseek(p->fd, static_cast<off_t>(offset), whence);
             if (r < 0) syserror("seek", errno);
             return make_integer(static_cast<int64_t>(r));
@@ -689,13 +689,13 @@ void VM::init_ports() {
         if (is_port(a[0])) {
             auto* p = as_obj<PortObj>(a[0]);
             if (p->kind == PortKind::String) {
-                int64_t pos = static_cast<int64_t>(p->str_pos) - static_cast<int64_t>(p->unread_buf.size());
+                int64_t pos = static_cast<int64_t>(p->str_pos) - static_cast<int64_t>(static_cast<size_t>(N(p->unread_buf)));
                 return make_integer(pos);
             }
             if (p->is_output) port_flush(p);
             off_t r = ::lseek(p->fd, 0, SEEK_CUR);
             if (r < 0) syserror("ftell", errno);
-            r -= static_cast<off_t>(p->read_buf.size() - p->read_pos + p->unread_buf.size());
+            r -= static_cast<off_t>(static_cast<size_t>(N(p->read_buf)) - p->read_pos + static_cast<size_t>(N(p->unread_buf)));
             return make_integer(static_cast<int64_t>(r));
         }
         int fd = static_cast<int>(scm_to_int64(a[0], "ftell", 1));
@@ -708,7 +708,7 @@ void VM::init_ports() {
         if (is_string(a[0])) {
             if (!has_len) misc_error("truncate-file", "must supply length for filename");
             off_t len = static_cast<off_t>(scm_to_int64(a[1], "truncate-file", 2));
-            if (::truncate(as_obj<StringObj>(a[0])->to_std_string().c_str(), len) < 0) syserror("truncate-file", errno);
+            if (::truncate(((char*) c_string(as_obj<StringObj>(a[0])->str())), len) < 0) syserror("truncate-file", errno);
             return SCM_UNSPECIFIED;
         }
         int fd = -1;
@@ -723,9 +723,9 @@ void VM::init_ports() {
             } else {
                 off_t cur = ::lseek(fd, 0, SEEK_CUR);
                 if (cur < 0) syserror("truncate-file", errno);
-                len = cur - static_cast<off_t>((p->read_buf.size() - p->read_pos) + p->unread_buf.size());
+                len = cur - static_cast<off_t>((static_cast<size_t>(N(p->read_buf)) - p->read_pos) + static_cast<size_t>(N(p->unread_buf)));
                 if (len < 0) len = 0;
-                p->read_buf.clear(); p->read_pos = 0; p->unread_buf.clear();
+                gcpp_clear(p->read_buf); p->read_pos = 0; gcpp_clear(p->unread_buf);
                 ::lseek(fd, len, SEEK_SET);
             }
         } else {
@@ -758,10 +758,10 @@ void VM::init_ports() {
         ScmRootVec ports(heap_);
         for (Obj* cur = heap_.all_objects(); cur; cur = cur->gc_next) {
             if (cur->tag == ObjTag::Port && !static_cast<PortObj*>(cur)->closed) {
-                ports.push_back(SCM::from_obj(cur));
+                (ports << SCM::from_obj(cur));
             }
         }
-        for (size_t i = 0; i < ports.size(); ++i) call1(a[0], ports[i]);
+        for (size_t i = 0; i < static_cast<size_t>(N(ports)); ++i) call1(a[0], ports[i]);
         return SCM_UNSPECIFIED;
     });
     define_proc("close-all-ports-except", 0, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
@@ -780,16 +780,16 @@ void VM::init_ports() {
     // simple-format
     define_proc("simple-format", 2, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[1])) wrong_type_arg("simple-format", 2, a[1], "string");
-        auto fmt = as_obj<StringObj>(a[1])->view();
+        StringObj* fmt_o = as_obj<StringObj>(a[1]); const char* fmt = fmt_o->chars(); size_t fmt_n = fmt_o->len;
         SCM rest = nargs > 2 ? a[2] : SCM_EOL;
         if (a[0].is_false()) {
             SCM sp = make_output_string_port();
-            simple_format_to_port(sp, fmt, rest);
+            simple_format_to_port(sp, string(fmt, static_cast<int>(fmt_n)), rest);
             return make_string(as_obj<PortObj>(sp)->str_buf);
         }
         SCM port = (a[0] == SCM_BOOL_T) ? current_output_port() : a[0];
         if (!is_port(port)) wrong_type_arg("simple-format", 1, a[0], "port or boolean");
-        simple_format_to_port(port, fmt, rest);
+        simple_format_to_port(port, string(fmt, static_cast<int>(fmt_n)), rest);
         return SCM_BOOL_T;
     });
 
@@ -799,7 +799,7 @@ void VM::init_ports() {
             // (%read-delimited! delims buf gobble [port [start [end]]])
             if (!is_string(a[0])) wrong_type_arg("%read-delimited!", 1, a[0], "string");
             if (!is_string(a[1])) wrong_type_arg("%read-delimited!", 2, a[1], "string");
-            auto delims = as_obj<StringObj>(a[0])->view();
+            StringObj* delims_o = as_obj<StringObj>(a[0]); const char* delims = delims_o->chars(); size_t delims_n = delims_o->len;
             auto* buf = as_obj<StringObj>(a[1]);
             bool gobble = a[2].is_true();
             SCM port = (nargs >= 4 && !a[3].is_undefined()) ? a[3] : current_input_port();
@@ -813,7 +813,7 @@ void VM::init_ports() {
             while (start + count < end) {
                 int c = port_getc(p);
                 if (c == EOF) { term = SCM_EOF; break; }
-                if (delims.find(static_cast<char>(c)) != std::string_view::npos) {
+                if (view_find(delims, delims_n, static_cast<char>(c)) != static_cast<size_t>(-1)) {
                     term = SCM::from_char(static_cast<uint32_t>(c));
                     if (!gobble) port_ungetc(p, c);
                     break;
@@ -828,16 +828,16 @@ void VM::init_ports() {
             SCM port = (nargs >= 1 && !a[0].is_undefined()) ? a[0] : current_input_port();
             if (!is_port(port)) wrong_type_arg("%read-line", 1, port, "input port");
             auto* p = as_obj<PortObj>(port);
-            std::string line;
+            string line;
             int c;
             while ((c = port_getc(p)) != EOF) {
                 if (c == '\n') {
-                    return cons(make_string(std::move(line)), SCM::from_char('\n'));
+                    return cons(make_string_owned(line), SCM::from_char('\n'));
                 }
-                line.push_back(static_cast<char>(c));
+                (line << static_cast<char>(c));
             }
-            if (line.empty()) return cons(SCM_EOF, SCM_EOF);
-            return cons(make_string(std::move(line)), SCM_EOF);
+            if ((N(line) == 0)) return cons(SCM_EOF, SCM_EOF);
+            return cons(make_string_owned(line), SCM_EOF);
         });
 
         define_proc("write-line", 1, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
@@ -874,13 +874,13 @@ void VM::init_ports() {
         });
         define_proc("write-string/partial", 1, 3, false, [this](const SCM* a, size_t nargs) -> SCM {
             if (!is_string(a[0])) wrong_type_arg("write-string/partial", 1, a[0], "string");
-            auto sv = as_obj<StringObj>(a[0])->view();
+            StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len;
             SCM port = (nargs >= 2 && !a[1].is_undefined()) ? a[1] : current_output_port();
             int64_t start = (nargs >= 3 && !a[2].is_undefined()) ? scm_to_int64(a[2], "write-string/partial", 3) : 0;
-            int64_t end = (nargs >= 4 && !a[3].is_undefined()) ? scm_to_int64(a[3], "write-string/partial", 4) : static_cast<int64_t>(sv.size());
+            int64_t end = (nargs >= 4 && !a[3].is_undefined()) ? scm_to_int64(a[3], "write-string/partial", 4) : static_cast<int64_t>(sv_n);
             if (!is_port(port)) wrong_type_arg("write-string/partial", 2, port, "output port");
-            if (start < 0 || end < start || static_cast<size_t>(end) > sv.size()) out_of_range("write-string/partial", a[2]);
-            port_puts(as_obj<PortObj>(port), sv.substr(static_cast<size_t>(start), static_cast<size_t>(end - start)));
+            if (start < 0 || end < start || static_cast<size_t>(end) > sv_n) out_of_range("write-string/partial", a[2]);
+            port_puts(as_obj<PortObj>(port), view_sub(sv, sv_n, static_cast<size_t>(start), static_cast<size_t>(end - start)));
             return make_integer(end - start);
         });
     };

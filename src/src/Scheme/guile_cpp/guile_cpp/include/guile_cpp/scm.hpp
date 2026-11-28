@@ -4,17 +4,12 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
-#include <string>
-#include <string_view>
-#include <vector>
-#include <memory>
 #include "hashmap.hpp"
 #include "hashset.hpp"
 #include "iterator.hpp"
 #include <type_traits>
 #include "basic.hpp"
-#include <optional>
-#include <variant>
+#include "guile_cpp/tm_string.hpp"
 #include <regex.h>
 #include <dirent.h>
 #include "guile_cpp/bigint.hpp"
@@ -25,7 +20,7 @@ namespace guile {
 // the tagged values, the objects header and the pairs are in value.hpp
 
 struct SymbolObj : Obj {
-    std::string name;
+    string name;  // (never changed: shared with the key of the symbol table)
     uint64_t hash = 0;
     uint32_t def_epoch = 0;
     bool interned = true;
@@ -33,8 +28,8 @@ struct SymbolObj : Obj {
     SCM fref = SCM_BOOL_F;
     SCM pref = SCM_EOL;
     SCM keyword = SCM_BOOL_F;
-    SymbolObj(std::string n, uint64_t h, bool intern = true)
-        : Obj(ObjTag::Symbol), name(std::move(n)), hash(h), interned(intern) {}
+    SymbolObj(string n, uint64_t h, bool intern = true)
+        : Obj(ObjTag::Symbol), name(n), hash(h), interned(intern) {}
 };
 
 struct KeywordObj : Obj {
@@ -42,44 +37,51 @@ struct KeywordObj : Obj {
     explicit KeywordObj(SCM sym) noexcept : Obj(ObjTag::Keyword), symbol(sym) {}
 };
 
-struct StringBuf {
-    std::string data;
-    bool read_only = false;
-    explicit StringBuf(std::string s, bool ro = false) : data(std::move(s)), read_only(ro) {}
-};
-
+// TeXmacs: the characters of a string are a TeXmacs string, which the
+// shared substrings (make-shared-substring) share with their string: a
+// change of one (string-set!...) is seen by the other, as in Guile. The
+// string given to the constructor must be owned by the new object (a fresh
+// string, or a copy): VM::make_string copies, VM::make_string_owned not.
 struct StringObj : Obj {
-    std::shared_ptr<StringBuf> buf;
+    string buf;
+    bool buf_read_only = false;  // (a literal: also for its substrings)
     size_t start = 0;
     size_t len = 0;
     bool read_only = false;
 
-    explicit StringObj(std::string s, bool ro = false)
-        : Obj(ObjTag::String),
-          buf(std::make_shared<StringBuf>(std::move(s), ro)),
-          start(0),
-          len(buf->data.size()),
-          read_only(ro) {}
+    explicit StringObj(string s, bool ro = false)
+        : Obj(ObjTag::String), buf(s), buf_read_only(ro),
+          start(0), len(static_cast<size_t>(N(s))), read_only(ro) {}
 
-    StringObj(std::shared_ptr<StringBuf> b, size_t st, size_t l, bool ro = false)
-        : Obj(ObjTag::String), buf(std::move(b)), start(st), len(l), read_only(ro) {}
+    StringObj(string b, bool b_ro, size_t st, size_t l, bool ro = false)
+        : Obj(ObjTag::String), buf(b), buf_read_only(b_ro), start(st), len(l), read_only(ro) {}
 
-    std::string_view view() const noexcept {
-        return std::string_view(buf->data.data() + start, len);
+    // the characters, not 0-terminated ("" for the empty string)
+    const char* chars() const noexcept {
+        return len == 0 ? "" : &const_cast<string&>(buf)[static_cast<int>(start)];
     }
-    std::string to_std_string() const {
-        return std::string(buf->data.data() + start, len);
+    // a fresh copy of the characters
+    string str() const {
+        return const_cast<string&>(buf)(static_cast<int>(start), static_cast<int>(start + len));
+    }
+    // a copy of the n characters from pos
+    string sub(size_t pos, size_t n = static_cast<size_t>(-1)) const {
+        return view_sub(chars(), len, pos, n);
+    }
+    // the same characters
+    friend bool string_obj_equal(const StringObj* a, const StringObj* b) {
+        return a->len == b->len && std::memcmp(a->chars(), b->chars(), a->len) == 0;
     }
     char* mutable_data() {
-        return buf->data.data() + start;
+        return &buf[static_cast<int>(start)];
     }
 };
 
 struct VectorObj : Obj {
-    std::vector<SCM> elts;
+    array<SCM> elts;
     explicit VectorObj(size_t n, SCM fill = SCM_UNSPECIFIED)
-        : Obj(ObjTag::Vector), elts(n, fill) {}
-    explicit VectorObj(std::vector<SCM> v)
+        : Obj(ObjTag::Vector), elts(array_fill(n, fill)) {}
+    explicit VectorObj(array<SCM> v)
         : Obj(ObjTag::Vector), elts(std::move(v)) {}
 };
 
@@ -92,10 +94,10 @@ enum class WeakKind : uint8_t {
 };
 
 struct WeakVectorObj : Obj {
-    std::vector<SCM> elts;
+    array<SCM> elts;
     WeakKind kind = WeakKind::Vector;
     WeakVectorObj(size_t n, SCM fill, WeakKind k = WeakKind::Vector)
-        : Obj(ObjTag::WeakVector), elts(n, fill), kind(k) {}
+        : Obj(ObjTag::WeakVector), elts(array_fill(n, fill)), kind(k) {}
 };
 
 struct BignumObj : Obj {
@@ -214,7 +216,7 @@ enum class SpecialSubr : uint8_t {
 };
 
 struct SubrObj : Obj {
-    std::string name;
+    string name;
     int req = 0;
     int opt = 0;
     bool rst = false;
@@ -226,8 +228,8 @@ struct SubrObj : Obj {
     SCM generic = SCM_BOOL_F;
     SCM props = SCM_EOL;
 
-    SubrObj(std::string n, int r, int o, bool rest, SubrFn f, SpecialSubr sp = SpecialSubr::None)
-        : Obj(ObjTag::Subr), name(std::move(n)), req(r), opt(o), rst(rest), fn(std::move(f)), special(sp) {}
+    SubrObj(string n, int r, int o, bool rest, SubrFn f, SpecialSubr sp = SpecialSubr::None)
+        : Obj(ObjTag::Subr), name(n), req(r), opt(o), rst(rest), fn(f), special(sp) {}
 };
 
 struct BoxObj : Obj {
@@ -245,14 +247,15 @@ struct BytecodeObj : Obj {
     SCM cached_env = SCM_EOL;     // pre-consed (eval_closure) or EOL to avoid PairObj alloc per OP_MAKE_CLOSURE
     SCM source_formals = SCM_EOL;
     SCM source_body = SCM_EOL;
-    std::vector<uint32_t> code;
-    std::vector<SCM> consts;
-    std::vector<SCM> globals;     // VariableObj* inline cache (or SCM_BOOL_F)
-    std::vector<SCM> global_syms; // SymbolObj*
-    std::vector<uint32_t> upval_descs; // (is_local << 16) | slot_index
-    std::vector<SCM> upval_syms;  // SymbolObj* for procedure-environment reconstruction
-    std::vector<uint8_t> upval_kinds; // 0=Val, 1=Box, 2=CellCar, 3=CellCdr
-    std::vector<SCM> upval_known_bc;  // BytecodeObj* for immutable all-lambda letrec boxes, else SCM_BOOL_F
+    array<uint32_t> code;
+    uint32_t* code_ptr = nullptr;  // (TeXmacs: &code[0], kept by emit, read by the VM at each call)
+    array<SCM> consts;
+    array<SCM> globals;     // VariableObj* inline cache (or SCM_BOOL_F)
+    array<SCM> global_syms; // SymbolObj*
+    array<uint32_t> upval_descs; // (is_local << 16) | slot_index
+    array<SCM> upval_syms;  // SymbolObj* for procedure-environment reconstruction
+    array<uint8_t> upval_kinds; // 0=Val, 1=Box, 2=CellCar, 3=CellCdr
+    array<SCM> upval_known_bc;  // BytecodeObj* for immutable all-lambda letrec boxes, else SCM_BOOL_F
     void* jit_code = nullptr;     // Compiled native ARM64 ext_entry pointer (or nullptr)
     void* jit_code_int = nullptr; // Compiled native ARM64 int_entry pointer (or nullptr)
     uint64_t jit_epoch = 0;       // VM::jit_epoch when compiled
@@ -319,24 +322,24 @@ struct PortObj : Obj {
     int fd = -1;
     FILE* pipe_fp = nullptr;
     pid_t pipe_pid = -1;
-    std::string filename;
+    string filename;
     SCM filename_scm = SCM_BOOL_F;
-    std::string mode_str;
+    string mode_str;
     long line = 0;
     long column = 0;
     int revealed = 0;
     // String port buffer
-    std::string str_buf;
+    string str_buf;
     size_t str_pos = 0;
     // Soft port vector #(write-char write-string flush read-char close)
     SCM soft_vec = SCM_BOOL_F;
     // Unread buffer (LIFO stack)
-    std::string unread_buf;
+    string unread_buf;
     // Read buffer for file/pipe ports
-    std::string read_buf;
+    string read_buf;
     size_t read_pos = 0;
     // Write buffer for file/pipe ports
-    std::string write_buf;
+    string write_buf;
     int buf_mode = _IOFBF; // _IONBF, _IOLBF, _IOFBF
 
     PortObj() : Obj(ObjTag::Port) {}
@@ -351,18 +354,18 @@ struct FluidObj : Obj {
 };
 
 struct DynamicStateObj : Obj {
-    std::vector<SCM> values;
+    array<SCM> values;
     DynamicStateObj() : Obj(ObjTag::DynamicState) {}
 };
 
 struct HashTableObj : Obj {
-    std::vector<SCM> buckets; // each bucket is an alist ((k . v) ...)
+    array<SCM> buckets; // each bucket is an alist ((k . v) ...)
     size_t count = 0;
     WeakKind weak = WeakKind::None;
     bool is_module_obarray = false;
 
     HashTableObj(size_t nbuckets, WeakKind w = WeakKind::None)
-        : Obj(ObjTag::HashTable), buckets(nbuckets ? nbuckets : 31, SCM_EOL), count(0), weak(w) {}
+        : Obj(ObjTag::HashTable), buckets(array_fill<SCM>(nbuckets ? nbuckets : 31, SCM_EOL)), count(0), weak(w) {}
 };
 
 // Guile 1.8.8 Structs & Vtables
@@ -386,7 +389,7 @@ constexpr uint32_t CLASSF_INHERIT         = ~(CLASSF_PURE_GENERIC | CLASSF_SIMPL
 
 struct StructObj : Obj {
     SCM vtable = SCM_BOOL_F;      // StructObj* (or self for vtable-vtable)
-    std::vector<uint64_t> slots;  // raw words ('p'/'s' store SCM::bits, 'u' stores uint64_t)
+    array<uint64_t> slots;  // raw words ('p'/'s' store SCM::bits, 'u' stores uint64_t)
     size_t tail_len = 0;          // length of tail array if layout has tail
     size_t tail_start = 0;        // index of tail length word (if any)
     bool has_tail = false;
@@ -470,41 +473,61 @@ struct SmallScmVec {
     static constexpr size_t INLINE_CAP = 6;
     SCM inline_buf[INLINE_CAP];
     uint32_t inline_sz = 0;
-    std::vector<SCM> heap_buf;
+    array<SCM> heap_buf;
 
-    size_t size() const noexcept { return heap_buf.empty() ? inline_sz : heap_buf.size(); }
+    // (TeXmacs: a copy owns its elements, as with std::vector: the frames
+    // of the evaluator copy their values, cf->vals, and then add to them)
+    SmallScmVec() noexcept {}
+    SmallScmVec(const SmallScmVec& o) : inline_sz(o.inline_sz), heap_buf(copy(o.heap_buf)) {
+        for (uint32_t i = 0; i < inline_sz; i++) inline_buf[i] = o.inline_buf[i];
+    }
+    SmallScmVec& operator=(const SmallScmVec& o) {
+        if (this == &o) return *this;
+        inline_sz = o.inline_sz;
+        for (uint32_t i = 0; i < inline_sz; i++) inline_buf[i] = o.inline_buf[i];
+        heap_buf = copy(o.heap_buf);
+        return *this;
+    }
+
+    size_t size() const noexcept { return (N(heap_buf) == 0) ? inline_sz : static_cast<size_t>(N(heap_buf)); }
     bool empty() const noexcept { return size() == 0; }
-    const SCM* data() const noexcept { return heap_buf.empty() ? inline_buf : heap_buf.data(); }
-    SCM* data() noexcept { return heap_buf.empty() ? inline_buf : heap_buf.data(); }
+    const SCM* data() const noexcept { return (N(heap_buf) == 0) ? inline_buf : gcpp_data(heap_buf); }
+    SCM* data() noexcept { return (N(heap_buf) == 0) ? inline_buf : gcpp_data(heap_buf); }
     SCM& operator[](size_t i) noexcept { return data()[i]; }
     SCM operator[](size_t i) const noexcept { return data()[i]; }
     const SCM* begin() const noexcept { return data(); }
     const SCM* end() const noexcept { return data() + size(); }
 
     void push_back(SCM v) {
-        if (heap_buf.empty()) {
+        if ((N(heap_buf) == 0)) {
             if (inline_sz < INLINE_CAP) {
                 inline_buf[inline_sz++] = v;
                 return;
             }
-            heap_buf.reserve(INLINE_CAP * 2);
-            heap_buf.insert(heap_buf.end(), inline_buf, inline_buf + inline_sz);
+            (void) 0;
+            array_append(heap_buf, inline_buf, inline_sz);
             inline_sz = 0;
         }
-        heap_buf.push_back(v);
+        (heap_buf << v);
     }
 
     void assign_from(const SCM* p, size_t n) {
-        heap_buf.clear();
+        gcpp_clear(heap_buf);
         if (n <= INLINE_CAP) {
             for (size_t i = 0; i < n; ++i) inline_buf[i] = p[i];
             inline_sz = static_cast<uint32_t>(n);
         } else {
             inline_sz = 0;
-            heap_buf.assign(p, p + n);
+            heap_buf = array_from(p, n);
         }
     }
 };
+// (TeXmacs: SmallScmVec as the arrays, for the code converted from
+// std::vector)
+inline SmallScmVec& operator<<(SmallScmVec& v, SCM x) { v.push_back(x); return v; }
+inline int N(const SmallScmVec& v) { return static_cast<int>(v.size()); }
+inline SCM* gcpp_data(SmallScmVec& v) { return v.data(); }
+inline const SCM* gcpp_data(const SmallScmVec& v) { return v.data(); }
 
 struct ContFrameObj : Obj {
     ContKind kind;
@@ -541,23 +564,23 @@ struct ContinuationObj : Obj {
     uint16_t inline_frame_len = 0;
     SCM inline_stack[INLINE_STACK_CAP];
     VmFrameSnap inline_frames[INLINE_FRAME_CAP];
-    std::vector<SCM> vm_stack_snap;
-    std::vector<VmFrameSnap> vm_frames_snap;
+    array<SCM> vm_stack_snap;
+    array<VmFrameSnap> vm_frames_snap;
 
     ContinuationObj(SCM cf, SCM dw, int cd = -1) noexcept
         : Obj(ObjTag::Continuation), cont_frame(cf), dynwind_chain(dw), cek_depth(cd) {}
 
     size_t snap_stack_size() const noexcept {
-        return vm_stack_snap.empty() ? inline_stack_len : vm_stack_snap.size();
+        return (N(vm_stack_snap) == 0) ? inline_stack_len : static_cast<size_t>(N(vm_stack_snap));
     }
     const SCM* snap_stack_data() const noexcept {
-        return vm_stack_snap.empty() ? inline_stack : vm_stack_snap.data();
+        return (N(vm_stack_snap) == 0) ? inline_stack : gcpp_data(vm_stack_snap);
     }
     size_t snap_frames_size() const noexcept {
-        return vm_frames_snap.empty() ? inline_frame_len : vm_frames_snap.size();
+        return (N(vm_frames_snap) == 0) ? inline_frame_len : static_cast<size_t>(N(vm_frames_snap));
     }
     const VmFrameSnap* snap_frames_data() const noexcept {
-        return vm_frames_snap.empty() ? inline_frames : vm_frames_snap.data();
+        return (N(vm_frames_snap) == 0) ? inline_frames : gcpp_data(vm_frames_snap);
     }
     void set_stack_snap(const SCM* src, size_t n) {
         if (n <= INLINE_STACK_CAP) {
@@ -565,23 +588,23 @@ struct ContinuationObj : Obj {
             inline_stack_len = static_cast<uint16_t>(n);
         } else {
             inline_stack_len = 0;
-            vm_stack_snap.assign(src, src + n);
+            vm_stack_snap = array_from(src, n);
         }
     }
     void reserve_frames_snap(size_t n) {
-        if (n > INLINE_FRAME_CAP) vm_frames_snap.reserve(n);
+        if (n > INLINE_FRAME_CAP) (void) 0;
     }
     void push_frame_snap(const VmFrameSnap& f) {
-        if (vm_frames_snap.empty()) {
+        if ((N(vm_frames_snap) == 0)) {
             if (inline_frame_len < INLINE_FRAME_CAP) {
                 inline_frames[inline_frame_len++] = f;
                 return;
             }
-            vm_frames_snap.reserve(INLINE_FRAME_CAP * 2);
-            vm_frames_snap.insert(vm_frames_snap.end(), inline_frames, inline_frames + inline_frame_len);
+            (void) 0;
+            array_append(vm_frames_snap, inline_frames, inline_frame_len);
             inline_frame_len = 0;
         }
-        vm_frames_snap.push_back(f);
+        (vm_frames_snap << f);
     }
 };
 
@@ -605,7 +628,7 @@ struct HookObj : Obj {
 };
 
 struct GuardianObj : Obj {
-    std::vector<SCM> live;
+    array<SCM> live;
     array<SCM> zombies;  // (TeXmacs: a queue, small)
     bool greedy = false;
     bool destroyed = false;
@@ -628,7 +651,7 @@ struct RandomStateObj : Obj {
 struct RegexpObj : Obj {
     regex_t rx{};
     bool compiled = false;
-    std::string pattern;
+    string pattern;
     int flags = 0;
     RegexpObj() : Obj(ObjTag::Regexp) {}
     ~RegexpObj() {
@@ -651,14 +674,14 @@ enum class UniformType : uint8_t {
 
 struct UniformVectorObj : Obj {
     UniformType utype;
-    std::vector<uint8_t> bytes;
+    array<uint8_t> bytes;
     size_t length = 0;
     UniformVectorObj(UniformType ut, size_t n);
     size_t elem_size() const noexcept;
 };
 
 struct BitVectorObj : Obj {
-    std::vector<uint64_t> words;
+    array<uint64_t> words;
     size_t length = 0;
     BitVectorObj(size_t n, bool fill = false);
     bool get(size_t i) const noexcept;
@@ -674,7 +697,7 @@ struct ArrayDim {
 struct ArrayObj : Obj {
     SCM base_vec; // VectorObj, StringObj, BitVectorObj, UniformVectorObj
     int64_t base_offset = 0;
-    std::vector<ArrayDim> dims;
+    array<ArrayDim> dims;
     bool contiguous = true;
     ArrayObj() : Obj(ObjTag::Array) {}
 };
@@ -702,7 +725,7 @@ struct EvalClosureObj : Obj {
 };
 
 struct SmobTypeInfo {
-    std::string name;
+    string name;
     void (*mark)(SCM, const Marker&) = nullptr;
     void (*free_fn)(SCM) = nullptr;
     void (*print)(SCM, SCM) = nullptr;
@@ -733,7 +756,7 @@ struct FrameObj : Obj {
 
 struct StackObj : Obj {
     SCM id = SCM_BOOL_F;
-    std::vector<SCM> frames; // vector of FrameObj
+    array<SCM> frames; // vector of FrameObj
     StackObj() : Obj(ObjTag::Stack) {}
 };
 
@@ -755,8 +778,8 @@ struct EnvironmentObj : Obj {
     SCM imported = SCM_BOOL_F;
     SCM child_obs_1 = SCM_BOOL_F;
     SCM child_obs_2 = SCM_BOOL_F;
-    std::vector<SCM> strong_observers;
-    std::vector<SCM> weak_observers;
+    array<SCM> strong_observers;
+    array<SCM> weak_observers;
     explicit EnvironmentObj(EnvKind k = EnvKind::Leaf) : Obj(ObjTag::Environment), env_kind(k) {}
 };
 
@@ -780,8 +803,8 @@ struct ThreadObj : Obj {
 
 struct DynamicLibObj : Obj {
     void* handle = nullptr;
-    std::string filename;
-    DynamicLibObj(void* h, std::string fn) : Obj(ObjTag::DynamicLib), handle(h), filename(std::move(fn)) {}
+    string filename;
+    DynamicLibObj(void* h, string fn) : Obj(ObjTag::DynamicLib), handle(h), filename(fn) {}
 };
 
 struct AsyncObj : Obj {

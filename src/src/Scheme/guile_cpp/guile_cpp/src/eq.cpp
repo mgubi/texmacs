@@ -111,14 +111,14 @@ static bool equal_rec(SCM a, SCM b, int depth) {
     }
 
     if (ta == ObjTag::String && tb == ObjTag::String) {
-        return as_obj<StringObj>(a)->view() == as_obj<StringObj>(b)->view();
+        return string_obj_equal(as_obj<StringObj>(a), as_obj<StringObj>(b));
     }
 
     if (ta == ObjTag::Vector && tb == ObjTag::Vector) {
         auto* va = as_obj<VectorObj>(a);
         auto* vb = as_obj<VectorObj>(b);
-        if (va->elts.size() != vb->elts.size()) return false;
-        for (size_t i = 0; i < va->elts.size(); ++i) {
+        if (static_cast<size_t>(N(va->elts)) != static_cast<size_t>(N(vb->elts))) return false;
+        for (size_t i = 0; i < static_cast<size_t>(N(va->elts)); ++i) {
             if (!equal_rec(va->elts[i], vb->elts[i], depth + 1)) return false;
         }
         return true;
@@ -127,8 +127,8 @@ static bool equal_rec(SCM a, SCM b, int depth) {
     if (ta == ObjTag::WeakVector && tb == ObjTag::WeakVector) {
         auto* va = as_obj<WeakVectorObj>(a);
         auto* vb = as_obj<WeakVectorObj>(b);
-        if (va->elts.size() != vb->elts.size()) return false;
-        for (size_t i = 0; i < va->elts.size(); ++i) {
+        if (static_cast<size_t>(N(va->elts)) != static_cast<size_t>(N(vb->elts))) return false;
+        for (size_t i = 0; i < static_cast<size_t>(N(va->elts)); ++i) {
             if (!equal_rec(va->elts[i], vb->elts[i], depth + 1)) return false;
         }
         return true;

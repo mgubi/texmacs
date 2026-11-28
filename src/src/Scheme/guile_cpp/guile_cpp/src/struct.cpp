@@ -7,11 +7,11 @@ static bool is_tail_prot(char c) {
     return c == 'R' || c == 'W' || c == 'O';
 }
 
-static void validate_layout_string(std::string_view fields, SCM orig) {
-    if (fields.size() % 2 == 1) {
+static void validate_layout_string(string fields, SCM orig) {
+    if (static_cast<size_t>(N(fields)) % 2 == 1) {
         vm().misc_error("make-struct-layout", "odd length field specification: ~S", vm().list1(orig));
     }
-    for (size_t x = 0; x < fields.size(); x += 2) {
+    for (size_t x = 0; x < static_cast<size_t>(N(fields)); x += 2) {
         char ftype = fields[x];
         char fprot = fields[x + 1];
         if (ftype != 'u' && ftype != 'p' && ftype != 's') {
@@ -24,7 +24,7 @@ static void validate_layout_string(std::string_view fields, SCM orig) {
             // ok
         } else if (is_tail_prot(fprot)) {
             if (ftype == 's') vm().misc_error("make-struct-layout", "self fields not allowed in tail array");
-            if (x != fields.size() - 2) vm().misc_error("make-struct-layout", "tail array field must be last field in layout");
+            if (x != static_cast<size_t>(N(fields)) - 2) vm().misc_error("make-struct-layout", "tail array field must be last field in layout");
         } else {
             vm().misc_error("make-struct-layout", "unrecognized ref specification: ~S",
                             vm().list1(SCM::from_char(static_cast<unsigned char>(fprot))));
@@ -41,7 +41,7 @@ SCM struct_layout(SCM s) {
     SCM vt = struct_vtable(s);
     if (!is_struct(vt)) return SCM_BOOL_F;
     auto* vto = as_obj<StructObj>(vt);
-    if (vto->slots.empty()) return SCM_BOOL_F;
+    if ((N(vto->slots) == 0)) return SCM_BOOL_F;
     return SCM(vto->slots[VTABLE_INDEX_LAYOUT]);
 }
 
@@ -52,20 +52,20 @@ bool is_struct_vtable(SCM x) {
     // AND slot 0 (layout) is a symbol and slot 1 is self!
     SCM my_layout = struct_layout(x);
     if (!is_symbol(my_layout)) return false;
-    const std::string& desc = as_obj<SymbolObj>(my_layout)->name;
-    auto req = as_obj<StringObj>(vm().required_vtable_fields)->view();
-    if (desc.size() < req.size()) return false;
-    if (desc.compare(0, req.size(), req) != 0) return false;
-    if (st->slots.size() < 2) return false;
+    string desc = as_obj<SymbolObj>(my_layout)->name;
+    auto req = as_obj<StringObj>(vm().required_vtable_fields)->str();
+    if (static_cast<size_t>(N(desc)) < static_cast<size_t>(N(req))) return false;
+    if (std::memcmp(str_data(desc), str_data(req), N(req)) != 0) return false;
+    if (static_cast<size_t>(N(st->slots)) < 2) return false;
     return is_symbol(SCM(st->slots[VTABLE_INDEX_LAYOUT]));
 }
 
 static void init_struct_fields(StructObj* obj, SCM handle, SCM layout_sym, size_t tail_elts, SCM inits) {
-    const std::string& desc = as_obj<SymbolObj>(layout_sym)->name;
-    size_t nfields = desc.size() / 2;
-    bool has_tail = (nfields > 0 && is_tail_prot(desc[desc.size() - 1]));
+    string desc = as_obj<SymbolObj>(layout_sym)->name;
+    size_t nfields = static_cast<size_t>(N(desc)) / 2;
+    bool has_tail = (nfields > 0 && is_tail_prot(desc[static_cast<size_t>(N(desc)) - 1]));
     size_t total_slots = has_tail ? (nfields - 1 + 1 + tail_elts) : nfields;
-    obj->slots.assign(total_slots, 0);
+    gcpp_assign(obj->slots, total_slots, 0);
     obj->has_tail = has_tail;
     obj->tail_len = has_tail ? tail_elts : 0;
     obj->tail_start = has_tail ? (nfields - 1) : 0;
@@ -127,8 +127,8 @@ SCM make_struct_impl(SCM vtable, size_t tail_len, SCM init_list) {
     if (!is_symbol(layout)) {
         vm().misc_error("make-struct", "invalid vtable layout");
     }
-    const std::string& desc = as_obj<SymbolObj>(layout)->name;
-    bool has_tail = (!desc.empty() && is_tail_prot(desc.back()));
+    string desc = as_obj<SymbolObj>(layout)->name;
+    bool has_tail = (!(N(desc) == 0) && is_tail_prot(desc[N(desc) - 1]));
     if (!has_tail && tail_len != 0) {
         vm().misc_error("make-struct", "tail array not allowed unless layout ends with R, W, or O");
     }
@@ -141,7 +141,7 @@ SCM make_struct_impl(SCM vtable, size_t tail_len, SCM init_list) {
     }
     init_struct_fields(st, handle, layout, tail_len, init_list);
     if (vtable == vm().module_type) {
-        if (!st->slots.empty() && is_hashtable(SCM(st->slots[0]))) {
+        if (!(N(st->slots) == 0) && is_hashtable(SCM(st->slots[0]))) {
             as_obj<HashTableObj>(SCM(st->slots[0]))->is_module_obarray = true;
         }
     }
@@ -152,8 +152,8 @@ SCM make_vtable_vtable_impl(SCM extra_fields, size_t tail_len, SCM init_list) {
     if (!is_string(extra_fields)) {
         vm().wrong_type_arg("make-vtable-vtable", 1, extra_fields, "string");
     }
-    std::string full_desc = as_obj<StringObj>(vm().required_vtable_fields)->to_std_string() +
-                            as_obj<StringObj>(extra_fields)->to_std_string();
+    string full_desc = as_obj<StringObj>(vm().required_vtable_fields)->str() *
+                            as_obj<StringObj>(extra_fields)->str();
     SCM full_str = vm().make_string(full_desc);
     validate_layout_string(full_desc, full_str);
     SCM layout_sym = vm().make_symbol(full_desc);
@@ -170,11 +170,11 @@ SCM struct_ref(SCM handle, size_t p) {
     if (!is_struct(handle)) vm().wrong_type_arg("struct-ref", 1, handle, "struct");
     auto* st = as_obj<StructObj>(handle);
     SCM layout = struct_layout(handle);
-    const std::string& desc = as_obj<SymbolObj>(layout)->name;
-    size_t layout_len = desc.size();
+    string desc = as_obj<SymbolObj>(layout)->name;
+    size_t layout_len = static_cast<size_t>(N(desc));
     size_t n_base = st->has_tail ? st->tail_start : (layout_len / 2);
 
-    if (p >= st->slots.size()) {
+    if (p >= static_cast<size_t>(N(st->slots))) {
         vm().out_of_range("struct-ref", vm().make_uinteger(p));
     }
     char ftype = 'p';
@@ -206,11 +206,11 @@ void struct_set(SCM handle, size_t p, SCM val) {
     if (!is_struct(handle)) vm().wrong_type_arg("struct-set!", 1, handle, "struct");
     auto* st = as_obj<StructObj>(handle);
     SCM layout = struct_layout(handle);
-    const std::string& desc = as_obj<SymbolObj>(layout)->name;
-    size_t layout_len = desc.size();
+    string desc = as_obj<SymbolObj>(layout)->name;
+    size_t layout_len = static_cast<size_t>(N(desc));
     size_t n_base = st->has_tail ? st->tail_start : (layout_len / 2);
 
-    if (p >= st->slots.size()) {
+    if (p >= static_cast<size_t>(N(st->slots))) {
         vm().out_of_range("struct-set!", vm().make_uinteger(p));
     }
     char ftype = 'p';
@@ -269,16 +269,16 @@ bool struct_equal(SCM a, SCM b) {
     auto* sa = as_obj<StructObj>(a);
     auto* sb = as_obj<StructObj>(b);
     if (sa->vtable != sb->vtable) return false;
-    if (sa->slots.size() != sb->slots.size()) return false;
+    if (static_cast<size_t>(N(sa->slots)) != static_cast<size_t>(N(sb->slots))) return false;
     SCM layout = struct_layout(a);
-    const std::string& desc = as_obj<SymbolObj>(layout)->name;
-    size_t n_base = sa->has_tail ? sa->tail_start : (desc.size() / 2);
-    for (size_t i = 0; i < sa->slots.size(); ++i) {
+    string desc = as_obj<SymbolObj>(layout)->name;
+    size_t n_base = sa->has_tail ? sa->tail_start : (static_cast<size_t>(N(desc)) / 2);
+    for (size_t i = 0; i < static_cast<size_t>(N(sa->slots)); ++i) {
         if (sa->has_tail && i == sa->tail_start) {
             if (sa->slots[i] != sb->slots[i]) return false;
             continue;
         }
-        char ftype = (i < n_base) ? desc[i * 2] : desc[desc.size() - 2];
+        char ftype = (i < n_base) ? desc[i * 2] : desc[static_cast<size_t>(N(desc)) - 2];
         if (ftype == 'u') {
             if (sa->slots[i] != sb->slots[i]) return false;
         } else if (ftype == 's') {
@@ -302,7 +302,7 @@ void VM::init_struct() {
 
     define_proc("make-struct-layout", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("make-struct-layout", 1, a[0], "string");
-        auto sv = as_obj<StringObj>(a[0])->view();
+        auto sv = as_obj<StringObj>(a[0])->str();
         validate_layout_string(sv, a[0]);
         return make_symbol(sv);
     });
@@ -331,8 +331,8 @@ void VM::init_struct() {
 
     define_proc("make-vtable", 1, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("make-vtable", 1, a[0], "string");
-        SCM layout = make_symbol(as_obj<StringObj>(a[0])->view());
-        validate_layout_string(as_obj<StringObj>(a[0])->view(), a[0]);
+        SCM layout = make_symbol(as_obj<StringObj>(a[0])->str());
+        validate_layout_string(as_obj<StringObj>(a[0])->str(), a[0]);
         SCM printer = (nargs >= 2 && !a[1].is_undefined()) ? a[1] : SCM_BOOL_F;
         return make_struct_impl(vtable_vtable_no_extra, 0, list2(layout, printer));
     });
@@ -411,7 +411,7 @@ void VM::init_struct() {
             st->is_entity = true;
             st->entity_proc = a[1];
         } else {
-            if (st->slots.size() > 3) st->slots[3] = a[1].bits;
+            if (static_cast<size_t>(N(st->slots)) > 3) st->slots[3] = a[1].bits;
             st->entity_proc = a[1];
         }
         return SCM_UNSPECIFIED;
@@ -422,13 +422,13 @@ void VM::init_struct() {
         uint32_t of = obj_class_flags(a[0]);
         uint32_t cf = struct_class_flags(a[0]);
         if ((of & CLASSF_ENTITY) != 0 || st->is_entity) return st->entity_proc;
-        if ((cf & CLASSF_OPERATOR) != 0 && st->slots.size() > 3) return SCM(st->slots[3]);
+        if ((cf & CLASSF_OPERATOR) != 0 && static_cast<size_t>(N(st->slots)) > 3) return SCM(st->slots[3]);
         wrong_type_arg("object-procedure", 1, a[0], "entity or operator class");
     });
     define_proc("make-class-object", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_struct(a[0])) wrong_type_arg("make-class-object", 1, a[0], "struct");
         if (!is_string(a[1])) wrong_type_arg("make-class-object", 2, a[1], "string");
-        auto sv = as_obj<StringObj>(a[1])->view();
+        auto sv = as_obj<StringObj>(a[1])->str();
         validate_layout_string(sv, a[1]);
         SCM layout = make_symbol(sv);
         SCM c = make_struct_impl(a[0], 0, list4(layout, SCM_BOOL_F, SCM_EOL, SCM_EOL));
@@ -440,7 +440,7 @@ void VM::init_struct() {
         if (!is_string(a[1])) wrong_type_arg("make-subclass-object", 2, a[1], "string");
         auto* st = as_obj<StructObj>(a[0]);
         SCM pl = SCM(st->slots[VTABLE_INDEX_LAYOUT]);
-        std::string combined = as_obj<SymbolObj>(pl)->name + as_obj<StringObj>(a[1])->to_std_string();
+        string combined = as_obj<SymbolObj>(pl)->name * as_obj<StringObj>(a[1])->str();
         SCM combined_str = make_string(combined);
         validate_layout_string(combined, combined_str);
         SCM layout = make_symbol(combined);

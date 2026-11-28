@@ -35,16 +35,9 @@ using guile::SmobObj;
 * Strings between TeXmacs and guile_cpp
 ******************************************************************************/
 
-static std::string_view
-as_view (string s) {
-  int n= N (s);
-  if (n == 0) return std::string_view ();
-  return std::string_view (&s[0], (size_t) n);
-}
-
 static void
 port_write (SCM port, string s) {
-  guile::port_puts (guile::as_obj<PortObj> (port), as_view (s));
+  guile::port_puts (guile::as_obj<PortObj> (port), s);
 }
 
 /******************************************************************************
@@ -170,7 +163,7 @@ current_dynwind () {
 // own frames for it
 void
 tmscm_raise_error (string msg) {
-  guile::vm ().misc_error ("glue", std::string (as_view (msg)));
+  guile::vm ().misc_error ("glue", msg);
 }
 
 void
@@ -409,7 +402,7 @@ eval_scheme_file (string file) {
   if (DEBUG_STD) debug_std << "Evaluating " << file << "...\n";
   SCM dw= current_dynwind ();
   try {
-    return guile::vm ().primitive_load (std::string (as_view (file)));
+    return guile::vm ().primitive_load (file);
   }
   catch (...) {
     return handle_exception (dw);
@@ -420,7 +413,7 @@ tmscm
 eval_scheme (string s) {
   SCM dw= current_dynwind ();
   try {
-    return guile::vm ().eval_string (as_view (s));
+    return guile::vm ().eval_string (s);
   }
   catch (...) {
     return handle_exception (dw);
@@ -597,15 +590,14 @@ tmscm_to_double (tmscm obj) {
 
 tmscm
 string_to_tmscm (string s) {
-  return guile::vm ().make_string (as_view (s));
+  return guile::vm ().make_string (s);  // (a copy: Scheme may change it)
 }
 
 string
 tmscm_to_string (tmscm obj) {
   if (!guile::is_string (obj))
     guile::vm ().wrong_type_arg ("tmscm_to_string", 1, obj, "string");
-  std::string_view sv= guile::as_obj<guile::StringObj> (obj)->view ();
-  return string (sv.data (), (int) sv.size ());
+  return guile::as_obj<guile::StringObj> (obj)->str ();  // (a copy)
 }
 
 tmscm
@@ -617,6 +609,6 @@ string
 tmscm_to_symbol (tmscm obj) {
   if (!guile::is_symbol (obj))
     guile::vm ().wrong_type_arg ("tmscm_to_symbol", 1, obj, "symbol");
-  const std::string& nm= guile::as_obj<guile::SymbolObj> (obj)->name;
-  return string (nm.data (), (int) nm.size ());
+  // (a copy: the name of a symbol must never change, the caller may)
+  return copy (guile::as_obj<guile::SymbolObj> (obj)->name);
 }

@@ -1,7 +1,5 @@
 #include "guile_cpp/vm.hpp"
-#include "ntuple.hpp"
 #include <algorithm>
-#include <vector>
 
 namespace guile {
 
@@ -12,8 +10,8 @@ void env_notify(SCM env_scm);
 SCM env_add_observer(SCM env_scm, SCM proc_or_parent, bool weak) {
     auto* en = as_obj<EnvironmentObj>(env_scm);
     SCM tok = vm().heap().alloc_scm<ObserverObj>(env_scm, proc_or_parent, weak);
-    if (weak) en->weak_observers.push_back(tok);
-    else en->strong_observers.push_back(tok);
+    if (weak) (en->weak_observers << tok);
+    else (en->strong_observers << tok);
     return tok;
 }
 
@@ -25,7 +23,7 @@ void env_remove_observer(SCM tok_scm) {
     if (is_environment(obs->env)) {
         auto* en = as_obj<EnvironmentObj>(obs->env);
         auto& vec = obs->weak ? en->weak_observers : en->strong_observers;
-        vec.erase(std::remove(vec.begin(), vec.end(), tok_scm), vec.end());
+        vec = array_remove(vec, tok_scm);
     }
     obs->env = SCM_BOOL_F;
     obs->proc = SCM_BOOL_F;
@@ -36,14 +34,14 @@ void env_notify(SCM env_scm) {
     auto* en = as_obj<EnvironmentObj>(env_scm);
     // Snapshot active observers so mutations during callbacks don't invalidate iteration
     ScmRootVec snapshot(vm().heap());
-    for (SCM o : en->strong_observers) snapshot.push_back(o);
-    for (SCM o : en->weak_observers) snapshot.push_back(o);
+    for (SCM o : en->strong_observers) (snapshot << o);
+    for (SCM o : en->weak_observers) (snapshot << o);
 
     bool has_err = false;
     SCM err_key = SCM_BOOL_F;
     SCM err_args = SCM_EOL;
 
-    for (size_t i = 0; i < snapshot.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(N(snapshot)); ++i) {
         SCM o = snapshot[i];
         if (!is_observer(o)) continue;
         auto* obs = as_obj<ObserverObj>(o);
@@ -187,7 +185,13 @@ void env_set_op(SCM env_scm, SCM sym, SCM val) {
 }
 
 // Collect all (sym . val) bindings of an environment without duplicates (preserving shadowing)
-void env_collect_bindings(SCM env_scm, std::vector<::pair<SCM, SCM>>& out, std::vector<SCM>& seen) {
+// (TeXmacs: a binding of an environment, an element of an array)
+struct EnvBinding {
+    SCM sym;
+    SCM val;
+};
+
+void env_collect_bindings(SCM env_scm, array<EnvBinding>& out, array<SCM>& seen) {
     auto* en = as_obj<EnvironmentObj>(env_scm);
     auto has_seen = [&](SCM sym) {
         for (SCM s : seen) if (s == sym) return true;
@@ -203,8 +207,8 @@ void env_collect_bindings(SCM env_scm, std::vector<::pair<SCM, SCM>>& out, std::
                 SCM sym = car(entry);
                 SCM cell = cdr(entry);
                 if (!has_seen(sym)) {
-                    seen.push_back(sym);
-                    out.emplace_back(sym, cdr(cell));
+                    (seen << sym);
+                    (out << EnvBinding{sym, cdr(cell)});
                 }
                 p = cdr(p);
             }
@@ -224,13 +228,13 @@ void env_collect_bindings(SCM env_scm, std::vector<::pair<SCM, SCM>>& out, std::
         break;
     }
     case EnvKind::Export: {
-        std::vector<::pair<SCM, SCM>> sub_out;
-        std::vector<SCM> sub_seen;
+        array<EnvBinding> sub_out;
+        array<SCM> sub_seen;
         env_collect_bindings(en->local, sub_out, sub_seen);
         for (auto& [sym, val] : sub_out) {
             if (!has_seen(sym) && export_allows(en->imported, sym)) {
-                seen.push_back(sym);
-                out.emplace_back(sym, val);
+                (seen << sym);
+                (out << EnvBinding{sym, val});
             }
         }
         break;
@@ -239,8 +243,8 @@ void env_collect_bindings(SCM env_scm, std::vector<::pair<SCM, SCM>>& out, std::
 }
 
 SCM env_fold_op(SCM env_scm, SCM proc, SCM init) {
-    std::vector<::pair<SCM, SCM>> bindings;
-    std::vector<SCM> seen;
+    array<EnvBinding> bindings;
+    array<SCM> seen;
     env_collect_bindings(env_scm, bindings, seen);
     SCM acc = init;
     for (auto& [sym, val] : bindings) {

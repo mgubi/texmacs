@@ -1,6 +1,5 @@
 #include "guile_cpp/vm.hpp"
 #include <cstdio>
-#include <sstream>
 
 namespace guile {
 
@@ -13,7 +12,7 @@ void print_obj(SCM obj, SCM port_scm, PortObj* p, bool display_mode, int depth) 
     }
 
     if (obj.is_fixnum()) {
-        port_puts(p, std::to_string(obj.to_fixnum()));
+        port_puts(p, as_string(obj.to_fixnum()));
         return;
     }
     if (obj == SCM_BOOL_F) { port_puts(p, "#f"); return; }
@@ -82,7 +81,7 @@ void print_obj(SCM obj, SCM port_scm, PortObj* p, bool display_mode, int depth) 
             port_puts(p, sym->name);
         } else {
             // Check if symbol needs #{...}# escaping
-            bool needs_escape = sym->name.empty();
+            bool needs_escape = (N(sym->name) == 0);
             for (unsigned char c : sym->name) {
                 if (c <= 32 || c == '(' || c == ')' || c == '"' || c == ';' || c == '\\' || c == '\'' || c == '`' || c == ',') {
                     needs_escape = true;
@@ -112,12 +111,15 @@ void print_obj(SCM obj, SCM port_scm, PortObj* p, bool display_mode, int depth) 
         break;
     }
     case ObjTag::String: {
-        auto sv = static_cast<StringObj*>(o)->view();
+        StringObj* so = static_cast<StringObj*>(o);
+        const char* sv = so->chars();
+        size_t sv_n = so->len;
         if (display_mode) {
-            port_puts(p, sv);
+            port_puts(p, sv, sv_n);
         } else {
             port_putc(p, '"');
-            for (unsigned char c : sv) {
+            for (size_t si = 0; si < sv_n; si++) {
+                unsigned char c = static_cast<unsigned char>(sv[si]);
                 if (c == '"' || c == '\\') {
                     port_putc(p, '\\');
                     port_putc(p, static_cast<char>(c));
@@ -140,7 +142,7 @@ void print_obj(SCM obj, SCM port_scm, PortObj* p, bool display_mode, int depth) 
     case ObjTag::Vector: {
         auto* v = static_cast<VectorObj*>(o);
         port_puts(p, "#(");
-        for (size_t i = 0; i < v->elts.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(v->elts)); ++i) {
             if (i > 0) port_putc(p, ' ');
             print_obj(v->elts[i], port_scm, p, display_mode, depth + 1);
         }
@@ -150,7 +152,7 @@ void print_obj(SCM obj, SCM port_scm, PortObj* p, bool display_mode, int depth) 
     case ObjTag::WeakVector: {
         auto* v = static_cast<WeakVectorObj*>(o);
         port_puts(p, "#w(");
-        for (size_t i = 0; i < v->elts.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(v->elts)); ++i) {
             if (i > 0) port_putc(p, ' ');
             print_obj(v->elts[i], port_scm, p, display_mode, depth + 1);
         }
@@ -217,7 +219,7 @@ void print_obj(SCM obj, SCM port_scm, PortObj* p, bool display_mode, int depth) 
         if (pt->kind == PortKind::String) port_puts(p, "string");
         else if (pt->kind == PortKind::Soft) port_puts(p, "soft");
         else if (pt->kind == PortKind::Pipe) port_puts(p, "pipe");
-        else port_puts(p, pt->filename.empty() ? "file" : pt->filename);
+        else port_puts(p, (N(pt->filename) == 0) ? "file" : pt->filename);
         port_putc(p, '>');
         break;
     }
@@ -235,7 +237,7 @@ void print_obj(SCM obj, SCM port_scm, PortObj* p, bool display_mode, int depth) 
         SCM vt = st->vtable;
         if (is_struct(vt)) {
             auto* vto = as_obj<StructObj>(vt);
-            if (vto->slots.size() > VTABLE_INDEX_PRINTER) {
+            if (static_cast<size_t>(N(vto->slots)) > VTABLE_INDEX_PRINTER) {
                 SCM printer = SCM(vto->slots[VTABLE_INDEX_PRINTER]);
                 if (vm().is_procedure(printer)) {
                     vm().call2(printer, obj, port_scm);
@@ -275,7 +277,7 @@ void print_obj(SCM obj, SCM port_scm, PortObj* p, bool display_mode, int depth) 
     case ObjTag::Array: {
         auto* ar = static_cast<ArrayObj*>(o);
         port_putc(p, '#');
-        port_puts(p, std::to_string(ar->dims.size()));
+        port_puts(p, as_string(static_cast<size_t>(N(ar->dims))));
         if (is_uniform_vector(ar->base_vec)) {
             port_puts(p, uniform_type_tag(as_obj<UniformVectorObj>(ar->base_vec)->utype));
         } else if (is_bitvector(ar->base_vec)) {
@@ -301,7 +303,7 @@ void print_obj(SCM obj, SCM port_scm, PortObj* p, bool display_mode, int depth) 
     case ObjTag::HashTable: {
         auto* ht = static_cast<HashTableObj*>(o);
         char buf[64];
-        std::snprintf(buf, sizeof(buf), "#<hash-table %zu/%zu>", ht->count, ht->buckets.size());
+        std::snprintf(buf, sizeof(buf), "#<hash-table %zu/%zu>", ht->count, static_cast<size_t>(N(ht->buckets)));
         port_puts(p, buf);
         break;
     }
@@ -385,7 +387,7 @@ void VM::write_to_port(SCM obj, SCM port, bool display_mode) {
     print_obj(obj, port, as_obj<PortObj>(port), display_mode, 0);
 }
 
-std::string VM::write_to_string(SCM obj, bool display_mode) {
+string VM::write_to_string(SCM obj, bool display_mode) {
     SCM p = make_output_string_port();
     write_to_port(obj, p, display_mode);
     return as_obj<PortObj>(p)->str_buf;
@@ -435,9 +437,9 @@ void VM::init_print() {
             else if (scm_eqv(k, kw_display)) disp = v.is_true();
             rest = cdr(cdr(rest));
         }
-        std::string s = write_to_string(a[0], disp);
-        if (width > 3 && static_cast<int>(s.size()) > width) {
-            s = s.substr(0, static_cast<size_t>(width - 3)) + "...";
+        string s = write_to_string(a[0], disp);
+        if (width > 3 && static_cast<int>(static_cast<size_t>(N(s))) > width) {
+            s = str_sub(s, 0, static_cast<size_t>(width - 3)) * "...";
         }
         port_puts(as_obj<PortObj>(port), s);
         return SCM_UNSPECIFIED;

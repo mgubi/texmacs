@@ -23,18 +23,18 @@ size_t UniformVectorObj::elem_size() const noexcept {
 
 UniformVectorObj::UniformVectorObj(UniformType ut, size_t n)
     : Obj(ObjTag::UniformVector), utype(ut), length(n) {
-    bytes.resize(n * elem_size(), 0);
+    gcpp_resize(bytes, n * elem_size(), 0);
 }
 
 BitVectorObj::BitVectorObj(size_t n, bool fill)
     : Obj(ObjTag::BitVector), words((n + 63) / 64, fill ? ~0ULL : 0ULL), length(n) {
     if (fill && (n % 64) != 0) {
-        words.back() &= (1ULL << (n % 64)) - 1ULL;
+        words[N(words) - 1] &= (1ULL << (n % 64)) - 1ULL;
     }
 }
 
 bool BitVectorObj::get(size_t i) const noexcept {
-    return (words[i >> 6] >> (i & 63)) & 1ULL;
+    return (A(words)[i >> 6] >> (i & 63)) & 1ULL;
 }
 
 void BitVectorObj::set(size_t i, bool v) noexcept {
@@ -61,7 +61,7 @@ const char* uniform_type_tag(UniformType ut) {
 }
 
 SCM uniform_vector_ref(UniformVectorObj* uv, size_t i) {
-    const uint8_t* p = uv->bytes.data() + i * uv->elem_size();
+    const uint8_t* p = gcpp_data(uv->bytes) + i * uv->elem_size();
     switch (uv->utype) {
     case UniformType::U8:  { uint8_t  v; std::memcpy(&v, p, 1); return vm().make_uinteger(v); }
     case UniformType::S8:  { int8_t   v; std::memcpy(&v, p, 1); return vm().make_integer(v); }
@@ -86,7 +86,7 @@ SCM uniform_vector_ref(UniformVectorObj* uv, size_t i) {
 }
 
 void uniform_vector_set(UniformVectorObj* uv, size_t i, SCM val) {
-    uint8_t* p = uv->bytes.data() + i * uv->elem_size();
+    uint8_t* p = gcpp_data(uv->bytes) + i * uv->elem_size();
     switch (uv->utype) {
     case UniformType::U8: {
         uint64_t x = scm_to_uint64(val, "u8vector-set!", 3);
@@ -171,7 +171,7 @@ bool is_any_array(SCM x) {
 }
 
 static size_t base_vec_length(SCM bv) {
-    if (is_vector(bv)) return as_obj<VectorObj>(bv)->elts.size();
+    if (is_vector(bv)) return static_cast<size_t>(N(as_obj<VectorObj>(bv)->elts));
     if (is_string(bv)) return as_obj<StringObj>(bv)->len;
     if (is_bitvector(bv)) return as_obj<BitVectorObj>(bv)->length;
     if (is_uniform_vector(bv)) return as_obj<UniformVectorObj>(bv)->length;
@@ -180,7 +180,7 @@ static size_t base_vec_length(SCM bv) {
 
 static SCM base_vec_ref(SCM bv, size_t idx) {
     if (is_vector(bv)) return as_obj<VectorObj>(bv)->elts[idx];
-    if (is_string(bv)) return SCM::from_char(static_cast<unsigned char>(as_obj<StringObj>(bv)->view()[idx]));
+    if (is_string(bv)) return SCM::from_char(static_cast<unsigned char>(as_obj<StringObj>(bv)->chars()[idx]));
     if (is_bitvector(bv)) return SCM::from_bool(as_obj<BitVectorObj>(bv)->get(idx));
     if (is_uniform_vector(bv)) return uniform_vector_ref(as_obj<UniformVectorObj>(bv), idx);
     return SCM_UNSPECIFIED;
@@ -201,17 +201,17 @@ static void base_vec_set(SCM bv, size_t idx, SCM val) {
     if (is_uniform_vector(bv)) { uniform_vector_set(as_obj<UniformVectorObj>(bv), idx, val); return; }
 }
 
-static void get_array_info(SCM arr, SCM& base, int64_t& offset, std::vector<ArrayDim>& dims) {
+static void get_array_info(SCM arr, SCM& base, int64_t& offset, array<ArrayDim>& dims) {
     if (is_array(arr)) {
         auto* a = as_obj<ArrayObj>(arr);
         base = a->base_vec;
         offset = a->base_offset;
-        dims = a->dims;
+        dims = copy(a->dims);  // (callers may change their dims)
     } else if (is_vector(arr) || is_string(arr) || is_bitvector(arr) || is_uniform_vector(arr)) {
         base = arr;
         offset = 0;
         size_t len = base_vec_length(arr);
-        dims = {{0, static_cast<int64_t>(len) - 1, 1}};
+        dims = array_list<ArrayDim>({ArrayDim{0, static_cast<int64_t>(len) - 1, 1}});
     } else {
         vm().wrong_type_arg("array", 1, arr, "array");
     }
@@ -228,7 +228,7 @@ static SCM array_type_sym(SCM arr) {
 
 static bool parse_uniform_type_sym(SCM sym, UniformType& out) {
     if (!is_symbol(sym)) return false;
-    const std::string& s = as_obj<SymbolObj>(sym)->name;
+    string s = as_obj<SymbolObj>(sym)->name;
     if (s == "u8")  { out = UniformType::U8; return true; }
     if (s == "s8")  { out = UniformType::S8; return true; }
     if (s == "u16") { out = UniformType::U16; return true; }
@@ -249,10 +249,10 @@ static SCM make_base_vec_for_type(SCM type_sym, size_t total_len, SCM fill) {
         return vm().make_vector(total_len, fill.is_undefined() ? SCM_UNSPECIFIED : fill);
     }
     if (is_symbol(type_sym)) {
-        const std::string& nm = as_obj<SymbolObj>(type_sym)->name;
+        string nm = as_obj<SymbolObj>(type_sym)->name;
         if (nm == "a") {
             char ch = (!fill.is_undefined() && !fill.is_unspecified() && fill.is_char()) ? static_cast<char>(fill.to_char()) : '\0';
-            return vm().make_string(std::string(total_len, ch));
+            return vm().make_string_owned(string(static_cast<char>(ch), static_cast<int>(total_len)));
         }
         if (nm == "b") {
             bool b = (!fill.is_undefined() && !fill.is_unspecified() && fill.is_true());
@@ -273,15 +273,15 @@ static SCM make_base_vec_for_type(SCM type_sym, size_t total_len, SCM fill) {
 bool array_equal(SCM a, SCM b) {
     SCM ba, bb;
     int64_t oa = 0, ob = 0;
-    std::vector<ArrayDim> da, db;
+    array<ArrayDim> da, db;
     get_array_info(a, ba, oa, da);
     get_array_info(b, bb, ob, db);
-    if (da.size() != db.size()) return false;
-    for (size_t i = 0; i < da.size(); ++i) {
+    if (static_cast<size_t>(N(da)) != static_cast<size_t>(N(db))) return false;
+    for (size_t i = 0; i < static_cast<size_t>(N(da)); ++i) {
         if (da[i].lbnd != db[i].lbnd || da[i].ubnd != db[i].ubnd) return false;
     }
     auto cmp = [&](auto& cmp, size_t d, int64_t pa, int64_t pb) -> bool {
-        if (d == da.size()) return scm_equal(base_vec_ref(ba, static_cast<size_t>(pa)), base_vec_ref(bb, static_cast<size_t>(pb)));
+        if (d == static_cast<size_t>(N(da))) return scm_equal(base_vec_ref(ba, static_cast<size_t>(pa)), base_vec_ref(bb, static_cast<size_t>(pb)));
         for (int64_t i = da[d].lbnd; i <= da[d].ubnd; ++i) {
             int64_t off = i - da[d].lbnd;
             if (!cmp(cmp, d + 1, pa + off * da[d].inc, pb + off * db[d].inc)) return false;
@@ -295,53 +295,53 @@ void VM::init_arrays() {
     // ========================================================================
     // SRFI-4 Uniform Numeric Vectors
     // ========================================================================
-    auto reg_uvec = [this](UniformType ut, const std::string& pfx) {
-        define_proc(pfx + "vector?", 1, 0, false, [ut](const SCM* a, size_t) -> SCM {
+    auto reg_uvec = [this](UniformType ut, string pfx) {
+        define_proc(pfx * "vector?", 1, 0, false, [ut](const SCM* a, size_t) -> SCM {
             return SCM::from_bool(is_uniform_vector(a[0]) && as_obj<UniformVectorObj>(a[0])->utype == ut);
         });
-        define_proc("make-" + pfx + "vector", 1, 1, false, [this, ut, pfx](const SCM* a, size_t nargs) -> SCM {
-            int64_t n = scm_to_int64(a[0], ("make-" + pfx + "vector").c_str(), 1);
-            if (n < 0) out_of_range(("make-" + pfx + "vector").c_str(), a[0]);
+        define_proc("make-" * pfx * "vector", 1, 1, false, [this, ut, pfx](const SCM* a, size_t nargs) -> SCM {
+            int64_t n = scm_to_int64(a[0], ((char*) c_string(("make-" * pfx * "vector"))), 1);
+            if (n < 0) out_of_range(((char*) c_string(("make-" * pfx * "vector"))), a[0]);
             auto* uv = heap_.alloc<UniformVectorObj>(ut, static_cast<size_t>(n));
             if (nargs >= 2 && !a[1].is_undefined()) {
                 for (size_t i = 0; i < static_cast<size_t>(n); ++i) uniform_vector_set(uv, i, a[1]);
             }
             return SCM::from_obj(uv);
         });
-        define_proc(pfx + "vector", 0, 0, true, [ut](const SCM* a, size_t nargs) -> SCM {
+        define_proc(pfx * "vector", 0, 0, true, [ut](const SCM* a, size_t nargs) -> SCM {
             return read_uniform_vector_body(ut, nargs > 0 ? a[0] : SCM_EOL);
         });
-        define_proc(pfx + "vector-length", 1, 0, false, [this, ut, pfx](const SCM* a, size_t) -> SCM {
+        define_proc(pfx * "vector-length", 1, 0, false, [this, ut, pfx](const SCM* a, size_t) -> SCM {
             if (!is_uniform_vector(a[0]) || as_obj<UniformVectorObj>(a[0])->utype != ut)
-                wrong_type_arg((pfx + "vector-length").c_str(), 1, a[0], (pfx + "vector").c_str());
+                wrong_type_arg(((char*) c_string((pfx * "vector-length"))), 1, a[0], ((char*) c_string((pfx * "vector"))));
             return make_uinteger(as_obj<UniformVectorObj>(a[0])->length);
         });
-        define_proc(pfx + "vector-ref", 2, 0, false, [this, ut, pfx](const SCM* a, size_t) -> SCM {
+        define_proc(pfx * "vector-ref", 2, 0, false, [this, ut, pfx](const SCM* a, size_t) -> SCM {
             if (!is_uniform_vector(a[0]) || as_obj<UniformVectorObj>(a[0])->utype != ut)
-                wrong_type_arg((pfx + "vector-ref").c_str(), 1, a[0], (pfx + "vector").c_str());
+                wrong_type_arg(((char*) c_string((pfx * "vector-ref"))), 1, a[0], ((char*) c_string((pfx * "vector"))));
             auto* uv = as_obj<UniformVectorObj>(a[0]);
-            int64_t k = scm_to_int64(a[1], (pfx + "vector-ref").c_str(), 2);
-            if (k < 0 || static_cast<size_t>(k) >= uv->length) out_of_range((pfx + "vector-ref").c_str(), a[1]);
+            int64_t k = scm_to_int64(a[1], ((char*) c_string((pfx * "vector-ref"))), 2);
+            if (k < 0 || static_cast<size_t>(k) >= uv->length) out_of_range(((char*) c_string((pfx * "vector-ref"))), a[1]);
             return uniform_vector_ref(uv, static_cast<size_t>(k));
         });
-        define_proc(pfx + "vector-set!", 3, 0, false, [this, ut, pfx](const SCM* a, size_t) -> SCM {
+        define_proc(pfx * "vector-set!", 3, 0, false, [this, ut, pfx](const SCM* a, size_t) -> SCM {
             if (!is_uniform_vector(a[0]) || as_obj<UniformVectorObj>(a[0])->utype != ut)
-                wrong_type_arg((pfx + "vector-set!").c_str(), 1, a[0], (pfx + "vector").c_str());
+                wrong_type_arg(((char*) c_string((pfx * "vector-set!"))), 1, a[0], ((char*) c_string((pfx * "vector"))));
             auto* uv = as_obj<UniformVectorObj>(a[0]);
-            int64_t k = scm_to_int64(a[1], (pfx + "vector-set!").c_str(), 2);
-            if (k < 0 || static_cast<size_t>(k) >= uv->length) out_of_range((pfx + "vector-set!").c_str(), a[1]);
+            int64_t k = scm_to_int64(a[1], ((char*) c_string((pfx * "vector-set!"))), 2);
+            if (k < 0 || static_cast<size_t>(k) >= uv->length) out_of_range(((char*) c_string((pfx * "vector-set!"))), a[1]);
             uniform_vector_set(uv, static_cast<size_t>(k), a[2]);
             return SCM_UNSPECIFIED;
         });
-        define_proc(pfx + "vector->list", 1, 0, false, [this, ut, pfx](const SCM* a, size_t) -> SCM {
+        define_proc(pfx * "vector->list", 1, 0, false, [this, ut, pfx](const SCM* a, size_t) -> SCM {
             if (!is_uniform_vector(a[0]) || as_obj<UniformVectorObj>(a[0])->utype != ut)
-                wrong_type_arg((pfx + "vector->list").c_str(), 1, a[0], (pfx + "vector").c_str());
+                wrong_type_arg(((char*) c_string((pfx * "vector->list"))), 1, a[0], ((char*) c_string((pfx * "vector"))));
             auto* uv = as_obj<UniformVectorObj>(a[0]);
             SCM res = SCM_EOL;
             for (size_t i = uv->length; i > 0; --i) res = cons(uniform_vector_ref(uv, i - 1), res);
             return res;
         });
-        define_proc("list->" + pfx + "vector", 1, 0, false, [ut](const SCM* a, size_t) -> SCM {
+        define_proc("list->" * pfx * "vector", 1, 0, false, [ut](const SCM* a, size_t) -> SCM {
             return read_uniform_vector_body(ut, a[0]);
         });
     };
@@ -499,14 +499,14 @@ void VM::init_arrays() {
     });
     define_proc("array-rank", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_any_array(a[0])) wrong_type_arg("array-rank", 1, a[0], "array");
-        if (is_array(a[0])) return make_uinteger(as_obj<ArrayObj>(a[0])->dims.size());
+        if (is_array(a[0])) return make_uinteger(static_cast<size_t>(N(as_obj<ArrayObj>(a[0])->dims)));
         return make_integer(1);
     });
     define_proc("array-dimensions", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
-        SCM base; int64_t off; std::vector<ArrayDim> dims;
+        SCM base; int64_t off; array<ArrayDim> dims;
         get_array_info(a[0], base, off, dims);
         SCM res = SCM_EOL;
-        for (size_t i = dims.size(); i > 0; --i) {
+        for (size_t i = static_cast<size_t>(N(dims)); i > 0; --i) {
             auto& d = dims[i - 1];
             SCM spec = (d.lbnd == 0) ? make_integer(d.ubnd + 1) : list2(make_integer(d.lbnd), make_integer(d.ubnd));
             res = cons(spec, res);
@@ -515,7 +515,7 @@ void VM::init_arrays() {
     });
 
     auto make_typed_array_impl = [this](SCM type_sym, SCM fill, SCM bounds_list) -> SCM {
-        std::vector<ArrayDim> dims;
+        array<ArrayDim> dims;
         SCM cur = bounds_list;
         while (is_pair(cur)) {
             SCM b = car(cur);
@@ -527,18 +527,18 @@ void VM::init_arrays() {
                 d.lbnd = 0;
                 d.ubnd = scm_to_int64(b, "make-typed-array", 3) - 1;
             }
-            dims.push_back(d);
+            (dims << d);
             cur = cdr(cur);
         }
         int64_t total = 1;
-        for (size_t i = dims.size(); i > 0; --i) {
+        for (size_t i = static_cast<size_t>(N(dims)); i > 0; --i) {
             dims[i - 1].inc = total;
             int64_t sz = dims[i - 1].ubnd - dims[i - 1].lbnd + 1;
             if (sz < 0) sz = 0;
             total *= sz;
         }
         SCM base = make_base_vec_for_type(type_sym, static_cast<size_t>(total), fill);
-        if (dims.size() == 1 && dims[0].lbnd == 0) return base;
+        if (static_cast<size_t>(N(dims)) == 1 && dims[0].lbnd == 0) return base;
         auto* ar = heap_.alloc<ArrayObj>();
         ar->base_vec = base;
         ar->base_offset = 0;
@@ -557,60 +557,60 @@ void VM::init_arrays() {
     });
 
     define_proc("array-in-bounds?", 1, 0, true, [](const SCM* a, size_t nargs) -> SCM {
-        SCM base; int64_t off; std::vector<ArrayDim> dims;
+        SCM base; int64_t off; array<ArrayDim> dims;
         get_array_info(a[0], base, off, dims);
         SCM idxs = nargs > 1 ? a[1] : SCM_EOL;
         size_t d = 0;
         while (is_pair(idxs)) {
-            if (d >= dims.size()) return SCM_BOOL_F;
+            if (d >= static_cast<size_t>(N(dims))) return SCM_BOOL_F;
             int64_t idx = scm_to_int64(car(idxs), "array-in-bounds?", 2);
             if (idx < dims[d].lbnd || idx > dims[d].ubnd) return SCM_BOOL_F;
             ++d; idxs = cdr(idxs);
         }
-        return SCM::from_bool(d == dims.size());
+        return SCM::from_bool(d == static_cast<size_t>(N(dims)));
     });
 
     define_proc("array-ref", 1, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
-        SCM base; int64_t off; std::vector<ArrayDim> dims;
+        SCM base; int64_t off; array<ArrayDim> dims;
         get_array_info(a[0], base, off, dims);
         SCM idxs = nargs > 1 ? a[1] : SCM_EOL;
         size_t d = 0;
         int64_t pos = off;
         while (is_pair(idxs)) {
-            if (d >= dims.size()) wrong_num_args("array-ref");
+            if (d >= static_cast<size_t>(N(dims))) wrong_num_args("array-ref");
             int64_t idx = scm_to_int64(car(idxs), "array-ref", 2);
             if (idx < dims[d].lbnd || idx > dims[d].ubnd) out_of_range("array-ref", car(idxs));
             pos += (idx - dims[d].lbnd) * dims[d].inc;
             ++d; idxs = cdr(idxs);
         }
-        if (d != dims.size()) wrong_num_args("array-ref");
+        if (d != static_cast<size_t>(N(dims))) wrong_num_args("array-ref");
         return base_vec_ref(base, static_cast<size_t>(pos));
     });
 
     define_proc("array-set!", 2, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
-        SCM base; int64_t off; std::vector<ArrayDim> dims;
+        SCM base; int64_t off; array<ArrayDim> dims;
         get_array_info(a[0], base, off, dims);
         SCM val = a[1];
         SCM idxs = nargs > 2 ? a[2] : SCM_EOL;
         size_t d = 0;
         int64_t pos = off;
         while (is_pair(idxs)) {
-            if (d >= dims.size()) misc_error("array-set!", "wrong number of indices");
+            if (d >= static_cast<size_t>(N(dims))) misc_error("array-set!", "wrong number of indices");
             int64_t idx = scm_to_int64(car(idxs), "array-set!", 3);
             if (idx < dims[d].lbnd || idx > dims[d].ubnd) out_of_range("array-set!", car(idxs));
             pos += (idx - dims[d].lbnd) * dims[d].inc;
             ++d; idxs = cdr(idxs);
         }
-        if (d != dims.size()) misc_error("array-set!", "wrong number of indices");
+        if (d != static_cast<size_t>(N(dims))) misc_error("array-set!", "wrong number of indices");
         base_vec_set(base, static_cast<size_t>(pos), val);
         return SCM_UNSPECIFIED;
     });
 
     define_proc("array->list", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
-        SCM base; int64_t off; std::vector<ArrayDim> dims;
+        SCM base; int64_t off; array<ArrayDim> dims;
         get_array_info(a[0], base, off, dims);
         auto build = [&](auto& build, size_t d, int64_t pos) -> SCM {
-            if (d == dims.size()) return base_vec_ref(base, static_cast<size_t>(pos));
+            if (d == static_cast<size_t>(N(dims))) return base_vec_ref(base, static_cast<size_t>(pos));
             SCM res = SCM_EOL;
             for (int64_t i = dims[d].ubnd; i >= dims[d].lbnd; --i) {
                 res = cons(build(build, d + 1, pos + (i - dims[d].lbnd) * dims[d].inc), res);
@@ -640,10 +640,10 @@ void VM::init_arrays() {
             bounds = shape;
         }
         SCM arr = make_typed_array_impl(type_sym, SCM_UNDEFINED, bounds);
-        SCM base; int64_t off; std::vector<ArrayDim> dims;
+        SCM base; int64_t off; array<ArrayDim> dims;
         get_array_info(arr, base, off, dims);
         auto fill = [&](auto& fill, size_t d, int64_t pos, SCM cur) -> void {
-            if (d == dims.size()) { base_vec_set(base, static_cast<size_t>(pos), cur); return; }
+            if (d == static_cast<size_t>(N(dims))) { base_vec_set(base, static_cast<size_t>(pos), cur); return; }
             SCM p = cur;
             for (int64_t i = dims[d].lbnd; i <= dims[d].ubnd; ++i) {
                 if (!is_pair(p)) wrong_type_arg("list->typed-array", 3, lst, "nested list");
@@ -695,10 +695,10 @@ void VM::init_arrays() {
     });
 
     define_proc("array-fill!", 2, 0, false, [](const SCM* a, size_t) -> SCM {
-        SCM base; int64_t off; std::vector<ArrayDim> dims;
+        SCM base; int64_t off; array<ArrayDim> dims;
         get_array_info(a[0], base, off, dims);
         auto go = [&](auto& go, size_t d, int64_t pos) -> void {
-            if (d == dims.size()) { base_vec_set(base, static_cast<size_t>(pos), a[1]); return; }
+            if (d == static_cast<size_t>(N(dims))) { base_vec_set(base, static_cast<size_t>(pos), a[1]); return; }
             for (int64_t i = dims[d].lbnd; i <= dims[d].ubnd; ++i) go(go, d + 1, pos + (i - dims[d].lbnd) * dims[d].inc);
         };
         go(go, 0, off);
@@ -706,12 +706,12 @@ void VM::init_arrays() {
     });
 
     define_proc("array-copy!", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
-        SCM b1, b2; int64_t o1, o2; std::vector<ArrayDim> d1, d2;
+        SCM b1, b2; int64_t o1, o2; array<ArrayDim> d1, d2;
         get_array_info(a[0], b1, o1, d1);
         get_array_info(a[1], b2, o2, d2);
-        if (d1.size() != d2.size()) misc_error("array-copy!", "arrays have different ranks");
+        if (static_cast<size_t>(N(d1)) != static_cast<size_t>(N(d2))) misc_error("array-copy!", "arrays have different ranks");
         auto go = [&](auto& go, size_t d, int64_t p1, int64_t p2) -> void {
-            if (d == d1.size()) { base_vec_set(b2, static_cast<size_t>(p2), base_vec_ref(b1, static_cast<size_t>(p1))); return; }
+            if (d == static_cast<size_t>(N(d1))) { base_vec_set(b2, static_cast<size_t>(p2), base_vec_ref(b1, static_cast<size_t>(p1))); return; }
             int64_t len = d1[d].ubnd - d1[d].lbnd + 1;
             for (int64_t i = 0; i < len; ++i) go(go, d + 1, p1 + i * d1[d].inc, p2 + i * d2[d].inc);
         };
@@ -720,12 +720,12 @@ void VM::init_arrays() {
     });
 
     define_proc("array-index-map!", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
-        SCM base; int64_t off; std::vector<ArrayDim> dims;
+        SCM base; int64_t off; array<ArrayDim> dims;
         get_array_info(a[0], base, off, dims);
-        std::vector<SCM> idxs(dims.size());
+        array<SCM> idxs(static_cast<size_t>(N(dims)));
         auto go = [&](auto& go, size_t d, int64_t pos) -> void {
-            if (d == dims.size()) {
-                SCM v = apply(a[1], idxs.data(), idxs.size());
+            if (d == static_cast<size_t>(N(dims))) {
+                SCM v = apply(a[1], gcpp_data(idxs), static_cast<size_t>(N(idxs)));
                 base_vec_set(base, static_cast<size_t>(pos), v);
                 return;
             }
@@ -741,41 +741,41 @@ void VM::init_arrays() {
     define_proc("array-map!", 2, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
         SCM dst = a[0], proc = a[1];
         SCM srcs_lst = nargs > 2 ? a[2] : SCM_EOL;
-        SCM db; int64_t doff; std::vector<ArrayDim> dd;
+        SCM db; int64_t doff; array<ArrayDim> dd;
         get_array_info(dst, db, doff, dd);
-        struct SrcInfo { SCM base; int64_t off; std::vector<ArrayDim> dims; };
-        std::vector<SrcInfo> srcs;
+        struct SrcInfo { SCM base; int64_t off; array<ArrayDim> dims; };
+        array<SrcInfo> srcs;
         while (is_pair(srcs_lst)) {
             SrcInfo si;
             get_array_info(car(srcs_lst), si.base, si.off, si.dims);
-            srcs.push_back(std::move(si));
+            (srcs << std::move(si));
             srcs_lst = cdr(srcs_lst);
         }
         bool dsubr_1arg = false;
         if (is_subr(proc)) {
             auto* sub = as_obj<SubrObj>(proc);
-            if (srcs.size() >= 2 && sub->req == 1 && sub->opt == 0 && !sub->rst) {
-                if (!sub->name.empty() && sub->name[0] == '$') {
+            if (static_cast<size_t>(N(srcs)) >= 2 && sub->req == 1 && sub->opt == 0 && !sub->rst) {
+                if (!(N(sub->name) == 0) && sub->name[0] == '$') {
                     dsubr_1arg = true; // Guile 1.8 dsubr accepts extra sources and uses 1st
                 } else {
                     wrong_type_arg("array-map!", 2, proc, "procedure");
                 }
             }
         }
-        std::vector<int64_t> offsets(srcs.size());
-        for (size_t s = 0; s < srcs.size(); ++s) offsets[s] = srcs[s].off;
+        array<int64_t> offsets(static_cast<size_t>(N(srcs)));
+        for (size_t s = 0; s < static_cast<size_t>(N(srcs)); ++s) offsets[s] = srcs[s].off;
         auto go = [&](auto& go, size_t d, int64_t dpos) -> void {
-            if (d == dd.size()) {
-                std::vector<SCM> cargs(srcs.size());
-                for (size_t s = 0; s < srcs.size(); ++s) cargs[s] = base_vec_ref(srcs[s].base, static_cast<size_t>(offsets[s]));
-                SCM v = dsubr_1arg ? call1(proc, cargs[0]) : apply(proc, cargs.data(), cargs.size());
+            if (d == static_cast<size_t>(N(dd))) {
+                array<SCM> cargs(static_cast<size_t>(N(srcs)));
+                for (size_t s = 0; s < static_cast<size_t>(N(srcs)); ++s) cargs[s] = base_vec_ref(srcs[s].base, static_cast<size_t>(offsets[s]));
+                SCM v = dsubr_1arg ? call1(proc, cargs[0]) : apply(proc, gcpp_data(cargs), static_cast<size_t>(N(cargs)));
                 base_vec_set(db, static_cast<size_t>(dpos), v);
                 return;
             }
             int64_t len = dd[d].ubnd - dd[d].lbnd + 1;
             for (int64_t i = 0; i < len; ++i) {
-                std::vector<int64_t> saved = offsets;
-                for (size_t s = 0; s < srcs.size(); ++s) offsets[s] += i * srcs[s].dims[d].inc;
+                array<int64_t> saved = offsets;
+                for (size_t s = 0; s < static_cast<size_t>(N(srcs)); ++s) offsets[s] += i * srcs[s].dims[d].inc;
                 go(go, d + 1, dpos + i * dd[d].inc);
                 offsets = saved;
             }
@@ -788,27 +788,27 @@ void VM::init_arrays() {
         SCM proc = a[0];
         SCM first = a[1];
         SCM rest = nargs > 2 ? a[2] : SCM_EOL;
-        struct SrcInfo { SCM base; int64_t off; std::vector<ArrayDim> dims; };
-        std::vector<SrcInfo> srcs;
-        { SrcInfo si; get_array_info(first, si.base, si.off, si.dims); srcs.push_back(std::move(si)); }
+        struct SrcInfo { SCM base; int64_t off; array<ArrayDim> dims; };
+        array<SrcInfo> srcs;
+        { SrcInfo si; get_array_info(first, si.base, si.off, si.dims); (srcs << std::move(si)); }
         while (is_pair(rest)) {
-            SrcInfo si; get_array_info(car(rest), si.base, si.off, si.dims); srcs.push_back(std::move(si));
+            SrcInfo si; get_array_info(car(rest), si.base, si.off, si.dims); (srcs << std::move(si));
             rest = cdr(rest);
         }
-        std::vector<int64_t> offsets(srcs.size());
-        for (size_t s = 0; s < srcs.size(); ++s) offsets[s] = srcs[s].off;
-        const auto& dd = srcs[0].dims;
+        array<int64_t> offsets(static_cast<size_t>(N(srcs)));
+        for (size_t s = 0; s < static_cast<size_t>(N(srcs)); ++s) offsets[s] = srcs[s].off;
+        auto dd = srcs[0].dims;
         auto go = [&](auto& go, size_t d) -> void {
-            if (d == dd.size()) {
-                std::vector<SCM> cargs(srcs.size());
-                for (size_t s = 0; s < srcs.size(); ++s) cargs[s] = base_vec_ref(srcs[s].base, static_cast<size_t>(offsets[s]));
-                apply(proc, cargs.data(), cargs.size());
+            if (d == static_cast<size_t>(N(dd))) {
+                array<SCM> cargs(static_cast<size_t>(N(srcs)));
+                for (size_t s = 0; s < static_cast<size_t>(N(srcs)); ++s) cargs[s] = base_vec_ref(srcs[s].base, static_cast<size_t>(offsets[s]));
+                apply(proc, gcpp_data(cargs), static_cast<size_t>(N(cargs)));
                 return;
             }
             int64_t len = dd[d].ubnd - dd[d].lbnd + 1;
             for (int64_t i = 0; i < len; ++i) {
-                std::vector<int64_t> saved = offsets;
-                for (size_t s = 0; s < srcs.size(); ++s) offsets[s] += i * srcs[s].dims[d].inc;
+                array<int64_t> saved = offsets;
+                for (size_t s = 0; s < static_cast<size_t>(N(srcs)); ++s) offsets[s] += i * srcs[s].dims[d].inc;
                 go(go, d + 1);
                 offsets = saved;
             }
@@ -820,10 +820,10 @@ void VM::init_arrays() {
     define_proc("make-shared-array", 2, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
         SCM oldarr = a[0], mapfunc = a[1];
         SCM bounds = nargs > 2 ? a[2] : SCM_EOL;
-        SCM base; int64_t old_off; std::vector<ArrayDim> old_dims;
+        SCM base; int64_t old_off; array<ArrayDim> old_dims;
         get_array_info(oldarr, base, old_off, old_dims);
 
-        std::vector<ArrayDim> new_dims;
+        array<ArrayDim> new_dims;
         SCM cur = bounds;
         while (is_pair(cur)) {
             ArrayDim d;
@@ -834,16 +834,16 @@ void VM::init_arrays() {
                 d.lbnd = 0;
                 d.ubnd = scm_to_int64(car(cur), "make-shared-array", 3) - 1;
             }
-            new_dims.push_back(d);
+            (new_dims << d);
             cur = cdr(cur);
         }
 
-        auto eval_pos = [&](const std::vector<SCM>& idxs, bool check_low, bool check_high) -> int64_t {
-            SCM mapped = apply(mapfunc, idxs.data(), idxs.size());
+        auto eval_pos = [&](array<SCM> idxs, bool check_low, bool check_high) -> int64_t {
+            SCM mapped = apply(mapfunc, gcpp_data(idxs), static_cast<size_t>(N(idxs)));
             int64_t pos = old_off;
             size_t d = 0;
             while (is_pair(mapped)) {
-                if (d >= old_dims.size()) misc_error("make-shared-array", "mapping out of range");
+                if (d >= static_cast<size_t>(N(old_dims))) misc_error("make-shared-array", "mapping out of range");
                 int64_t i = scm_to_int64(car(mapped), "make-shared-array", 2);
                 if (check_low && (i < old_dims[d].lbnd || i > old_dims[d].ubnd)) {
                     out_of_range("make-shared-array", car(mapped));
@@ -854,7 +854,7 @@ void VM::init_arrays() {
                 pos += (i - old_dims[d].lbnd) * old_dims[d].inc;
                 ++d; mapped = cdr(mapped);
             }
-            if (d != old_dims.size()) misc_error("make-shared-array", "mapping out of range");
+            if (d != static_cast<size_t>(N(old_dims))) misc_error("make-shared-array", "mapping out of range");
             return pos;
         };
 
@@ -862,15 +862,15 @@ void VM::init_arrays() {
         for (const auto& nd : new_dims) {
             if (nd.ubnd < nd.lbnd) { non_empty = false; break; }
         }
-        std::vector<SCM> zero_idx(new_dims.size());
-        for (size_t d = 0; d < new_dims.size(); ++d) zero_idx[d] = make_integer(new_dims[d].lbnd);
+        array<SCM> zero_idx(static_cast<size_t>(N(new_dims)));
+        for (size_t d = 0; d < static_cast<size_t>(N(new_dims)); ++d) zero_idx[d] = make_integer(new_dims[d].lbnd);
         int64_t new_off = non_empty ? eval_pos(zero_idx, true, false) : 0;
         if (non_empty) {
-            std::vector<SCM> hi_idx(new_dims.size());
-            for (size_t d = 0; d < new_dims.size(); ++d) hi_idx[d] = make_integer(new_dims[d].ubnd);
+            array<SCM> hi_idx(static_cast<size_t>(N(new_dims)));
+            for (size_t d = 0; d < static_cast<size_t>(N(new_dims)); ++d) hi_idx[d] = make_integer(new_dims[d].ubnd);
             (void)eval_pos(hi_idx, false, true);
         }
-        for (size_t d = 0; d < new_dims.size(); ++d) {
+        for (size_t d = 0; d < static_cast<size_t>(N(new_dims)); ++d) {
             if (non_empty && new_dims[d].ubnd > new_dims[d].lbnd) {
                 auto probe = zero_idx;
                 probe[d] = make_integer(new_dims[d].lbnd + 1);
@@ -894,27 +894,27 @@ void VM::init_arrays() {
         return make_integer(is_array(a[0]) ? as_obj<ArrayObj>(a[0])->base_offset : 0);
     });
     define_proc("shared-array-increments", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
-        SCM base; int64_t off; std::vector<ArrayDim> dims;
+        SCM base; int64_t off; array<ArrayDim> dims;
         get_array_info(a[0], base, off, dims);
         SCM res = SCM_EOL;
-        for (size_t i = dims.size(); i > 0; --i) res = cons(make_integer(dims[i - 1].inc), res);
+        for (size_t i = static_cast<size_t>(N(dims)); i > 0; --i) res = cons(make_integer(dims[i - 1].inc), res);
         return res;
     });
     define_proc("transpose-array", 1, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
-        SCM base; int64_t off; std::vector<ArrayDim> dims;
+        SCM base; int64_t off; array<ArrayDim> dims;
         get_array_info(a[0], base, off, dims);
         SCM args = nargs > 1 ? a[1] : SCM_EOL;
-        std::vector<int64_t> perm;
+        array<int64_t> perm;
         int64_t max_d = -1;
         while (is_pair(args)) {
             int64_t p = scm_to_int64(car(args), "transpose-array", 2);
-            perm.push_back(p);
+            (perm << p);
             if (p > max_d) max_d = p;
             args = cdr(args);
         }
-        std::vector<ArrayDim> ndims(static_cast<size_t>(max_d + 1));
-        std::vector<bool> seen(ndims.size(), false);
-        for (size_t i = 0; i < perm.size() && i < dims.size(); ++i) {
+        array<ArrayDim> ndims(static_cast<size_t>(max_d + 1));
+        array<bool> seen = array_fill<bool>(static_cast<size_t>(N(ndims)), false);
+        for (size_t i = 0; i < static_cast<size_t>(N(perm)) && i < static_cast<size_t>(N(dims)); ++i) {
             size_t t = static_cast<size_t>(perm[i]);
             if (!seen[t]) { ndims[t] = dims[i]; seen[t] = true; }
             else { ndims[t].inc += dims[i].inc; }

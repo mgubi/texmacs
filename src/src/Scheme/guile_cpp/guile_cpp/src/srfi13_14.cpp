@@ -134,14 +134,14 @@ void VM::init_srfi13_14() {
             if (!is_charset(a[1])) wrong_type_arg("string->char-set", 2, a[1], "char-set");
             std::memcpy(cs->bits, as_obj<CharSetObj>(a[1])->bits, sizeof(cs->bits));
         }
-        for (unsigned char c : as_obj<StringObj>(a[0])->view()) cs->add(c);
+        for (unsigned char c : as_obj<StringObj>(a[0])->str()) cs->add(c);
         return SCM::from_obj(cs);
     });
     define_proc("string->char-set!", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("string->char-set!", 1, a[0], "string");
         if (!is_charset(a[1])) wrong_type_arg("string->char-set!", 2, a[1], "char-set");
         auto* cs = as_obj<CharSetObj>(a[1]);
-        for (unsigned char c : as_obj<StringObj>(a[0])->view()) cs->add(c);
+        for (unsigned char c : as_obj<StringObj>(a[0])->str()) cs->add(c);
         return a[1];
     });
     define_proc("char-set->list", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
@@ -156,11 +156,11 @@ void VM::init_srfi13_14() {
     define_proc("char-set->string", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_charset(a[0])) wrong_type_arg("char-set->string", 1, a[0], "char-set");
         auto* cs = as_obj<CharSetObj>(a[0]);
-        std::string res;
+        string res;
         for (int i = 0; i < 256; ++i) {
-            if (cs->contains(static_cast<uint8_t>(i))) res.push_back(static_cast<char>(i));
+            if (cs->contains(static_cast<uint8_t>(i))) (res << static_cast<char>(i));
         }
-        return make_string(std::move(res));
+        return make_string_owned(res);
     });
     define_proc("char-set-size", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_charset(a[0])) wrong_type_arg("char-set-size", 1, a[0], "char-set");
@@ -531,7 +531,7 @@ void VM::init_srfi13_14() {
         auto* cs = heap_.alloc<CharSetObj>();
         if (a[0].is_char()) { cs->add(static_cast<uint8_t>(a[0].to_char())); return SCM::from_obj(cs); }
         if (is_string(a[0])) {
-            for (unsigned char c : as_obj<StringObj>(a[0])->view()) cs->add(c);
+            for (unsigned char c : as_obj<StringObj>(a[0])->str()) cs->add(c);
             return SCM::from_obj(cs);
         }
         wrong_type_arg("->char-set", 1, a[0], "char, string, or char-set");
@@ -569,7 +569,7 @@ void VM::init_srfi13_14() {
     define_proc("string-any-c-code", 2, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[1], a, nargs, 2, "string-any", s, e);
-        auto sv = as_obj<StringObj>(a[1])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[1]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
         for (size_t i = s; i < e; ++i) {
             if (is_procedure(a[0])) {
                 SCM r = call1(a[0], SCM::from_char(static_cast<unsigned char>(sv[i])));
@@ -583,7 +583,7 @@ void VM::init_srfi13_14() {
     define_proc("string-every-c-code", 2, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[1], a, nargs, 2, "string-every", s, e);
-        auto sv = as_obj<StringObj>(a[1])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[1]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
         SCM last = SCM_BOOL_T;
         for (size_t i = s; i < e; ++i) {
             if (is_procedure(a[0])) {
@@ -600,32 +600,32 @@ void VM::init_srfi13_14() {
         if (!is_procedure(a[0])) wrong_type_arg("string-tabulate", 1, a[0], "procedure");
         int64_t len = scm_to_int64(a[1], "string-tabulate", 2);
         if (len < 0) out_of_range("string-tabulate", a[1]);
-        std::string res;
-        res.reserve(static_cast<size_t>(len));
+        string res;
+        (void) 0;
         for (int64_t i = 0; i < len; ++i) {
             SCM c = call1(a[0], make_integer(i));
             if (!c.is_char()) wrong_type_arg("string-tabulate", 1, c, "char");
-            res.push_back(static_cast<char>(c.to_char()));
+            (res << static_cast<char>(c.to_char()));
         }
-        return make_string(std::move(res));
+        return make_string_owned(res);
     });
 
     define_proc("reverse-list->string", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
-        std::string s;
+        string s;
         SCM cur = a[0];
         while (is_pair(cur)) {
             if (!car(cur).is_char()) wrong_type_arg("reverse-list->string", 1, car(cur), "char");
-            s.push_back(static_cast<char>(car(cur).to_char()));
+            (s << static_cast<char>(car(cur).to_char()));
             cur = cdr(cur);
         }
-        std::reverse(s.begin(), s.end());
-        return make_string(std::move(s));
+        std::reverse(begin(s), end(s));
+        return make_string_owned(s);
     });
 
     define_proc("string-join", 1, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
-        std::string delim = (nargs >= 2 && !a[1].is_undefined()) ? as_obj<StringObj>(a[1])->to_std_string() : " ";
+        string delim = (nargs >= 2 && !a[1].is_undefined()) ? as_obj<StringObj>(a[1])->str() : " ";
         SCM grammar = (nargs >= 3 && !a[2].is_undefined()) ? a[2] : make_symbol("infix");
-        std::string res;
+        string res;
         bool first = true;
         SCM cur = a[0];
         if (cur.is_null() && grammar == make_symbol("strict-infix")) {
@@ -633,14 +633,14 @@ void VM::init_srfi13_14() {
         }
         while (is_pair(cur)) {
             if (!is_string(car(cur))) wrong_type_arg("string-join", 1, car(cur), "string");
-            if (grammar == make_symbol("prefix")) res += delim;
-            else if (!first && (grammar == make_symbol("infix") || grammar == make_symbol("strict-infix"))) res += delim;
-            res.append(as_obj<StringObj>(car(cur))->view());
-            if (grammar == make_symbol("suffix")) res += delim;
+            if (grammar == make_symbol("prefix")) res << delim;
+            else if (!first && (grammar == make_symbol("infix") || grammar == make_symbol("strict-infix"))) res << delim;
+            str_append(res, as_obj<StringObj>(car(cur))->chars(), as_obj<StringObj>(car(cur))->len);
+            if (grammar == make_symbol("suffix")) res << delim;
             first = false;
             cur = cdr(cur);
         }
-        return make_string(std::move(res));
+        return make_string_owned(res);
     });
 
     define_proc("string-copy!", 3, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
@@ -650,39 +650,39 @@ void VM::init_srfi13_14() {
         size_t s = 0, e = 0;
         parse_str_bounds(a[2], a, nargs, 3, "string-copy!", s, e);
         auto* dst = as_obj<StringObj>(a[0]);
-        auto src = as_obj<StringObj>(a[2])->view();
+        auto src = as_obj<StringObj>(a[2])->str();
         if (tstart < 0 || static_cast<size_t>(tstart) + (e - s) > dst->len) out_of_range("string-copy!", a[1]);
-        std::memmove(dst->mutable_data() + tstart, src.data() + s, e - s);
+        std::memmove(dst->mutable_data() + tstart, gcpp_data(src) + s, e - s);
         return SCM_UNSPECIFIED;
     });
 
     define_proc("string-take", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("string-take", 1, a[0], "string");
         int64_t n = scm_to_int64(a[1], "string-take", 2);
-        auto sv = as_obj<StringObj>(a[0])->view();
-        if (n < 0 || static_cast<size_t>(n) > sv.size()) out_of_range("string-take", a[1]);
-        return make_string(sv.substr(0, static_cast<size_t>(n)));
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len;
+        if (n < 0 || static_cast<size_t>(n) > sv_n) out_of_range("string-take", a[1]);
+        return make_string(view_sub(sv, sv_n, 0, static_cast<size_t>(n)));
     });
     define_proc("string-take-right", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("string-take-right", 1, a[0], "string");
         int64_t n = scm_to_int64(a[1], "string-take-right", 2);
-        auto sv = as_obj<StringObj>(a[0])->view();
-        if (n < 0 || static_cast<size_t>(n) > sv.size()) out_of_range("string-take-right", a[1]);
-        return make_string(sv.substr(sv.size() - static_cast<size_t>(n)));
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len;
+        if (n < 0 || static_cast<size_t>(n) > sv_n) out_of_range("string-take-right", a[1]);
+        return make_string(view_sub(sv, sv_n, sv_n - static_cast<size_t>(n)));
     });
     define_proc("string-drop", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("string-drop", 1, a[0], "string");
         int64_t n = scm_to_int64(a[1], "string-drop", 2);
-        auto sv = as_obj<StringObj>(a[0])->view();
-        if (n < 0 || static_cast<size_t>(n) > sv.size()) out_of_range("string-drop", a[1]);
-        return make_string(sv.substr(static_cast<size_t>(n)));
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len;
+        if (n < 0 || static_cast<size_t>(n) > sv_n) out_of_range("string-drop", a[1]);
+        return make_string(view_sub(sv, sv_n, static_cast<size_t>(n)));
     });
     define_proc("string-drop-right", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("string-drop-right", 1, a[0], "string");
         int64_t n = scm_to_int64(a[1], "string-drop-right", 2);
-        auto sv = as_obj<StringObj>(a[0])->view();
-        if (n < 0 || static_cast<size_t>(n) > sv.size()) out_of_range("string-drop-right", a[1]);
-        return make_string(sv.substr(0, sv.size() - static_cast<size_t>(n)));
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len;
+        if (n < 0 || static_cast<size_t>(n) > sv_n) out_of_range("string-drop-right", a[1]);
+        return make_string(view_sub(sv, sv_n, 0, sv_n - static_cast<size_t>(n)));
     });
 
     define_proc("string-pad", 2, 3, false, [this](const SCM* a, size_t nargs) -> SCM {
@@ -692,9 +692,9 @@ void VM::init_srfi13_14() {
         char pad = (nargs >= 3 && !a[2].is_undefined()) ? static_cast<char>(a[2].to_char()) : ' ';
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 3, "string-pad", s, e);
-        auto sv = as_obj<StringObj>(a[0])->view().substr(s, e - s);
-        if (static_cast<size_t>(len) <= sv.size()) return make_string(sv.substr(sv.size() - static_cast<size_t>(len)));
-        return make_string(std::string(static_cast<size_t>(len) - sv.size(), pad) + std::string(sv));
+        auto sv = as_obj<StringObj>(a[0])->sub(s, e - s);
+        if (static_cast<size_t>(len) <= static_cast<size_t>(N(sv))) return make_string(str_sub(sv, static_cast<size_t>(N(sv)) - static_cast<size_t>(len)));
+        return make_string_owned(string(pad, static_cast<int>(len) - N(sv)) * sv);
     });
     define_proc("string-pad-right", 2, 3, false, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("string-pad-right", 1, a[0], "string");
@@ -703,9 +703,9 @@ void VM::init_srfi13_14() {
         char pad = (nargs >= 3 && !a[2].is_undefined()) ? static_cast<char>(a[2].to_char()) : ' ';
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 3, "string-pad-right", s, e);
-        auto sv = as_obj<StringObj>(a[0])->view().substr(s, e - s);
-        if (static_cast<size_t>(len) <= sv.size()) return make_string(sv.substr(0, static_cast<size_t>(len)));
-        return make_string(std::string(sv) + std::string(static_cast<size_t>(len) - sv.size(), pad));
+        auto sv = as_obj<StringObj>(a[0])->sub(s, e - s);
+        if (static_cast<size_t>(len) <= static_cast<size_t>(N(sv))) return make_string(str_sub(sv, 0, static_cast<size_t>(len)));
+        return make_string_owned(sv * string(pad, static_cast<int>(len) - N(sv)));
     });
 
     auto reg_trim = [this](const char* name, bool left, bool right) {
@@ -713,13 +713,13 @@ void VM::init_srfi13_14() {
             size_t s = 0, e = 0;
             parse_str_bounds(a[0], a, nargs, 2, name, s, e);
             SCM pred = (nargs >= 2 && !a[1].is_undefined()) ? a[1] : SCM_UNDEFINED;
-            auto sv = as_obj<StringObj>(a[0])->view();
+            StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len;
             auto is_trim = [&](unsigned char c) {
                 return pred.is_undefined() ? (std::isspace(c) != 0) : match_char_pred(pred, c);
             };
             if (left) while (s < e && is_trim(static_cast<unsigned char>(sv[s]))) ++s;
             if (right) while (e > s && is_trim(static_cast<unsigned char>(sv[e - 1]))) --e;
-            return make_string(sv.substr(s, e - s));
+            return make_string(view_sub(sv, sv_n, s, e - s));
         });
     };
     reg_trim("string-trim", true, false);
@@ -729,7 +729,7 @@ void VM::init_srfi13_14() {
     define_proc("string-index", 2, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 2, "string-index", s, e);
-        auto sv = as_obj<StringObj>(a[0])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
         for (size_t i = s; i < e; ++i) {
             if (match_char_pred(a[1], static_cast<unsigned char>(sv[i]))) return make_uinteger(i);
         }
@@ -738,7 +738,7 @@ void VM::init_srfi13_14() {
     define_proc("string-rindex", 2, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 2, "string-rindex", s, e);
-        auto sv = as_obj<StringObj>(a[0])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
         for (size_t i = e; i > s; --i) {
             if (match_char_pred(a[1], static_cast<unsigned char>(sv[i - 1]))) return make_uinteger(i - 1);
         }
@@ -747,7 +747,7 @@ void VM::init_srfi13_14() {
     define_proc("string-index-right", 2, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 2, "string-index-right", s, e);
-        auto sv = as_obj<StringObj>(a[0])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
         for (size_t i = e; i > s; --i) {
             if (match_char_pred(a[1], static_cast<unsigned char>(sv[i - 1]))) return make_uinteger(i - 1);
         }
@@ -756,7 +756,7 @@ void VM::init_srfi13_14() {
     define_proc("string-skip", 2, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 2, "string-skip", s, e);
-        auto sv = as_obj<StringObj>(a[0])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
         for (size_t i = s; i < e; ++i) {
             if (!match_char_pred(a[1], static_cast<unsigned char>(sv[i]))) return make_uinteger(i);
         }
@@ -765,7 +765,7 @@ void VM::init_srfi13_14() {
     define_proc("string-skip-right", 2, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 2, "string-skip-right", s, e);
-        auto sv = as_obj<StringObj>(a[0])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
         for (size_t i = e; i > s; --i) {
             if (!match_char_pred(a[1], static_cast<unsigned char>(sv[i - 1]))) return make_uinteger(i - 1);
         }
@@ -774,7 +774,7 @@ void VM::init_srfi13_14() {
     define_proc("string-count", 2, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 2, "string-count", s, e);
-        auto sv = as_obj<StringObj>(a[0])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
         size_t cnt = 0;
         for (size_t i = s; i < e; ++i) {
             if (match_char_pred(a[1], static_cast<unsigned char>(sv[i]))) ++cnt;
@@ -787,8 +787,8 @@ void VM::init_srfi13_14() {
             size_t s1 = 0, e1 = 0, s2 = 0, e2 = 0;
             parse_str_bounds(a[0], a, nargs, 2, name, s1, e1);
             parse_str_bounds(a[1], a, nargs, 4, name, s2, e2);
-            auto v1 = as_obj<StringObj>(a[0])->view();
-            auto v2 = as_obj<StringObj>(a[1])->view();
+            StringObj* v1_o = as_obj<StringObj>(a[0]); const char* v1 = v1_o->chars(); size_t v1_n = v1_o->len; (void) v1_n;
+            StringObj* v2_o = as_obj<StringObj>(a[1]); const char* v2 = v2_o->chars(); size_t v2_n = v2_o->len; (void) v2_n;
             size_t n2 = e2 - s2;
             if (n2 == 0) return make_uinteger(s1);
             if (n2 > e1 - s1) return SCM_BOOL_F;
@@ -814,7 +814,7 @@ void VM::init_srfi13_14() {
         define_proc(name, 1, 2, false, [this, name, mode, destructive](const SCM* a, size_t nargs) -> SCM {
             size_t s = 0, e = 0;
             parse_str_bounds(a[0], a, nargs, 1, name, s, e);
-            SCM target = destructive ? a[0] : make_string(as_obj<StringObj>(a[0])->to_std_string());
+            SCM target = destructive ? a[0] : make_string(as_obj<StringObj>(a[0])->chars(), as_obj<StringObj>(a[0])->len);
             char* d = as_obj<StringObj>(target)->mutable_data();
             bool in_word = false;
             for (size_t i = s; i < e; ++i) {
@@ -845,9 +845,9 @@ void VM::init_srfi13_14() {
     define_proc("string-reverse", 1, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 1, "string-reverse", s, e);
-        std::string res(as_obj<StringObj>(a[0])->view().substr(s, e - s));
-        std::reverse(res.begin(), res.end());
-        return make_string(std::move(res));
+        string res(as_obj<StringObj>(a[0])->sub(s, e - s));
+        std::reverse(begin(res), end(res));
+        return make_string_owned(res);
     });
     define_proc("string-reverse!", 1, 2, false, [](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
@@ -858,56 +858,56 @@ void VM::init_srfi13_14() {
     });
 
     define_proc("string-concatenate", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
-        std::string res;
+        string res;
         SCM cur = a[0];
         while (is_pair(cur)) {
             if (!is_string(car(cur))) wrong_type_arg("string-concatenate", 1, car(cur), "string");
-            res.append(as_obj<StringObj>(car(cur))->view());
+            str_append(res, as_obj<StringObj>(car(cur))->chars(), as_obj<StringObj>(car(cur))->len);
             cur = cdr(cur);
         }
         if (!cur.is_null()) wrong_type_arg("string-concatenate", 1, a[0], "proper list");
-        return make_string(std::move(res));
+        return make_string_owned(res);
     });
     define_proc("string-concatenate-reverse", 1, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
-        std::vector<std::string_view> parts;
+        array<string> parts;
         SCM cur = a[0];
         while (is_pair(cur)) {
             if (!is_string(car(cur))) wrong_type_arg("string-concatenate-reverse", 1, car(cur), "string");
-            parts.push_back(as_obj<StringObj>(car(cur))->view());
+            (parts << as_obj<StringObj>(car(cur))->str());
             cur = cdr(cur);
         }
-        std::string res;
-        for (size_t i = parts.size(); i > 0; --i) res.append(parts[i - 1]);
+        string res;
+        for (size_t i = static_cast<size_t>(N(parts)); i > 0; --i) str_append(res, parts[i - 1]);
         if (nargs >= 2 && !a[1].is_undefined()) {
             if (!is_string(a[1])) wrong_type_arg("string-concatenate-reverse", 2, a[1], "string");
-            auto tail = as_obj<StringObj>(a[1])->view();
-            size_t end = (nargs >= 3 && !a[2].is_undefined()) ? static_cast<size_t>(scm_to_int64(a[2], "string-concatenate-reverse", 3)) : tail.size();
-            if (end > tail.size()) out_of_range("string-concatenate-reverse", a[2]);
-            res.append(tail.substr(0, end));
+            StringObj* tail_o = as_obj<StringObj>(a[1]); const char* tail = tail_o->chars(); size_t tail_n = tail_o->len;
+            size_t end = (nargs >= 3 && !a[2].is_undefined()) ? static_cast<size_t>(scm_to_int64(a[2], "string-concatenate-reverse", 3)) : tail_n;
+            if (end > tail_n) out_of_range("string-concatenate-reverse", a[2]);
+            str_append(res, view_sub(tail, tail_n, 0, end));
         }
-        return make_string(std::move(res));
+        return make_string_owned(res);
     });
     define_proc("string-concatenate/shared", 1, 0, false, [this](const SCM* a, size_t nargs) -> SCM {
         return call1(as_obj<VariableObj>(lookup("string-concatenate"))->value, a[0]);
     });
     define_proc("string-concatenate-reverse/shared", 1, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
-        std::vector<SCM> v(a, a + nargs);
-        return apply(as_obj<VariableObj>(lookup("string-concatenate-reverse"))->value, v.data(), v.size());
+        array<SCM> v = array_from<SCM>(a, nargs);
+        return apply(as_obj<VariableObj>(lookup("string-concatenate-reverse"))->value, gcpp_data(v), static_cast<size_t>(N(v)));
     });
 
     define_proc("string-map", 2, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_procedure(a[0])) wrong_type_arg("string-map", 1, a[0], "procedure");
         size_t s = 0, e = 0;
         parse_str_bounds(a[1], a, nargs, 2, "string-map", s, e);
-        auto sv = as_obj<StringObj>(a[1])->view();
-        std::string res;
-        res.reserve(e - s);
+        StringObj* sv_o = as_obj<StringObj>(a[1]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
+        string res;
+        (void) 0;
         for (size_t i = s; i < e; ++i) {
             SCM c = call1(a[0], SCM::from_char(static_cast<unsigned char>(sv[i])));
             if (!c.is_char()) wrong_type_arg("string-map", 1, c, "char");
-            res.push_back(static_cast<char>(c.to_char()));
+            (res << static_cast<char>(c.to_char()));
         }
-        return make_string(std::move(res));
+        return make_string_owned(res);
     });
     define_proc("string-map!", 2, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_procedure(a[0])) wrong_type_arg("string-map!", 1, a[0], "procedure");
@@ -915,7 +915,7 @@ void VM::init_srfi13_14() {
         parse_str_bounds(a[1], a, nargs, 2, "string-map!", s, e);
         auto* so = as_obj<StringObj>(a[1]);
         for (size_t i = s; i < e; ++i) {
-            SCM c = call1(a[0], SCM::from_char(static_cast<unsigned char>(so->view()[i])));
+            SCM c = call1(a[0], SCM::from_char(static_cast<unsigned char>(so->chars()[i])));
             if (!c.is_char()) wrong_type_arg("string-map!", 1, c, "char");
             so->mutable_data()[i] = static_cast<char>(c.to_char());
         }
@@ -924,7 +924,7 @@ void VM::init_srfi13_14() {
     define_proc("string-fold", 3, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[2], a, nargs, 3, "string-fold", s, e);
-        auto sv = as_obj<StringObj>(a[2])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[2]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
         SCM acc = a[1];
         for (size_t i = s; i < e; ++i) acc = call2(a[0], SCM::from_char(static_cast<unsigned char>(sv[i])), acc);
         return acc;
@@ -932,7 +932,7 @@ void VM::init_srfi13_14() {
     define_proc("string-fold-right", 3, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[2], a, nargs, 3, "string-fold-right", s, e);
-        auto sv = as_obj<StringObj>(a[2])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[2]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
         SCM acc = a[1];
         for (size_t i = e; i > s; --i) acc = call2(a[0], SCM::from_char(static_cast<unsigned char>(sv[i - 1])), acc);
         return acc;
@@ -941,7 +941,7 @@ void VM::init_srfi13_14() {
         if (!is_procedure(a[0])) wrong_type_arg("string-for-each", 1, a[0], "procedure");
         size_t s = 0, e = 0;
         parse_str_bounds(a[1], a, nargs, 2, "string-for-each", s, e);
-        auto sv = as_obj<StringObj>(a[1])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[1]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
         for (size_t i = s; i < e; ++i) call1(a[0], SCM::from_char(static_cast<unsigned char>(sv[i])));
         return SCM_UNSPECIFIED;
     });
@@ -955,28 +955,28 @@ void VM::init_srfi13_14() {
     define_proc("string-filter", 2, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 2, "string-filter", s, e);
-        auto sv = as_obj<StringObj>(a[0])->view();
-        std::string res;
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
+        string res;
         for (size_t i = s; i < e; ++i) {
-            if (match_char_pred(a[1], static_cast<unsigned char>(sv[i]))) res.push_back(sv[i]);
+            if (match_char_pred(a[1], static_cast<unsigned char>(sv[i]))) (res << sv[i]);
         }
-        return make_string(std::move(res));
+        return make_string_owned(res);
     });
     define_proc("string-delete", 2, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 2, "string-delete", s, e);
-        auto sv = as_obj<StringObj>(a[0])->view();
-        std::string res;
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len; (void) sv_n;
+        string res;
         for (size_t i = s; i < e; ++i) {
-            if (!match_char_pred(a[1], static_cast<unsigned char>(sv[i]))) res.push_back(sv[i]);
+            if (!match_char_pred(a[1], static_cast<unsigned char>(sv[i]))) (res << sv[i]);
         }
-        return make_string(std::move(res));
+        return make_string_owned(res);
     });
     define_proc("string-tokenize", 1, 3, false, [this](const SCM* a, size_t nargs) -> SCM {
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 2, "string-tokenize", s, e);
         SCM cs = (nargs >= 2 && !a[1].is_undefined()) ? a[1] : SCM_UNDEFINED;
-        auto sv = as_obj<StringObj>(a[0])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len;
         auto in_tok = [&](unsigned char c) {
             return cs.is_undefined() ? (std::isgraph(c) != 0) : match_char_pred(cs, c);
         };
@@ -986,96 +986,96 @@ void VM::init_srfi13_14() {
             while (i < e && !in_tok(static_cast<unsigned char>(sv[i]))) ++i;
             size_t start = i;
             while (i < e && in_tok(static_cast<unsigned char>(sv[i]))) ++i;
-            if (i > start) res = cons(make_string(sv.substr(start, i - start)), res);
+            if (i > start) res = cons(make_string(view_sub(sv, sv_n, start, i - start)), res);
         }
         return scm_reverse_x(res);
     });
     define_proc("string-replace", 2, 4, false, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("string-replace", 1, a[0], "string");
         if (!is_string(a[1])) wrong_type_arg("string-replace", 2, a[1], "string");
-        auto v1 = as_obj<StringObj>(a[0])->view();
-        auto v2 = as_obj<StringObj>(a[1])->view();
+        StringObj* v1_o = as_obj<StringObj>(a[0]); const char* v1 = v1_o->chars(); size_t v1_n = v1_o->len;
+        StringObj* v2_o = as_obj<StringObj>(a[1]); const char* v2 = v2_o->chars(); size_t v2_n = v2_o->len;
         int64_t st1 = (nargs >= 3 && !a[2].is_undefined()) ? scm_to_int64(a[2], "string-replace", 3) : 0;
-        int64_t en1 = (nargs >= 4 && !a[3].is_undefined()) ? scm_to_int64(a[3], "string-replace", 4) : static_cast<int64_t>(v1.size());
+        int64_t en1 = (nargs >= 4 && !a[3].is_undefined()) ? scm_to_int64(a[3], "string-replace", 4) : static_cast<int64_t>(v1_n);
         int64_t st2 = (nargs >= 5 && !a[4].is_undefined()) ? scm_to_int64(a[4], "string-replace", 5) : 0;
-        int64_t en2 = (nargs >= 6 && !a[5].is_undefined()) ? scm_to_int64(a[5], "string-replace", 6) : static_cast<int64_t>(v2.size());
-        if (st1 < 0 || en1 < st1 || static_cast<size_t>(en1) > v1.size() ||
-            st2 < 0 || en2 < st2 || static_cast<size_t>(en2) > v2.size()) out_of_range("string-replace", a[2]);
-        std::string res;
-        res.append(v1.substr(0, static_cast<size_t>(st1)));
-        res.append(v2.substr(static_cast<size_t>(st2), static_cast<size_t>(en2 - st2)));
-        res.append(v1.substr(static_cast<size_t>(en1)));
-        return make_string(std::move(res));
+        int64_t en2 = (nargs >= 6 && !a[5].is_undefined()) ? scm_to_int64(a[5], "string-replace", 6) : static_cast<int64_t>(v2_n);
+        if (st1 < 0 || en1 < st1 || static_cast<size_t>(en1) > v1_n ||
+            st2 < 0 || en2 < st2 || static_cast<size_t>(en2) > v2_n) out_of_range("string-replace", a[2]);
+        string res;
+        str_append(res, view_sub(v1, v1_n, 0, static_cast<size_t>(st1)));
+        str_append(res, view_sub(v2, v2_n, static_cast<size_t>(st2), static_cast<size_t>(en2 - st2)));
+        str_append(res, view_sub(v1, v1_n, static_cast<size_t>(en1)));
+        return make_string_owned(res);
     });
     define_proc("xsubstring", 2, 3, false, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("xsubstring", 1, a[0], "string");
         int64_t from = scm_to_int64(a[1], "xsubstring", 2);
-        auto sv = as_obj<StringObj>(a[0])->view();
+        StringObj* sv_o = as_obj<StringObj>(a[0]); const char* sv = sv_o->chars(); size_t sv_n = sv_o->len;
         size_t s = (nargs >= 4 && !a[3].is_undefined()) ? static_cast<size_t>(scm_to_int64(a[3], "xsubstring", 4)) : 0;
-        size_t e = (nargs >= 5 && !a[4].is_undefined()) ? static_cast<size_t>(scm_to_int64(a[4], "xsubstring", 5)) : sv.size();
-        auto sub = sv.substr(s, e - s);
-        int64_t to = (nargs >= 3 && !a[2].is_undefined()) ? scm_to_int64(a[2], "xsubstring", 3) : (from + static_cast<int64_t>(sub.size()));
+        size_t e = (nargs >= 5 && !a[4].is_undefined()) ? static_cast<size_t>(scm_to_int64(a[4], "xsubstring", 5)) : sv_n;
+        auto sub = view_sub(sv, sv_n, s, e - s);
+        int64_t to = (nargs >= 3 && !a[2].is_undefined()) ? scm_to_int64(a[2], "xsubstring", 3) : (from + static_cast<int64_t>(static_cast<size_t>(N(sub))));
         if (to < from) out_of_range("xsubstring", a[2]);
         if (to == from) return make_string("");
-        if (sub.empty()) misc_error("xsubstring", "cannot replicate empty string");
-        std::string res;
-        res.reserve(static_cast<size_t>(to - from));
-        int64_t n = static_cast<int64_t>(sub.size());
+        if ((N(sub) == 0)) misc_error("xsubstring", "cannot replicate empty string");
+        string res;
+        (void) 0;
+        int64_t n = static_cast<int64_t>(static_cast<size_t>(N(sub)));
         for (int64_t i = from; i < to; ++i) {
             int64_t idx = ((i % n) + n) % n;
-            res.push_back(sub[static_cast<size_t>(idx)]);
+            (res << sub[static_cast<size_t>(idx)]);
         }
-        return make_string(std::move(res));
+        return make_string_owned(res);
     });
     define_proc("string-xcopy!", 4, 3, false, [this](const SCM* a, size_t nargs) -> SCM {
         // (string-xcopy! target tstart s sfrom [sto [start [end]]])
         if (!is_string(a[0]) || !is_string(a[2])) wrong_type_arg("string-xcopy!", 1, a[0], "string");
         int64_t tstart = scm_to_int64(a[1], "string-xcopy!", 2);
-        std::vector<SCM> xs_args;
-        xs_args.push_back(a[2]);
-        xs_args.push_back(a[3]);
-        for (size_t i = 4; i < nargs; ++i) xs_args.push_back(a[i]);
-        SCM rep = apply(as_obj<VariableObj>(lookup("xsubstring"))->value, xs_args.data(), xs_args.size());
-        auto rv = as_obj<StringObj>(rep)->view();
+        array<SCM> xs_args;
+        (xs_args << a[2]);
+        (xs_args << a[3]);
+        for (size_t i = 4; i < nargs; ++i) (xs_args << a[i]);
+        SCM rep = apply(as_obj<VariableObj>(lookup("xsubstring"))->value, gcpp_data(xs_args), static_cast<size_t>(N(xs_args)));
+        auto rv = as_obj<StringObj>(rep)->str();
         auto* dst = as_obj<StringObj>(a[0]);
-        if (tstart < 0 || static_cast<size_t>(tstart) + rv.size() > dst->len) out_of_range("string-xcopy!", a[1]);
-        std::memcpy(dst->mutable_data() + tstart, rv.data(), rv.size());
+        if (tstart < 0 || static_cast<size_t>(tstart) + static_cast<size_t>(N(rv)) > dst->len) out_of_range("string-xcopy!", a[1]);
+        std::memcpy(dst->mutable_data() + tstart, gcpp_data(rv), static_cast<size_t>(N(rv)));
         return SCM_UNSPECIFIED;
     });
     define_proc("string-unfold", 4, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
-        std::string res;
-        if (nargs >= 5 && !a[4].is_undefined()) res = as_obj<StringObj>(a[4])->to_std_string();
+        string res;
+        if (nargs >= 5 && !a[4].is_undefined()) res = as_obj<StringObj>(a[4])->str();
         SCM seed = a[3];
         while (call1(a[0], seed).is_false()) {
             SCM c = call1(a[1], seed);
             if (!c.is_char()) wrong_type_arg("string-unfold", 2, c, "char");
-            res.push_back(static_cast<char>(c.to_char()));
+            (res << static_cast<char>(c.to_char()));
             seed = call1(a[2], seed);
         }
         if (nargs >= 6 && !a[5].is_undefined()) {
             SCM tail = call1(a[5], seed);
-            res.append(as_obj<StringObj>(tail)->view());
+            str_append(res, as_obj<StringObj>(tail)->chars(), as_obj<StringObj>(tail)->len);
         }
-        return make_string(std::move(res));
+        return make_string_owned(res);
     });
     define_proc("string-unfold-right", 4, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
-        std::string chars;
+        string chars;
         SCM seed = a[3];
         while (call1(a[0], seed).is_false()) {
             SCM c = call1(a[1], seed);
             if (!c.is_char()) wrong_type_arg("string-unfold-right", 2, c, "char");
-            chars.push_back(static_cast<char>(c.to_char()));
+            (chars << static_cast<char>(c.to_char()));
             seed = call1(a[2], seed);
         }
-        std::reverse(chars.begin(), chars.end());
-        std::string prefix;
+        std::reverse(begin(chars), end(chars));
+        string prefix;
         if (nargs >= 6 && !a[5].is_undefined()) {
             SCM hd = call1(a[5], seed);
-            prefix = as_obj<StringObj>(hd)->to_std_string();
+            prefix = as_obj<StringObj>(hd)->str();
         }
-        std::string suffix;
-        if (nargs >= 5 && !a[4].is_undefined()) suffix = as_obj<StringObj>(a[4])->to_std_string();
-        return make_string(prefix + chars + suffix);
+        string suffix;
+        if (nargs >= 5 && !a[4].is_undefined()) suffix = as_obj<StringObj>(a[4])->str();
+        return make_string_owned(prefix * chars * suffix);
     });
 
     // Prefix/Suffix/Compare/Hash
@@ -1084,18 +1084,18 @@ void VM::init_srfi13_14() {
             size_t s1 = 0, e1 = 0, s2 = 0, e2 = 0;
             parse_str_bounds(a[0], a, nargs, 2, name, s1, e1);
             parse_str_bounds(a[1], a, nargs, 4, name, s2, e2);
-            auto v1 = as_obj<StringObj>(a[0])->view().substr(s1, e1 - s1);
-            auto v2 = as_obj<StringObj>(a[1])->view().substr(s2, e2 - s2);
-            size_t n = std::min(v1.size(), v2.size());
+            auto v1 = as_obj<StringObj>(a[0])->sub(s1, e1 - s1);
+            auto v2 = as_obj<StringObj>(a[1])->sub(s2, e2 - s2);
+            size_t n = std::min(static_cast<size_t>(N(v1)), static_cast<size_t>(N(v2)));
             size_t match = 0;
             for (size_t i = 0; i < n; ++i) {
-                unsigned char c1 = static_cast<unsigned char>(is_prefix ? v1[i] : v1[v1.size() - 1 - i]);
-                unsigned char c2 = static_cast<unsigned char>(is_prefix ? v2[i] : v2[v2.size() - 1 - i]);
+                unsigned char c1 = static_cast<unsigned char>(is_prefix ? v1[i] : v1[static_cast<size_t>(N(v1)) - 1 - i]);
+                unsigned char c2 = static_cast<unsigned char>(is_prefix ? v2[i] : v2[static_cast<size_t>(N(v2)) - 1 - i]);
                 if (ci) { c1 = std::tolower(c1); c2 = std::tolower(c2); }
                 if (c1 != c2) break;
                 ++match;
             }
-            if (bool_ret) return SCM::from_bool(match == v1.size());
+            if (bool_ret) return SCM::from_bool(match == static_cast<size_t>(N(v1)));
             return make_uinteger(match);
         });
     };
@@ -1113,8 +1113,8 @@ void VM::init_srfi13_14() {
             size_t s1 = 0, e1 = 0, s2 = 0, e2 = 0;
             parse_str_bounds(a[0], a, nargs, 5, name, s1, e1);
             parse_str_bounds(a[1], a, nargs, 7, name, s2, e2);
-            auto v1 = as_obj<StringObj>(a[0])->view();
-            auto v2 = as_obj<StringObj>(a[1])->view();
+            StringObj* v1_o = as_obj<StringObj>(a[0]); const char* v1 = v1_o->chars(); size_t v1_n = v1_o->len; (void) v1_n;
+            StringObj* v2_o = as_obj<StringObj>(a[1]); const char* v2 = v2_o->chars(); size_t v2_n = v2_o->len; (void) v2_n;
             size_t i = s1, j = s2;
             while (i < e1 && j < e2) {
                 unsigned char c1 = static_cast<unsigned char>(v1[i]);
@@ -1138,8 +1138,8 @@ void VM::init_srfi13_14() {
             size_t s1 = 0, e1 = 0, s2 = 0, e2 = 0;
             parse_str_bounds(a[0], a, nargs, 2, name, s1, e1);
             parse_str_bounds(a[1], a, nargs, 4, name, s2, e2);
-            auto v1 = as_obj<StringObj>(a[0])->view();
-            auto v2 = as_obj<StringObj>(a[1])->view();
+            StringObj* v1_o = as_obj<StringObj>(a[0]); const char* v1 = v1_o->chars(); size_t v1_n = v1_o->len; (void) v1_n;
+            StringObj* v2_o = as_obj<StringObj>(a[1]); const char* v2 = v2_o->chars(); size_t v2_n = v2_o->len; (void) v2_n;
             size_t i = s1, j = s2;
             int cmp = 0;
             while (i < e1 && j < e2) {
@@ -1172,7 +1172,7 @@ void VM::init_srfi13_14() {
                          ? scm_to_uint64(a[1], "string-hash", 2) : 871ULL;
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 2, "string-hash", s, e);
-        return make_uinteger(scm_hash_string(as_obj<StringObj>(a[0])->view().substr(s, e - s)) % bound);
+        return make_uinteger(scm_hash_string(as_obj<StringObj>(a[0])->sub(s, e - s)) % bound);
     });
     define_proc("string-hash-ci", 1, 3, false, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("string-hash-ci", 1, a[0], "string");
@@ -1180,7 +1180,7 @@ void VM::init_srfi13_14() {
                          ? scm_to_uint64(a[1], "string-hash-ci", 2) : 871ULL;
         size_t s = 0, e = 0;
         parse_str_bounds(a[0], a, nargs, 2, "string-hash-ci", s, e);
-        std::string tmp(as_obj<StringObj>(a[0])->view().substr(s, e - s));
+        string tmp(as_obj<StringObj>(a[0])->sub(s, e - s));
         for (char& c : tmp) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         return make_uinteger(scm_hash_string(tmp) % bound);
     });

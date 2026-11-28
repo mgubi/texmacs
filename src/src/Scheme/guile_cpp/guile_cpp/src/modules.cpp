@@ -20,7 +20,7 @@ bool VM::is_module(SCM obj) const {
 
 static SCM mod_field(SCM mod, size_t idx) {
     auto* st = as_obj<StructObj>(mod);
-    if (idx >= st->slots.size()) return SCM_BOOL_F;
+    if (idx >= static_cast<size_t>(N(st->slots))) return SCM_BOOL_F;
     return SCM(st->slots[idx]);
 }
 
@@ -80,12 +80,12 @@ struct ModVisitedSet {
     static constexpr size_t SMALL_CAP = 32; // power of 2 -> 256 bytes on stack
     uint64_t small_slots[SMALL_CAP];
     size_t count = 0;
-    std::vector<uint64_t> big_slots;
+    array<uint64_t> big_slots;
 
     ModVisitedSet() noexcept { std::memset(small_slots, 0, sizeof(small_slots)); }
 
     bool insert(uint64_t bits) {
-        if (big_slots.empty()) {
+        if ((N(big_slots) == 0)) {
             if (count < 24) {
                 size_t idx = ((bits >> 4) * 2654435761ULL) & (SMALL_CAP - 1);
                 while (true) {
@@ -99,28 +99,28 @@ struct ModVisitedSet {
                     idx = (idx + 1) & (SMALL_CAP - 1);
                 }
             }
-            big_slots.assign(512, 0);
+            gcpp_assign(big_slots, 512, 0);
             for (size_t i = 0; i < SMALL_CAP; ++i) {
                 uint64_t b = small_slots[i];
                 if (b != 0) {
-                    size_t idx = ((b >> 4) * 2654435761ULL) & (big_slots.size() - 1);
-                    while (big_slots[idx] != 0) idx = (idx + 1) & (big_slots.size() - 1);
+                    size_t idx = ((b >> 4) * 2654435761ULL) & (static_cast<size_t>(N(big_slots)) - 1);
+                    while (big_slots[idx] != 0) idx = (idx + 1) & (static_cast<size_t>(N(big_slots)) - 1);
                     big_slots[idx] = b;
                 }
             }
         }
-        if ((count + 1) * 4 >= big_slots.size() * 3) {
-            std::vector<uint64_t> next(big_slots.size() * 2, 0);
+        if ((count + 1) * 4 >= static_cast<size_t>(N(big_slots)) * 3) {
+            array<uint64_t> next = array_fill<uint64_t>(static_cast<size_t>(N(big_slots)) * 2, 0);
             for (uint64_t b : big_slots) {
                 if (b != 0) {
-                    size_t idx = ((b >> 4) * 2654435761ULL) & (next.size() - 1);
-                    while (next[idx] != 0) idx = (idx + 1) & (next.size() - 1);
+                    size_t idx = ((b >> 4) * 2654435761ULL) & (static_cast<size_t>(N(next)) - 1);
+                    while (next[idx] != 0) idx = (idx + 1) & (static_cast<size_t>(N(next)) - 1);
                     next[idx] = b;
                 }
             }
-            big_slots.swap(next);
+            big_slots = next;
         }
-        size_t mask = big_slots.size() - 1;
+        size_t mask = static_cast<size_t>(N(big_slots)) - 1;
         size_t idx = ((bits >> 4) * 2654435761ULL) & mask;
         while (true) {
             uint64_t cur = big_slots[idx];
@@ -174,7 +174,7 @@ static inline uint64_t mix_sym_hash(SCM sym) noexcept {
 
 static inline SCM fast_obarray_ref(HashTableObj* ht, SCM sym, uint64_t mixed_h) noexcept {
     if (ht->count == 0) return SCM_BOOL_F;
-    size_t sz = ht->buckets.size();
+    size_t sz = static_cast<size_t>(N(ht->buckets));
     if (sz == 0) return SCM_BOOL_F;
     size_t idx = ((sz & (sz - 1)) == 0) ? static_cast<size_t>(mixed_h & (sz - 1)) : static_cast<size_t>(mixed_h % sz);
     SCM cur = ht->buckets[idx];
@@ -193,7 +193,7 @@ static SCM module_variable_stamped(VM& v, SCM mod, SCM sym, uint64_t mixed_h,
     if (st->visit_stamp == stamp) return SCM_BOOL_F;
     st->visit_stamp = stamp;
 
-    size_t nslots = st->slots.size();
+    size_t nslots = static_cast<size_t>(N(st->slots));
     if (nslots > MODULE_INDEX_OBARRAY) {
         SCM obarray(st->slots[MODULE_INDEX_OBARRAY]);
         if (is_hashtable(obarray)) {
@@ -237,7 +237,7 @@ SCM VM::module_variable(SCM mod, SCM sym) {
     uint64_t mh = mix_sym_hash(sym);
     // Fast-path: check mod's own obarray first before walking uses DAG
     auto* st = as_obj<StructObj>(mod);
-    if (!st->slots.empty()) {
+    if (!(N(st->slots) == 0)) {
         SCM ob(st->slots[MODULE_INDEX_OBARRAY]);
         if (is_hashtable(ob)) {
             auto* ht = as_obj<HashTableObj>(ob);
@@ -336,11 +336,11 @@ SCM VM::define_sym(SCM sym, SCM val) {
     return var;
 }
 
-SCM VM::define(const std::string& name, SCM val) {
+SCM VM::define(string name, SCM val) {
     return define_sym(make_symbol(name), val);
 }
 
-SCM VM::define_proc(const std::string& name, int req, int opt, bool rst, SubrFn fn, SpecialSubr sp) {
+SCM VM::define_proc(string name, int req, int opt, bool rst, SubrFn fn, SpecialSubr sp) {
     SCM proc = make_subr(name, req, opt, rst, std::move(fn), sp);
     define(name, proc);
     return proc;
@@ -350,7 +350,7 @@ SCM VM::lookup_sym(SCM sym) {
     return sym2var(sym, current_module_lookup_closure(), false);
 }
 
-SCM VM::lookup(const std::string& name) {
+SCM VM::lookup(string name) {
     return lookup_sym(make_symbol(name));
 }
 

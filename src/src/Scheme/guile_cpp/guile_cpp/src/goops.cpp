@@ -46,7 +46,7 @@ constexpr size_t INITIAL_MCACHE_SIZE = 1;
 std::mt19937 g_goops_rng(0x474F4F50u); // "GOOP"
 
 // Hell set for reentrancy guard during class redefinition / change-class (keyed by data_id)
-std::vector<uint64_t> g_hell;
+array<uint64_t> g_hell;
 uint64_t g_next_data_id = 1;
 
 uint64_t get_data_id(StructObj* st) {
@@ -63,12 +63,12 @@ inline SCM raw_slot(SCM obj, size_t idx) {
 
 inline void set_raw_slot(SCM obj, size_t idx, SCM val) {
     auto* st = as_obj<StructObj>(obj);
-    if (idx < st->slots.size()) st->slots[idx] = val.bits;
+    if (idx < static_cast<size_t>(N(st->slots))) st->slots[idx] = val.bits;
 }
 
 inline void set_raw_uword(SCM obj, size_t idx, uint64_t val) {
     auto* st = as_obj<StructObj>(obj);
-    if (idx < st->slots.size()) st->slots[idx] = val;
+    if (idx < static_cast<size_t>(N(st->slots))) st->slots[idx] = val;
 }
 
 inline void set_class_flags(SCM cls, uint32_t f) {
@@ -82,7 +82,7 @@ inline void clear_class_flags(SCM cls, uint32_t f) {
 inline bool is_subclass(SCM c1, SCM c2) {
     if (!is_struct(c1)) return false;
     auto* st = as_obj<StructObj>(c1);
-    if (st->slots.size() <= SI_CPL) return false;
+    if (static_cast<size_t>(N(st->slots)) <= SI_CPL) return false;
     return scm_memq(c2, SCM(st->slots[SI_CPL])).is_true();
 }
 
@@ -156,7 +156,7 @@ void goops_change_object_class(SCM obj, SCM old_cls, SCM new_cls);
 SCM test_change_class(SCM obj) {
     SCM cls = struct_vtable(obj);
     auto* cso = as_obj<StructObj>(cls);
-    if (cso->slots.size() > SI_REDEFINED) {
+    if (static_cast<size_t>(N(cso->slots)) > SI_REDEFINED) {
         SCM redef = SCM(cso->slots[SI_REDEFINED]);
         if (redef.is_true() && !redef.is_unbound()) {
             goops_change_object_class(obj, cls, redef);
@@ -171,12 +171,11 @@ void goops_change_object_class(SCM obj, SCM /*old_cls*/, SCM new_cls) {
     for (uint64_t id : g_hell) {
         if (id == did) return; // already undergoing class change
     }
-    g_hell.push_back(did);
+    (g_hell << did);
     struct Guard {
         uint64_t id;
         ~Guard() {
-            auto it = std::find(g_hell.begin(), g_hell.end(), id);
-            if (it != g_hell.end()) g_hell.erase(it);
+            g_hell = array_remove(g_hell, id);
         }
     } guard{did};
     goops_call_gf2("change-class", obj, new_cls);
@@ -449,7 +448,7 @@ SCM goops_prep_layout(SCM cls) {
     }
 
     SCM kw_class = v.make_keyword("class");
-    std::string layout(n, '\0');
+    string layout('\0', static_cast<int>(n));
     size_t i = 0;
     while (is_pair(gns)) {
         if (gns_instance_allocated_p(car(gns))) {
@@ -518,13 +517,13 @@ SCM wrap_init_instance(SCM cls, size_t n, bool is_ent) {
     SCM handle = SCM::from_obj(st);
     st->vtable = cls;
     st->is_entity = is_ent;
-    st->slots.assign(n, 0);
+    gcpp_assign(st->slots, n, 0);
     SCM slayout = raw_slot(cls, SI_LAYOUT);
-    const std::string& desc = as_obj<SymbolObj>(slayout)->name;
+    string desc = as_obj<SymbolObj>(slayout)->name;
     for (size_t i = 0; i < n; ++i) {
-        if (i * 2 < desc.size() && desc[i * 2] == 'p') {
+        if (i * 2 < static_cast<size_t>(N(desc)) && desc[i * 2] == 'p') {
             st->slots[i] = SCM_UNBOUND.bits;
-        } else if (i * 2 < desc.size() && desc[i * 2] == 's') {
+        } else if (i * 2 < static_cast<size_t>(N(desc)) && desc[i * 2] == 's') {
             st->slots[i] = handle.bits;
         } else {
             st->slots[i] = 0;
@@ -719,23 +718,23 @@ bool more_specific_p(SCM m1, SCM m2, const SCM* targs) {
 }
 
 SCM compute_applicable_methods_impl(SCM gf, SCM args, int64_t len, bool find_method_p) {
-    std::vector<SCM> types;
-    types.reserve(static_cast<size_t>(len));
+    array<SCM> types;
+    (void) 0;
     for (SCM p = args; is_pair(p); p = cdr(p)) {
-        types.push_back(goops_class_of(car(p)));
+        (types << goops_class_of(car(p)));
     }
 
-    std::vector<SCM> applicable;
+    array<SCM> applicable;
     for (SCM l = goops_gf_methods(gf); is_pair(l); l = cdr(l)) {
         SCM m = car(l);
         SCM fl = raw_slot(m, SI_M_SPECIALIZERS);
         // Only accept accessors which match exactly in first arg
-        if (is_accessor_method(m) && (!is_pair(fl) || types.empty() || types[0] != car(fl))) {
+        if (is_accessor_method(m) && (!is_pair(fl) || (N(types) == 0) || types[0] != car(fl))) {
             continue;
         }
         for (int64_t i = 0; ; ++i, fl = cdr(fl)) {
             if (is_goops_instance(fl) || (i >= len && fl.is_null())) {
-                applicable.push_back(m);
+                (applicable << m);
                 break;
             }
             if (i >= len || fl.is_null() || !is_pair(fl) || !applicable_p(types[static_cast<size_t>(i)], car(fl))) {
@@ -744,21 +743,21 @@ SCM compute_applicable_methods_impl(SCM gf, SCM args, int64_t len, bool find_met
         }
     }
 
-    if (applicable.empty()) {
+    if ((N(applicable) == 0)) {
         if (find_method_p) return SCM_BOOL_F;
         goops_call_gf2("no-applicable-method", gf, args);
         return SCM_BOOL_F;
     }
 
-    if (applicable.size() > 1) {
+    if (static_cast<size_t>(N(applicable)) > 1) {
         // Shell sort matching goops.c
-        size_t sz = applicable.size();
+        size_t sz = static_cast<size_t>(N(applicable));
         for (size_t incr = sz / 2; incr > 0; incr /= 2) {
             for (size_t i = incr; i < sz; ++i) {
                 for (int64_t j = static_cast<int64_t>(i - incr); j >= 0; j -= static_cast<int64_t>(incr)) {
                     if (more_specific_p(applicable[static_cast<size_t>(j)],
                                         applicable[static_cast<size_t>(j) + incr],
-                                        types.data())) {
+                                        gcpp_data(types))) {
                         break;
                     }
                     std::swap(applicable[static_cast<size_t>(j)], applicable[static_cast<size_t>(j) + incr]);
@@ -768,7 +767,7 @@ SCM compute_applicable_methods_impl(SCM gf, SCM args, int64_t len, bool find_met
     }
 
     SCM res = SCM_EOL;
-    for (size_t i = applicable.size(); i > 0; --i) {
+    for (size_t i = static_cast<size_t>(N(applicable)); i > 0; --i) {
         res = vm().cons(applicable[i - 1], res);
     }
     return res;
@@ -788,7 +787,7 @@ SCM mcache_lookup_cmethod(SCM cache, SCM args) {
         // Format #1: linear search
         mask = ~uint64_t{0};
         i = 0;
-        end = as_obj<VectorObj>(methods)->elts.size();
+        end = static_cast<size_t>(N(as_obj<VectorObj>(methods)->elts));
         if (end == 0) return SCM_BOOL_F;
     } else {
         // Format #2: hashed search
@@ -796,7 +795,7 @@ SCM mcache_lookup_cmethod(SCM cache, SCM args) {
         z = cdr(cdr(z));
         mask = scm_to_uint64(car(z), "apply-generic", 1);
         methods = car(cdr(z));
-        if (!is_vector(methods) || as_obj<VectorObj>(methods)->elts.empty()) return SCM_BOOL_F;
+        if (!is_vector(methods) || (N(as_obj<VectorObj>(methods)->elts) == 0)) return SCM_BOOL_F;
         int64_t j = n;
         SCM ls = args;
         i = 0;
@@ -901,7 +900,7 @@ SCM build_class_class_slots() {
     SCM kw_class = v.make_keyword("class");
     auto s1 = [&](const char* nm) { return v.list1(v.make_symbol(nm)); };
     auto s3 = [&](const char* nm, SCM c) { return v.list3(v.make_symbol(nm), kw_class, c); };
-    std::vector<SCM> items = {
+    array<SCM> items = array_list<SCM>({
         s3("layout", v.goops_class_protected_read_only),
         s3("vtable", v.goops_class_self),
         s1("print"),
@@ -928,8 +927,8 @@ SCM build_class_class_slots() {
         s1("keyword-access"),
         s1("nfields"),
         s1("environment"),
-    };
-    return v.list_n(items.data(), items.size());
+    });
+    return v.list_n(gcpp_data(items), static_cast<size_t>(N(items)));
 }
 
 void fix_cpl(SCM c, SCM before, SCM after) {
@@ -1157,7 +1156,7 @@ void create_struct_classes() {
             SCM vt = car(entry);
             SCM data = cdr(entry);
             if (is_pair(data) && is_symbol(car(data))) {
-                const char* nm = as_obj<SymbolObj>(car(data))->name.c_str();
+                const char* nm = ((char*) c_string(as_obj<SymbolObj>(car(data))->name));
                 bool app = (struct_class_flags(vt) & CLASSF_OPERATOR) != 0;
                 set_cdr(data, goops_make_extended_class(nm, app));
             }
@@ -1237,7 +1236,7 @@ SCM goops_class_of(SCM obj) {
             return cdr(data);
         }
         SCM nm = is_pair(data) ? car(data) : SCM_BOOL_F;
-        const char* cname = is_symbol(nm) ? as_obj<SymbolObj>(nm)->name.c_str() : nullptr;
+        const char* cname = is_symbol(nm) ? ((char*) c_string(as_obj<SymbolObj>(nm)->name)) : nullptr;
         bool app = (obj_class_flags(obj) & CLASSF_OPERATOR) != 0;
         SCM cls = goops_make_extended_class(cname, app);
         if (is_pair(data)) set_cdr(data, cls);
@@ -1545,7 +1544,7 @@ static SCM init_goops_builtins_impl() {
         if ((of & CLASSF_ENTITY) != 0 || st->is_entity) {
             st->entity_setter = a[1];
         } else if ((cf & CLASSF_OPERATOR) != 0) {
-            if (st->slots.size() > SI_SETTER) st->slots[SI_SETTER] = a[1].bits;
+            if (static_cast<size_t>(N(st->slots)) > SI_SETTER) st->slots[SI_SETTER] = a[1].bits;
             st->entity_setter = a[1];
         } else {
             vm().wrong_type_arg("%set-object-setter!", 1, a[0], "entity or operator class");
@@ -1585,8 +1584,8 @@ static SCM init_goops_builtins_impl() {
         std::swap(o->entity_proc, n->entity_proc);
         std::swap(o->entity_setter, n->entity_setter);
         std::swap(o->vtable_flags, n->vtable_flags);
-        if (o->slots.size() > SI_VTABLE) o->slots[SI_VTABLE] = a[0].bits;
-        if (n->slots.size() > SI_VTABLE) n->slots[SI_VTABLE] = a[1].bits;
+        if (static_cast<size_t>(N(o->slots)) > SI_VTABLE) o->slots[SI_VTABLE] = a[0].bits;
+        if (static_cast<size_t>(N(n->slots)) > SI_VTABLE) n->slots[SI_VTABLE] = a[1].bits;
         // Redirect existing instances of `old` to point to the old-class snapshot `new`
         // (mirrors Guile 1.8 where instances hold a pointer to the malloc'd vtable data block).
         for (Obj* cur = vm().heap().all_objects(); cur; cur = cur->gc_next) {
@@ -1691,15 +1690,15 @@ static SCM init_goops_builtins_impl() {
         if (len < 0 || (len < m1_s && len < m2_s)) {
             vm().wrong_type_arg("%method-more-specific?", 3, a[2], "list of classes");
         }
-        std::vector<SCM> targs;
-        targs.reserve(static_cast<size_t>(len));
+        array<SCM> targs;
+        (void) 0;
         for (SCM p = a[2]; is_pair(p); p = cdr(p)) {
             if (!is_goops_class(car(p))) {
                 vm().wrong_type_arg("%method-more-specific?", 3, a[2], "list of classes");
             }
-            targs.push_back(car(p));
+            (targs << car(p));
         }
-        return SCM::from_bool(more_specific_p(a[0], a[1], targs.data()));
+        return SCM::from_bool(more_specific_p(a[0], a[1], gcpp_data(targs)));
     });
     define_goops_proc("pure-generic?", 1, 0, false, [](const SCM* a, size_t) -> SCM {
         return SCM::from_bool(is_pure_generic(a[0]));

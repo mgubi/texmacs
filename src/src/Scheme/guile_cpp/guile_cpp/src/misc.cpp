@@ -5,25 +5,25 @@
 
 namespace guile {
 
-void VM::register_extension(const std::string& lib, const std::string& init_fn, void (*fn)()) {
-    std::string key = lib + ":" + init_fn;
-    extensions(string(key.data(), static_cast<int>(key.size()))) = (pointer) fn;
+void VM::register_extension(string lib, string init_fn, void (*fn)()) {
+    string key = lib * ":" * init_fn;
+    extensions(string(gcpp_data(key), static_cast<int>(static_cast<size_t>(N(key))))) = (pointer) fn;
 }
 
-void VM::load_extension(const std::string& lib, const std::string& init_fn) {
-    std::string key = lib + ":" + init_fn;
-    pointer fn = extensions[string(key.data(), static_cast<int>(key.size()))];
+void VM::load_extension(string lib, string init_fn) {
+    string key = lib * ":" * init_fn;
+    pointer fn = extensions[string(gcpp_data(key), static_cast<int>(static_cast<size_t>(N(key))))];
     if (fn != nullptr) {
         reinterpret_cast<void (*)()>(fn)();
         return;
     }
     // Fallback to dynamic linking via dlopen
-    void* h = dlopen(lib.c_str(), RTLD_LAZY | RTLD_GLOBAL);
+    void* h = dlopen(((char*) c_string(lib)), RTLD_LAZY | RTLD_GLOBAL);
     if (!h) {
         misc_error("load-extension", "file: ~S, message: ~S",
                    list2(make_string(lib), make_string(dlerror() ? dlerror() : "not found")));
     }
-    void* sym = dlsym(h, init_fn.c_str());
+    void* sym = dlsym(h, ((char*) c_string(init_fn)));
     if (!sym) {
         misc_error("load-extension", "symbol not found: ~S", list1(make_string(init_fn)));
     }
@@ -32,8 +32,8 @@ void VM::load_extension(const std::string& lib, const std::string& init_fn) {
 }
 
 size_t VM::make_smob_type(const SmobTypeInfo& info) {
-    smob_types_.push_back(info);
-    return smob_types_.size() - 1;
+    (smob_types_ << info);
+    return static_cast<size_t>(N(smob_types_)) - 1;
 }
 
 void VM::init_misc() {
@@ -41,18 +41,18 @@ void VM::init_misc() {
     define_proc("load-extension", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("load-extension", 1, a[0], "string");
         if (!is_string(a[1])) wrong_type_arg("load-extension", 2, a[1], "string");
-        load_extension(as_obj<StringObj>(a[0])->to_std_string(), as_obj<StringObj>(a[1])->to_std_string());
+        load_extension(as_obj<StringObj>(a[0])->str(), as_obj<StringObj>(a[1])->str());
         return SCM_UNSPECIFIED;
     });
 
     // Dynamic linking (dynl.c)
     define_proc("dynamic-link", 0, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
-        std::string fn;
+        string fn;
         const char* p = nullptr;
         if (nargs >= 1 && !a[0].is_undefined() && a[0].is_true()) {
             if (!is_string(a[0])) wrong_type_arg("dynamic-link", 1, a[0], "string");
-            fn = as_obj<StringObj>(a[0])->to_std_string();
-            p = fn.c_str();
+            fn = as_obj<StringObj>(a[0])->str();
+            p = ((char*) c_string(fn));
         }
         void* h = dlopen(p, RTLD_LAZY | RTLD_GLOBAL);
         if (!h) misc_error("dynamic-link", "file: ~S, message: ~S",
@@ -79,11 +79,11 @@ void VM::init_misc() {
     define_proc("setlocale", 1, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
         int cat = static_cast<int>(scm_to_int64(a[0], "setlocale", 1));
         const char* loc = nullptr;
-        std::string tmp;
+        string tmp;
         if (nargs >= 2 && !a[1].is_undefined()) {
             if (!is_string(a[1])) wrong_type_arg("setlocale", 2, a[1], "string");
-            tmp = as_obj<StringObj>(a[1])->to_std_string();
-            loc = tmp.c_str();
+            tmp = as_obj<StringObj>(a[1])->str();
+            loc = ((char*) c_string(tmp));
         }
         const char* r = std::setlocale(cat, loc);
         if (!r) misc_error("setlocale", "invalid locale");

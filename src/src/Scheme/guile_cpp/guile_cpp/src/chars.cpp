@@ -27,16 +27,16 @@ const char* char_to_name(uint32_t c) {
     return nullptr;
 }
 
-static bool iequals(std::string_view a, std::string_view b) {
-    if (a.size() != b.size()) return false;
-    for (size_t i = 0; i < a.size(); ++i) {
+static bool iequals(string a, string b) {
+    if (static_cast<size_t>(N(a)) != static_cast<size_t>(N(b))) return false;
+    for (size_t i = 0; i < static_cast<size_t>(N(a)); ++i) {
         if (std::tolower(static_cast<unsigned char>(a[i])) !=
             std::tolower(static_cast<unsigned char>(b[i]))) return false;
     }
     return true;
 }
 
-int name_to_char(std::string_view name) {
+int name_to_char(string name) {
     if (iequals(name, "space") || iequals(name, "sp")) return ' ';
     if (iequals(name, "newline") || iequals(name, "nl") || iequals(name, "lf")) return '\n';
     if (iequals(name, "tab") || iequals(name, "ht")) return '\t';
@@ -52,7 +52,7 @@ int name_to_char(std::string_view name) {
         if (iequals(name, kAsciiNames[i])) return i;
     }
     // Check octal digits (Guile 1.8 supports #\000 .. #\377)
-    if (!name.empty()) {
+    if (!(N(name) == 0)) {
         bool all_oct = true;
         int val = 0;
         for (char c : name) {

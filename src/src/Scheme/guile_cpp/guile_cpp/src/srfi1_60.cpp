@@ -1,6 +1,5 @@
 #include "guile_cpp/vm.hpp"
 #include <algorithm>
-#include <vector>
 
 namespace guile {
 
@@ -30,7 +29,7 @@ static void init_srfi_60_extension() {
         int64_t r = ((count % width) + width) % width;
         if (r == 0) return a[0];
         BigInt z = scm_to_bigint(a[0], "rotate-bit-field", 1);
-        std::vector<bool> bits(static_cast<size_t>(width));
+        array<bool> bits(static_cast<size_t>(width));
         for (int64_t i = 0; i < width; ++i) {
             bits[static_cast<size_t>(i)] = BigInt::tstbit(z, static_cast<size_t>(start + i));
         }
@@ -229,25 +228,25 @@ static void init_srfi_1_extension() {
     // Fold / Reduce / Map / Filter-map
     v.define_proc("fold", 3, 0, true, [&v, check_proc_arity](const SCM* a, size_t nargs) -> SCM {
         SCM kons = a[0], acc = a[1];
-        std::vector<SCM> ls;
-        ls.push_back(a[2]);
+        array<SCM> ls;
+        (ls << a[2]);
         SCM rest = nargs > 3 ? a[3] : SCM_EOL;
-        while (is_pair(rest)) { ls.push_back(car(rest)); rest = cdr(rest); }
-        if (ls.size() == 1) check_proc_arity(kons, 2, "fold", 1);
+        while (is_pair(rest)) { (ls << car(rest)); rest = cdr(rest); }
+        if (static_cast<size_t>(N(ls)) == 1) check_proc_arity(kons, 2, "fold", 1);
         while (true) {
             bool done = false;
-            for (size_t i = 0; i < ls.size(); ++i) {
+            for (size_t i = 0; i < static_cast<size_t>(N(ls)); ++i) {
                 if (ls[i].is_null()) done = true;
                 else if (!is_pair(ls[i])) v.wrong_type_arg("fold", static_cast<int>(3 + i), ls[i], "proper list");
             }
             if (done) return acc;
-            std::vector<SCM> cargs;
+            array<SCM> cargs;
             for (auto& l : ls) {
-                cargs.push_back(car(l));
+                (cargs << car(l));
                 l = cdr(l);
             }
-            cargs.push_back(acc);
-            acc = v.apply(kons, cargs.data(), cargs.size());
+            (cargs << acc);
+            acc = v.apply(kons, gcpp_data(cargs), static_cast<size_t>(N(cargs)));
         }
     });
 
@@ -268,9 +267,9 @@ static void init_srfi_1_extension() {
         if (!is_pair(a[2])) v.wrong_type_arg("reduce-right", 3, a[2], "list");
         ScmRootVec items(v.heap());
         SCM cur = a[2];
-        while (is_pair(cur)) { items.push_back(car(cur)); cur = cdr(cur); }
-        SCM acc = items[items.size() - 1];
-        for (size_t i = items.size() - 1; i > 0; --i) {
+        while (is_pair(cur)) { (items << car(cur)); cur = cdr(cur); }
+        SCM acc = items[static_cast<size_t>(N(items)) - 1];
+        for (size_t i = static_cast<size_t>(N(items)) - 1; i > 0; --i) {
             acc = v.call2(a[0], items[i - 1], acc);
         }
         return acc;
@@ -278,24 +277,24 @@ static void init_srfi_1_extension() {
 
     v.define_proc("filter-map", 2, 0, true, [&v](const SCM* a, size_t nargs) -> SCM {
         SCM proc = a[0];
-        std::vector<SCM> ls;
-        ls.push_back(a[1]);
+        array<SCM> ls;
+        (ls << a[1]);
         SCM rest = nargs > 2 ? a[2] : SCM_EOL;
-        while (is_pair(rest)) { ls.push_back(car(rest)); rest = cdr(rest); }
+        while (is_pair(rest)) { (ls << car(rest)); rest = cdr(rest); }
         SCM head = SCM_EOL, tail = SCM_EOL;
         while (true) {
             bool done = false;
-            for (size_t i = 0; i < ls.size(); ++i) {
+            for (size_t i = 0; i < static_cast<size_t>(N(ls)); ++i) {
                 if (ls[i].is_null()) done = true;
                 else if (!is_pair(ls[i])) v.wrong_type_arg("filter-map", static_cast<int>(2 + i), ls[i], "proper list");
             }
             if (done) return head;
-            std::vector<SCM> cargs;
+            array<SCM> cargs;
             for (auto& l : ls) {
-                cargs.push_back(car(l));
+                (cargs << car(l));
                 l = cdr(l);
             }
-            SCM r = v.apply(proc, cargs.data(), cargs.size());
+            SCM r = v.apply(proc, gcpp_data(cargs), static_cast<size_t>(N(cargs)));
             if (r.is_true()) {
                 SCM n = v.cons(r, SCM_EOL);
                 if (head.is_null()) head = tail = n; else { set_cdr(tail, n); tail = n; }
@@ -377,24 +376,24 @@ static void init_srfi_1_extension() {
     });
     v.define_proc("list-index", 2, 0, true, [&v, check_proc_arity](const SCM* a, size_t nargs) -> SCM {
         SCM pred = a[0];
-        std::vector<SCM> ls;
-        ls.push_back(a[1]);
+        array<SCM> ls;
+        (ls << a[1]);
         SCM rest = nargs > 2 ? a[2] : SCM_EOL;
-        while (is_pair(rest)) { ls.push_back(car(rest)); rest = cdr(rest); }
-        if (ls.size() <= 2) check_proc_arity(pred, static_cast<int>(ls.size()), "list-index", 1);
+        while (is_pair(rest)) { (ls << car(rest)); rest = cdr(rest); }
+        if (static_cast<size_t>(N(ls)) <= 2) check_proc_arity(pred, static_cast<int>(static_cast<size_t>(N(ls))), "list-index", 1);
         int64_t idx = 0;
         while (true) {
             bool done = false;
-            for (size_t i = 0; i < ls.size(); ++i) {
+            for (size_t i = 0; i < static_cast<size_t>(N(ls)); ++i) {
                 if (ls[i].is_null()) done = true;
                 else if (!is_pair(ls[i])) v.wrong_type_arg("list-index", static_cast<int>(2 + i), ls[i], "proper list");
             }
             if (done) return SCM_BOOL_F;
-            std::vector<SCM> cargs;
+            array<SCM> cargs;
             for (auto& l : ls) {
-                cargs.push_back(car(l)); l = cdr(l);
+                (cargs << car(l)); l = cdr(l);
             }
-            if (v.apply(pred, cargs.data(), cargs.size()).is_true()) return v.make_integer(idx);
+            if (v.apply(pred, gcpp_data(cargs), static_cast<size_t>(N(cargs))).is_true()) return v.make_integer(idx);
             ++idx;
         }
     });
@@ -425,11 +424,11 @@ static void init_srfi_1_extension() {
     v.define_proc("concatenate", 1, 0, false, [&v](const SCM* a, size_t) -> SCM {
         ScmRootVec lists(v.heap());
         SCM cur = a[0];
-        while (is_pair(cur)) { lists.push_back(car(cur)); cur = cdr(cur); }
+        while (is_pair(cur)) { (lists << car(cur)); cur = cdr(cur); }
         if (!cur.is_null()) v.wrong_type_arg("concatenate", 1, a[0], "proper list");
-        if (lists.empty()) return SCM_EOL;
-        SCM res = lists[lists.size() - 1];
-        for (size_t i = lists.size() - 1; i > 0; --i) res = scm_append2(lists[i - 1], res);
+        if ((N(lists) == 0)) return SCM_EOL;
+        SCM res = lists[static_cast<size_t>(N(lists)) - 1];
+        for (size_t i = static_cast<size_t>(N(lists)) - 1; i > 0; --i) res = scm_append2(lists[i - 1], res);
         return res;
     });
     v.define_proc("concatenate!", 1, 0, false, [&v](const SCM* a, size_t) -> SCM {
@@ -440,25 +439,25 @@ static void init_srfi_1_extension() {
     });
     v.define_proc("count", 2, 0, true, [&v, check_proc_arity](const SCM* a, size_t nargs) -> SCM {
         SCM pred = a[0];
-        std::vector<SCM> ls;
-        ls.push_back(a[1]);
+        array<SCM> ls;
+        (ls << a[1]);
         SCM rest = nargs > 2 ? a[2] : SCM_EOL;
-        while (is_pair(rest)) { ls.push_back(car(rest)); rest = cdr(rest); }
-        if (ls.size() <= 2) check_proc_arity(pred, static_cast<int>(ls.size()), "count", 1);
+        while (is_pair(rest)) { (ls << car(rest)); rest = cdr(rest); }
+        if (static_cast<size_t>(N(ls)) <= 2) check_proc_arity(pred, static_cast<int>(static_cast<size_t>(N(ls))), "count", 1);
         int64_t cnt = 0;
         while (true) {
             bool done = false;
-            for (size_t i = 0; i < ls.size(); ++i) {
+            for (size_t i = 0; i < static_cast<size_t>(N(ls)); ++i) {
                 if (ls[i].is_null()) done = true;
                 else if (!is_pair(ls[i])) v.wrong_type_arg("count", static_cast<int>(2 + i), ls[i], "proper list");
             }
             if (done) return v.make_integer(cnt);
-            std::vector<SCM> cargs;
+            array<SCM> cargs;
             for (auto& l : ls) {
-                cargs.push_back(car(l));
+                (cargs << car(l));
                 l = cdr(l);
             }
-            if (v.apply(pred, cargs.data(), cargs.size()).is_true()) ++cnt;
+            if (v.apply(pred, gcpp_data(cargs), static_cast<size_t>(N(cargs))).is_true()) ++cnt;
         }
     });
     v.define_proc("delete", 2, 1, false, [&v](const SCM* a, size_t nargs) -> SCM {
@@ -498,15 +497,15 @@ static void init_srfi_1_extension() {
         while (is_pair(cur)) {
             SCM x = car(cur);
             bool dup = false;
-            for (size_t i = 0; i < kept.size(); ++i) {
+            for (size_t i = 0; i < static_cast<size_t>(N(kept)); ++i) {
                 if (eq.is_undefined() ? scm_equal(kept[i], x) : v.call2(eq, kept[i], x).is_true()) {
                     dup = true; break;
                 }
             }
-            if (!dup) kept.push_back(x);
+            if (!dup) (kept << x);
             cur = cdr(cur);
         }
-        return v.list_n(kept.data(), kept.size());
+        return v.list_n(gcpp_data(kept), static_cast<size_t>(N(kept)));
     });
     v.define_proc("delete-duplicates!", 1, 1, false, [&v](const SCM* a, size_t nargs) -> SCM {
         return v.apply(as_obj<VariableObj>(v.lookup("delete-duplicates"))->value, a, nargs);
@@ -639,18 +638,18 @@ static void init_srfi_1_extension() {
     });
     auto srfi1_map = [&v](const SCM* a, size_t nargs) -> SCM {
         SCM proc = a[0];
-        std::vector<SCM> ls;
-        ls.push_back(a[1]);
+        array<SCM> ls;
+        (ls << a[1]);
         SCM rest = nargs > 2 ? a[2] : SCM_EOL;
-        while (is_pair(rest)) { ls.push_back(car(rest)); rest = cdr(rest); }
+        while (is_pair(rest)) { (ls << car(rest)); rest = cdr(rest); }
         SCM head = SCM_EOL, tail = SCM_EOL;
         while (true) {
-            std::vector<SCM> cargs;
+            array<SCM> cargs;
             for (auto& l : ls) {
                 if (!is_pair(l)) return head;
-                cargs.push_back(car(l)); l = cdr(l);
+                (cargs << car(l)); l = cdr(l);
             }
-            SCM n = v.cons(v.apply(proc, cargs.data(), cargs.size()), SCM_EOL);
+            SCM n = v.cons(v.apply(proc, gcpp_data(cargs), static_cast<size_t>(N(cargs))), SCM_EOL);
             if (head.is_null()) head = tail = n; else { set_cdr(tail, n); tail = n; }
         }
     };
@@ -658,17 +657,17 @@ static void init_srfi_1_extension() {
     v.define_proc("map-in-order", 2, 0, true, srfi1_map);
     v.define_proc("for-each", 2, 0, true, [&v](const SCM* a, size_t nargs) -> SCM {
         SCM proc = a[0];
-        std::vector<SCM> ls;
-        ls.push_back(a[1]);
+        array<SCM> ls;
+        (ls << a[1]);
         SCM rest = nargs > 2 ? a[2] : SCM_EOL;
-        while (is_pair(rest)) { ls.push_back(car(rest)); rest = cdr(rest); }
+        while (is_pair(rest)) { (ls << car(rest)); rest = cdr(rest); }
         while (true) {
-            std::vector<SCM> cargs;
+            array<SCM> cargs;
             for (auto& l : ls) {
                 if (!is_pair(l)) return SCM_UNSPECIFIED;
-                cargs.push_back(car(l)); l = cdr(l);
+                (cargs << car(l)); l = cdr(l);
             }
-            v.apply(proc, cargs.data(), cargs.size());
+            v.apply(proc, gcpp_data(cargs), static_cast<size_t>(N(cargs)));
         }
     });
 }

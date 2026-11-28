@@ -56,8 +56,8 @@ void VM::init_posix() {
     define_proc("stat", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         struct stat st{};
         if (is_string(a[0])) {
-            std::string p = as_obj<StringObj>(a[0])->to_std_string();
-            if (::stat(p.c_str(), &st) != 0) syserror("stat", errno, p);
+            string p = as_obj<StringObj>(a[0])->str();
+            if (::stat(((char*) c_string(p)), &st) != 0) syserror("stat", errno, p);
         } else if (is_port(a[0])) {
             auto* pt = as_obj<PortObj>(a[0]);
             if (::fstat(pt->fd, &st) != 0) syserror("stat", errno);
@@ -69,9 +69,9 @@ void VM::init_posix() {
     });
     define_proc("lstat", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("lstat", 1, a[0], "string");
-        std::string p = as_obj<StringObj>(a[0])->to_std_string();
+        string p = as_obj<StringObj>(a[0])->str();
         struct stat st{};
-        if (::lstat(p.c_str(), &st) != 0) syserror("lstat", errno, p);
+        if (::lstat(((char*) c_string(p)), &st) != 0) syserror("lstat", errno, p);
         return stat_to_vector(st);
     });
     define_proc("stat:dev",     1, 0, false, [](const SCM* a, size_t) -> SCM { return as_obj<VectorObj>(a[0])->elts[0]; });
@@ -106,8 +106,8 @@ void VM::init_posix() {
     define_proc("chmod", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         mode_t m = static_cast<mode_t>(scm_to_int64(a[1], "chmod", 2));
         if (is_string(a[0])) {
-            std::string p = as_obj<StringObj>(a[0])->to_std_string();
-            if (::chmod(p.c_str(), m) != 0) syserror("chmod", errno, p);
+            string p = as_obj<StringObj>(a[0])->str();
+            if (::chmod(((char*) c_string(p)), m) != 0) syserror("chmod", errno, p);
         } else if (is_port(a[0])) {
             if (::fchmod(as_obj<PortObj>(a[0])->fd, m) != 0) syserror("chmod", errno);
         } else {
@@ -119,8 +119,8 @@ void VM::init_posix() {
         uid_t u = static_cast<uid_t>(scm_to_int64(a[1], "chown", 2));
         gid_t g = static_cast<gid_t>(scm_to_int64(a[2], "chown", 3));
         if (is_string(a[0])) {
-            std::string p = as_obj<StringObj>(a[0])->to_std_string();
-            if (::chown(p.c_str(), u, g) != 0) syserror("chown", errno, p);
+            string p = as_obj<StringObj>(a[0])->str();
+            if (::chown(((char*) c_string(p)), u, g) != 0) syserror("chown", errno, p);
         } else {
             int fd = is_port(a[0]) ? as_obj<PortObj>(a[0])->fd : static_cast<int>(scm_to_int64(a[0], "chown", 1));
             if (::fchown(fd, u, g) != 0) syserror("chown", errno);
@@ -138,58 +138,58 @@ void VM::init_posix() {
     });
     define_proc("mkdir", 1, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("mkdir", 1, a[0], "string");
-        std::string p = as_obj<StringObj>(a[0])->to_std_string();
+        string p = as_obj<StringObj>(a[0])->str();
         mode_t m = (nargs >= 2 && !a[1].is_undefined()) ? static_cast<mode_t>(scm_to_int64(a[1], "mkdir", 2)) : 0777;
-        if (::mkdir(p.c_str(), m) != 0) syserror("mkdir", errno, p);
+        if (::mkdir(((char*) c_string(p)), m) != 0) syserror("mkdir", errno, p);
         return SCM_UNSPECIFIED;
     });
     define_proc("rmdir", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("rmdir", 1, a[0], "string");
-        std::string p = as_obj<StringObj>(a[0])->to_std_string();
-        if (::rmdir(p.c_str()) != 0) syserror("rmdir", errno, p);
+        string p = as_obj<StringObj>(a[0])->str();
+        if (::rmdir(((char*) c_string(p))) != 0) syserror("rmdir", errno, p);
         return SCM_UNSPECIFIED;
     });
     define_proc("rename-file", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0]) || !is_string(a[1])) wrong_type_arg("rename-file", 1, a[0], "string");
-        std::string p1 = as_obj<StringObj>(a[0])->to_std_string();
-        std::string p2 = as_obj<StringObj>(a[1])->to_std_string();
-        if (::rename(p1.c_str(), p2.c_str()) != 0) syserror("rename-file", errno, p1);
+        string p1 = as_obj<StringObj>(a[0])->str();
+        string p2 = as_obj<StringObj>(a[1])->str();
+        if (::rename(((char*) c_string(p1)), ((char*) c_string(p2))) != 0) syserror("rename-file", errno, p1);
         return SCM_UNSPECIFIED;
     });
     define_proc("delete-file", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("delete-file", 1, a[0], "string");
-        std::string p = as_obj<StringObj>(a[0])->to_std_string();
-        if (::unlink(p.c_str()) != 0) syserror("delete-file", errno, p);
+        string p = as_obj<StringObj>(a[0])->str();
+        if (::unlink(((char*) c_string(p))) != 0) syserror("delete-file", errno, p);
         return SCM_UNSPECIFIED;
     });
     define_proc("link", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
-        std::string p1 = as_obj<StringObj>(a[0])->to_std_string();
-        std::string p2 = as_obj<StringObj>(a[1])->to_std_string();
-        if (::link(p1.c_str(), p2.c_str()) != 0) syserror("link", errno, p1);
+        string p1 = as_obj<StringObj>(a[0])->str();
+        string p2 = as_obj<StringObj>(a[1])->str();
+        if (::link(((char*) c_string(p1)), ((char*) c_string(p2))) != 0) syserror("link", errno, p1);
         return SCM_UNSPECIFIED;
     });
     define_proc("symlink", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
-        std::string p1 = as_obj<StringObj>(a[0])->to_std_string();
-        std::string p2 = as_obj<StringObj>(a[1])->to_std_string();
-        if (::symlink(p1.c_str(), p2.c_str()) != 0) syserror("symlink", errno, p1);
+        string p1 = as_obj<StringObj>(a[0])->str();
+        string p2 = as_obj<StringObj>(a[1])->str();
+        if (::symlink(((char*) c_string(p1)), ((char*) c_string(p2))) != 0) syserror("symlink", errno, p1);
         return SCM_UNSPECIFIED;
     });
     define_proc("readlink", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("readlink", 1, a[0], "string");
-        std::string p = as_obj<StringObj>(a[0])->to_std_string();
+        string p = as_obj<StringObj>(a[0])->str();
         char buf[PATH_MAX];
-        ssize_t n = ::readlink(p.c_str(), buf, sizeof(buf));
+        ssize_t n = ::readlink(((char*) c_string(p)), buf, sizeof(buf));
         if (n < 0) syserror("readlink", errno, p);
-        return make_string(std::string(buf, static_cast<size_t>(n)));
+        return make_string(string(buf, static_cast<size_t>(n)));
     });
     define_proc("copy-file", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
-        std::string src = as_obj<StringObj>(a[0])->to_std_string();
-        std::string dst = as_obj<StringObj>(a[1])->to_std_string();
-        int in = ::open(src.c_str(), O_RDONLY);
+        string src = as_obj<StringObj>(a[0])->str();
+        string dst = as_obj<StringObj>(a[1])->str();
+        int in = ::open(((char*) c_string(src)), O_RDONLY);
         if (in < 0) syserror("copy-file", errno, src);
         struct stat st{};
         ::fstat(in, &st);
-        int out = ::open(dst.c_str(), O_WRONLY | O_CREAT | O_TRUNC, st.st_mode & 0777);
+        int out = ::open(((char*) c_string(dst)), O_WRONLY | O_CREAT | O_TRUNC, st.st_mode & 0777);
         if (out < 0) { int e = errno; ::close(in); syserror("copy-file", e, dst); }
         char buf[8192];
         ssize_t n;
@@ -208,39 +208,39 @@ void VM::init_posix() {
     });
     define_proc("chdir", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("chdir", 1, a[0], "string");
-        std::string p = as_obj<StringObj>(a[0])->to_std_string();
-        if (::chdir(p.c_str()) != 0) syserror("chdir", errno, p);
+        string p = as_obj<StringObj>(a[0])->str();
+        if (::chdir(((char*) c_string(p))) != 0) syserror("chdir", errno, p);
         return SCM_UNSPECIFIED;
     });
     define_proc("access?", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("access?", 1, a[0], "string");
-        std::string p = as_obj<StringObj>(a[0])->to_std_string();
+        string p = as_obj<StringObj>(a[0])->str();
         int mode = static_cast<int>(scm_to_int64(a[1], "access?", 2));
-        return SCM::from_bool(::access(p.c_str(), mode) == 0);
+        return SCM::from_bool(::access(((char*) c_string(p)), mode) == 0);
     });
     define_proc("utime", 1, 2, false, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("utime", 1, a[0], "string");
-        std::string p = as_obj<StringObj>(a[0])->to_std_string();
+        string p = as_obj<StringObj>(a[0])->str();
         if (nargs < 2 || a[1].is_undefined()) {
-            if (::utime(p.c_str(), nullptr) != 0) syserror("utime", errno, p);
+            if (::utime(((char*) c_string(p)), nullptr) != 0) syserror("utime", errno, p);
         } else {
             struct utimbuf ub{};
             ub.actime = static_cast<time_t>(scm_to_int64(a[1], "utime", 2));
             ub.modtime = (nargs >= 3 && !a[2].is_undefined()) ? static_cast<time_t>(scm_to_int64(a[2], "utime", 3)) : ub.actime;
-            if (::utime(p.c_str(), &ub) != 0) syserror("utime", errno, p);
+            if (::utime(((char*) c_string(p)), &ub) != 0) syserror("utime", errno, p);
         }
         return SCM_UNSPECIFIED;
     });
     define_proc("mkstemp!", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("mkstemp!", 1, a[0], "string");
         auto* so = as_obj<StringObj>(a[0]);
-        std::string tmpl = so->to_std_string();
-        std::vector<char> buf(tmpl.begin(), tmpl.end());
-        buf.push_back('\0');
-        int fd = ::mkstemp(buf.data());
+        string tmpl = so->str();
+        array<char> buf = array_from<char>(str_data(tmpl), N(tmpl));
+        (buf << '\0');
+        int fd = ::mkstemp(gcpp_data(buf));
         if (fd < 0) syserror("mkstemp!", errno, tmpl);
-        std::memcpy(so->mutable_data(), buf.data(), so->len);
-        return make_file_port(fd, std::string(buf.data()), "w+", true);
+        std::memcpy(so->mutable_data(), gcpp_data(buf), so->len);
+        return make_file_port(fd, string(gcpp_data(buf)), "w+", true);
     });
     define_proc("tmpnam", 0, 0, false, [this](const SCM*, size_t) -> SCM {
         char tmpl[] = "/tmp/guileXXXXXX";
@@ -250,34 +250,34 @@ void VM::init_posix() {
     });
     define_proc("dirname", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("dirname", 1, a[0], "string");
-        auto sv = as_obj<StringObj>(a[0])->view();
-        size_t end = sv.size();
+        auto sv = as_obj<StringObj>(a[0])->str();
+        size_t end = static_cast<size_t>(N(sv));
         while (end > 1 && sv[end - 1] == '/') --end;
-        auto pos = sv.rfind('/', end - 1);
-        if (pos == std::string_view::npos) return make_string(".");
+        auto pos = str_rfind(sv, '/', end - 1);
+        if (pos == static_cast<size_t>(-1)) return make_string(".");
         while (pos > 0 && sv[pos - 1] == '/') --pos;
-        return make_string(pos == 0 ? "/" : sv.substr(0, pos));
+        return make_string(pos == 0 ? "/" : str_sub(sv, 0, pos));
     });
     define_proc("basename", 1, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("basename", 1, a[0], "string");
-        auto sv = as_obj<StringObj>(a[0])->view();
-        size_t end = sv.size();
+        auto sv = as_obj<StringObj>(a[0])->str();
+        size_t end = static_cast<size_t>(N(sv));
         while (end > 1 && sv[end - 1] == '/') --end;
-        auto pos = sv.rfind('/', end - 1);
-        auto base = (pos == std::string_view::npos) ? sv.substr(0, end) : (end == 1 && sv[0] == '/' ? sv.substr(0, 1) : sv.substr(pos + 1, end - pos - 1));
+        auto pos = str_rfind(sv, '/', end - 1);
+        auto base = (pos == static_cast<size_t>(-1)) ? str_sub(sv, 0, end) : (end == 1 && sv[0] == '/' ? str_sub(sv, 0, 1) : str_sub(sv, pos + 1, end - pos - 1));
         if (nargs >= 2 && !a[1].is_undefined() && is_string(a[1])) {
-            auto suf = as_obj<StringObj>(a[1])->view();
-            if (base.size() >= suf.size() && base.substr(base.size() - suf.size()) == suf) {
-                base = base.substr(0, base.size() - suf.size());
+            auto suf = as_obj<StringObj>(a[1])->str();
+            if (static_cast<size_t>(N(base)) >= static_cast<size_t>(N(suf)) && str_sub(base, static_cast<size_t>(N(base)) - static_cast<size_t>(N(suf))) == suf) {
+                base = str_sub(base, 0, static_cast<size_t>(N(base)) - static_cast<size_t>(N(suf)));
             }
         }
         return make_string(base);
     });
     define_proc("canonicalize-path", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("canonicalize-path", 1, a[0], "string");
-        std::string p = as_obj<StringObj>(a[0])->to_std_string();
+        string p = as_obj<StringObj>(a[0])->str();
         char buf[PATH_MAX];
-        if (!::realpath(p.c_str(), buf)) syserror("canonicalize-path", errno, p);
+        if (!::realpath(((char*) c_string(p)), buf)) syserror("canonicalize-path", errno, p);
         return make_string(buf);
     });
 
@@ -285,8 +285,8 @@ void VM::init_posix() {
     define_proc("directory-stream?", 1, 0, false, [](const SCM* a, size_t) -> SCM { return SCM::from_bool(is_dir(a[0])); });
     define_proc("opendir", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("opendir", 1, a[0], "string");
-        std::string p = as_obj<StringObj>(a[0])->to_std_string();
-        DIR* d = ::opendir(p.c_str());
+        string p = as_obj<StringObj>(a[0])->str();
+        DIR* d = ::opendir(((char*) c_string(p)));
         if (!d) syserror("opendir", errno, p);
         return heap_.alloc_scm<DirObj>(d);
     });
@@ -315,10 +315,10 @@ void VM::init_posix() {
     // File descriptor operations
     define_proc("open-fdes", 2, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("open-fdes", 1, a[0], "string");
-        std::string p = as_obj<StringObj>(a[0])->to_std_string();
+        string p = as_obj<StringObj>(a[0])->str();
         int flags = static_cast<int>(scm_to_int64(a[1], "open-fdes", 2));
         mode_t mode = (nargs >= 3 && !a[2].is_undefined()) ? static_cast<mode_t>(scm_to_int64(a[2], "open-fdes", 3)) : 0666;
-        int fd = ::open(p.c_str(), flags, mode);
+        int fd = ::open(((char*) c_string(p)), flags, mode);
         if (fd < 0) syserror("open-fdes", errno, p);
         return make_integer(fd);
     });
@@ -368,27 +368,27 @@ void VM::init_posix() {
     // ========================================================================
     define_proc("getenv", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("getenv", 1, a[0], "string");
-        const char* val = std::getenv(as_obj<StringObj>(a[0])->to_std_string().c_str());
+        const char* val = std::getenv(((char*) c_string(as_obj<StringObj>(a[0])->str())));
         return val ? make_string(val) : SCM_BOOL_F;
     });
     define_proc("putenv", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("putenv", 1, a[0], "string");
-        std::string s = as_obj<StringObj>(a[0])->to_std_string();
-        auto eq = s.find('=');
-        if (eq == std::string::npos) {
-            ::unsetenv(s.c_str());
+        string s = as_obj<StringObj>(a[0])->str();
+        auto eq = str_find(s, '=');
+        if (eq == static_cast<size_t>(-1)) {
+            ::unsetenv(((char*) c_string(s)));
         } else {
-            ::setenv(s.substr(0, eq).c_str(), s.substr(eq + 1).c_str(), 1);
+            ::setenv(((char*) c_string(str_sub(s, 0, eq))), ((char*) c_string(str_sub(s, eq + 1))), 1);
         }
         return SCM_UNSPECIFIED;
     });
     define_proc("setenv", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("setenv", 1, a[0], "string");
-        std::string k = as_obj<StringObj>(a[0])->to_std_string();
-        if (a[1].is_false()) { ::unsetenv(k.c_str()); }
+        string k = as_obj<StringObj>(a[0])->str();
+        if (a[1].is_false()) { ::unsetenv(((char*) c_string(k))); }
         else {
             if (!is_string(a[1])) wrong_type_arg("setenv", 2, a[1], "string or #f");
-            ::setenv(k.c_str(), as_obj<StringObj>(a[1])->to_std_string().c_str(), 1);
+            ::setenv(((char*) c_string(k)), ((char*) c_string(as_obj<StringObj>(a[1])->str())), 1);
         }
         return SCM_UNSPECIFIED;
     });
@@ -398,9 +398,9 @@ void VM::init_posix() {
             SCM cur = a[0];
             while (is_pair(cur)) {
                 if (is_string(car(cur))) {
-                    std::string s = as_obj<StringObj>(car(cur))->to_std_string();
-                    auto eq = s.find('=');
-                    if (eq != std::string::npos) ::setenv(s.substr(0, eq).c_str(), s.substr(eq + 1).c_str(), 1);
+                    string s = as_obj<StringObj>(car(cur))->str();
+                    auto eq = str_find(s, '=');
+                    if (eq != static_cast<size_t>(-1)) ::setenv(((char*) c_string(str_sub(s, 0, eq))), ((char*) c_string(str_sub(s, eq + 1))), 1);
                 }
                 cur = cdr(cur);
             }
@@ -416,7 +416,7 @@ void VM::init_posix() {
         if (nargs == 0 || a[0].is_undefined()) return SCM::from_bool(std::system(nullptr) != 0);
         if (!is_string(a[0])) wrong_type_arg("system", 1, a[0], "string");
         flush_all_ports();
-        return make_integer(std::system(as_obj<StringObj>(a[0])->to_std_string().c_str()));
+        return make_integer(std::system(((char*) c_string(as_obj<StringObj>(a[0])->str()))));
     });
     define_proc("primitive-fork", 0, 0, false, [this](const SCM*, size_t) -> SCM {
         flush_all_ports();
@@ -472,7 +472,7 @@ void VM::init_posix() {
     define_proc("getpw", 0, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
         struct passwd* pw = nullptr;
         if (nargs == 0 || a[0].is_undefined()) { pw = ::getpwent(); }
-        else if (is_string(a[0])) { pw = ::getpwnam(as_obj<StringObj>(a[0])->to_std_string().c_str()); }
+        else if (is_string(a[0])) { pw = ::getpwnam(((char*) c_string(as_obj<StringObj>(a[0])->str()))); }
         else { pw = ::getpwuid(static_cast<uid_t>(scm_to_int64(a[0], "getpw", 1))); }
         if (!pw) misc_error("getpw", "entry not found");
         auto* v = heap_.alloc<VectorObj>(7, SCM_BOOL_F);
@@ -488,7 +488,7 @@ void VM::init_posix() {
     define_proc("getgr", 0, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
         struct group* gr = nullptr;
         if (nargs == 0 || a[0].is_undefined()) { gr = ::getgrent(); }
-        else if (is_string(a[0])) { gr = ::getgrnam(as_obj<StringObj>(a[0])->to_std_string().c_str()); }
+        else if (is_string(a[0])) { gr = ::getgrnam(((char*) c_string(as_obj<StringObj>(a[0])->str()))); }
         else { gr = ::getgrgid(static_cast<gid_t>(scm_to_int64(a[0], "getgr", 1))); }
         if (!gr) misc_error("getgr", "entry not found");
         auto* v = heap_.alloc<VectorObj>(4, SCM_BOOL_F);
@@ -570,57 +570,57 @@ void VM::init_posix() {
     // exec family: execl, execlp, execle
     define_proc("execl", 1, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("execl", 1, a[0], "string");
-        std::string path = as_obj<StringObj>(a[0])->to_std_string();
-        std::vector<std::string> storage;
+        string path = as_obj<StringObj>(a[0])->str();
+        array<string> storage;
         SCM rest = nargs > 1 ? a[1] : SCM_EOL;
         while (is_pair(rest)) {
             if (!is_string(car(rest))) wrong_type_arg("execl", 2, car(rest), "string");
-            storage.push_back(as_obj<StringObj>(car(rest))->to_std_string());
+            (storage << as_obj<StringObj>(car(rest))->str());
             rest = cdr(rest);
         }
-        std::vector<char*> argv;
-        for (auto& s : storage) argv.push_back(s.data());
-        argv.push_back(nullptr);
-        ::execv(path.c_str(), argv.data());
+        array<char*> argv;
+        for (auto& s : storage) (argv << gcpp_data(s));
+        (argv << static_cast<char*>(nullptr));
+        ::execv(((char*) c_string(path)), gcpp_data(argv));
         syserror("execl", errno);
     });
     define_proc("execlp", 1, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("execlp", 1, a[0], "string");
-        std::string file = as_obj<StringObj>(a[0])->to_std_string();
-        std::vector<std::string> storage;
+        string file = as_obj<StringObj>(a[0])->str();
+        array<string> storage;
         SCM rest = nargs > 1 ? a[1] : SCM_EOL;
         while (is_pair(rest)) {
             if (!is_string(car(rest))) wrong_type_arg("execlp", 2, car(rest), "string");
-            storage.push_back(as_obj<StringObj>(car(rest))->to_std_string());
+            (storage << as_obj<StringObj>(car(rest))->str());
             rest = cdr(rest);
         }
-        std::vector<char*> argv;
-        for (auto& s : storage) argv.push_back(s.data());
-        argv.push_back(nullptr);
-        ::execvp(file.c_str(), argv.data());
+        array<char*> argv;
+        for (auto& s : storage) (argv << gcpp_data(s));
+        (argv << static_cast<char*>(nullptr));
+        ::execvp(((char*) c_string(file)), gcpp_data(argv));
         syserror("execlp", errno);
     });
     define_proc("execle", 2, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("execle", 1, a[0], "string");
-        std::string path = as_obj<StringObj>(a[0])->to_std_string();
-        std::vector<std::string> env_storage;
+        string path = as_obj<StringObj>(a[0])->str();
+        array<string> env_storage;
         for (SCM e = a[1]; is_pair(e); e = cdr(e)) {
             if (!is_string(car(e))) wrong_type_arg("execle", 2, car(e), "list of strings");
-            env_storage.push_back(as_obj<StringObj>(car(e))->to_std_string());
+            (env_storage << as_obj<StringObj>(car(e))->str());
         }
-        std::vector<std::string> arg_storage;
+        array<string> arg_storage;
         SCM rest = nargs > 2 ? a[2] : SCM_EOL;
         while (is_pair(rest)) {
             if (!is_string(car(rest))) wrong_type_arg("execle", 3, car(rest), "string");
-            arg_storage.push_back(as_obj<StringObj>(car(rest))->to_std_string());
+            (arg_storage << as_obj<StringObj>(car(rest))->str());
             rest = cdr(rest);
         }
-        std::vector<char*> argv, envp;
-        for (auto& s : arg_storage) argv.push_back(s.data());
-        argv.push_back(nullptr);
-        for (auto& s : env_storage) envp.push_back(s.data());
-        envp.push_back(nullptr);
-        ::execve(path.c_str(), argv.data(), envp.data());
+        array<char*> argv, envp;
+        for (auto& s : arg_storage) (argv << gcpp_data(s));
+        (argv << static_cast<char*>(nullptr));
+        for (auto& s : env_storage) (envp << gcpp_data(s));
+        (envp << static_cast<char*>(nullptr));
+        ::execve(((char*) c_string(path)), gcpp_data(argv), gcpp_data(envp));
         syserror("execle", errno);
     });
 
@@ -761,22 +761,22 @@ void VM::init_posix() {
         if (rc < 0) syserror("select", errno);
 
         auto collect = [&](SCM col, const fd_set* fds, int pos) -> SCM {
-            std::vector<SCM> out;
+            array<SCM> out;
             if (is_vector(col)) {
                 for (SCM item : as_obj<VectorObj>(col)->elts) {
                     int fd = item_fd(item, pos);
-                    if (fd >= 0 && fd < FD_SETSIZE && FD_ISSET(fd, fds)) out.push_back(item);
+                    if (fd >= 0 && fd < FD_SETSIZE && FD_ISSET(fd, fds)) (out << item);
                 }
             } else {
                 SCM cur = col;
                 while (is_pair(cur)) {
                     SCM item = car(cur);
                     int fd = item_fd(item, pos);
-                    if (fd >= 0 && fd < FD_SETSIZE && FD_ISSET(fd, fds)) out.push_back(item);
+                    if (fd >= 0 && fd < FD_SETSIZE && FD_ISSET(fd, fds)) (out << item);
                     cur = cdr(cur);
                 }
             }
-            return list_n(out.data(), out.size());
+            return list_n(gcpp_data(out), static_cast<size_t>(N(out)));
         };
 
         return list3(collect(a[0], &rfds, 1), collect(a[1], &wfds, 2), collect(a[2], &efds, 3));

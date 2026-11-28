@@ -32,17 +32,17 @@ SCM ipv6_bytes_to_scm(const uint8_t in[16]) {
 // Convert either a socket-address vector OR (fam arg1 [arg2 ...]) into sockaddr_storage
 socklen_t fill_sockaddr(const SCM* args, size_t nargs, struct sockaddr_storage* ss, const char* subr) {
     std::memset(ss, 0, sizeof(*ss));
-    std::vector<SCM> fields;
+    array<SCM> fields;
     if (nargs == 1 && is_vector(args[0])) {
         auto* vec = as_obj<VectorObj>(args[0]);
         fields = vec->elts;
     } else {
-        fields.assign(args, args + nargs);
+        fields = array_from<SCM>(args, nargs);
     }
-    if (fields.empty()) vm().wrong_num_args(subr);
+    if ((N(fields) == 0)) vm().wrong_num_args(subr);
     int fam = static_cast<int>(scm_to_int64(fields[0], subr, 1));
     if (fam == AF_INET) {
-        if (fields.size() < 3) vm().wrong_num_args(subr);
+        if (static_cast<size_t>(N(fields)) < 3) vm().wrong_num_args(subr);
         auto* sin = reinterpret_cast<struct sockaddr_in*>(ss);
         sin->sin_family = AF_INET;
         uint64_t addr = scm_to_uint64(fields[1], subr, 2);
@@ -54,28 +54,28 @@ socklen_t fill_sockaddr(const SCM* args, size_t nargs, struct sockaddr_storage* 
         return sizeof(struct sockaddr_in);
     }
     if (fam == AF_INET6) {
-        if (fields.size() < 3) vm().wrong_num_args(subr);
+        if (static_cast<size_t>(N(fields)) < 3) vm().wrong_num_args(subr);
         auto* sin6 = reinterpret_cast<struct sockaddr_in6*>(ss);
         sin6->sin6_family = AF_INET6;
         bigint_to_ipv6_bytes(fields[1], sin6->sin6_addr.s6_addr, subr, 2);
         uint64_t port = scm_to_uint64(fields[2], subr, 3);
         if (port > 0xFFFFULL) vm().out_of_range(subr, fields[2]);
         sin6->sin6_port = htons(static_cast<uint16_t>(port));
-        if (fields.size() >= 4) sin6->sin6_flowinfo = static_cast<uint32_t>(scm_to_uint64(fields[3], subr, 4));
-        if (fields.size() >= 5) sin6->sin6_scope_id = static_cast<uint32_t>(scm_to_uint64(fields[4], subr, 5));
+        if (static_cast<size_t>(N(fields)) >= 4) sin6->sin6_flowinfo = static_cast<uint32_t>(scm_to_uint64(fields[3], subr, 4));
+        if (static_cast<size_t>(N(fields)) >= 5) sin6->sin6_scope_id = static_cast<uint32_t>(scm_to_uint64(fields[4], subr, 5));
         return sizeof(struct sockaddr_in6);
     }
     if (fam == AF_UNIX) {
-        if (fields.size() < 2) vm().wrong_num_args(subr);
+        if (static_cast<size_t>(N(fields)) < 2) vm().wrong_num_args(subr);
         if (!is_string(fields[1])) vm().wrong_type_arg(subr, 2, fields[1], "string");
         auto* sun = reinterpret_cast<struct sockaddr_un*>(ss);
         sun->sun_family = AF_UNIX;
-        std::string path = as_obj<StringObj>(fields[1])->to_std_string();
-        if (path.size() >= sizeof(sun->sun_path)) {
+        string path = as_obj<StringObj>(fields[1])->str();
+        if (static_cast<size_t>(N(path)) >= sizeof(sun->sun_path)) {
             vm().misc_error(subr, "unix address path too long: ~A", vm().list1(fields[1]));
         }
-        std::memcpy(sun->sun_path, path.c_str(), path.size() + 1);
-        return static_cast<socklen_t>(offsetof(struct sockaddr_un, sun_path) + path.size() + 1);
+        std::memcpy(sun->sun_path, ((char*) c_string(path)), static_cast<size_t>(N(path)) + 1);
+        return static_cast<socklen_t>(offsetof(struct sockaddr_un, sun_path) + static_cast<size_t>(N(path)) + 1);
     }
     vm().misc_error(subr, "unsupported address family");
 }
@@ -107,7 +107,7 @@ SCM sockaddr_to_scm(const struct sockaddr* sa, socklen_t len) {
         vec->elts[0] = v.make_integer(AF_UNIX);
         size_t max_len = (len > offsetof(struct sockaddr_un, sun_path)) ? (len - offsetof(struct sockaddr_un, sun_path)) : 0;
         size_t slen = ::strnlen(sun->sun_path, max_len);
-        vec->elts[1] = v.make_string(std::string_view(sun->sun_path, slen));
+        vec->elts[1] = v.make_string(string(sun->sun_path, slen));
         return SCM::from_obj(vec);
     }
     return v.make_vector(1, v.make_integer(sa->sa_family));
@@ -170,7 +170,7 @@ void VM::init_socket() {
     define_proc("inet-aton", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("inet-aton", 1, a[0], "string");
         struct in_addr addr{};
-        if (::inet_aton(as_obj<StringObj>(a[0])->to_std_string().c_str(), &addr) == 0) return SCM_BOOL_F;
+        if (::inet_aton(((char*) c_string(as_obj<StringObj>(a[0])->str())), &addr) == 0) return SCM_BOOL_F;
         return make_uinteger(ntohl(addr.s_addr));
     });
     define_proc("inet-ntoa", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
@@ -183,15 +183,15 @@ void VM::init_socket() {
     define_proc("inet-pton", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         int af = static_cast<int>(scm_to_int64(a[0], "inet-pton", 1));
         if (!is_string(a[1])) wrong_type_arg("inet-pton", 2, a[1], "string");
-        std::string s = as_obj<StringObj>(a[1])->to_std_string();
+        string s = as_obj<StringObj>(a[1])->str();
         if (af == AF_INET) {
             struct in_addr addr{};
-            if (::inet_pton(af, s.c_str(), &addr) != 1) misc_error("inet-pton", "invalid IPv4 address");
+            if (::inet_pton(af, ((char*) c_string(s)), &addr) != 1) misc_error("inet-pton", "invalid IPv4 address");
             return make_uinteger(ntohl(addr.s_addr));
         }
         if (af == AF_INET6) {
             uint8_t buf[16];
-            if (::inet_pton(af, s.c_str(), buf) != 1) misc_error("inet-pton", "invalid IPv6 address");
+            if (::inet_pton(af, ((char*) c_string(s)), buf) != 1) misc_error("inet-pton", "invalid IPv6 address");
             return ipv6_bytes_to_scm(buf);
         }
         misc_error("inet-pton", "unsupported address family");
@@ -218,36 +218,36 @@ void VM::init_socket() {
 
     // Socket address constructors & accessors
     define_proc("make-socket-address", 1, 0, true, [](const SCM* a, size_t nargs) -> SCM {
-        std::vector<SCM> all;
-        all.push_back(a[0]);
+        array<SCM> all;
+        (all << a[0]);
         SCM rest = nargs > 1 ? a[1] : SCM_EOL;
-        while (is_pair(rest)) { all.push_back(car(rest)); rest = cdr(rest); }
+        while (is_pair(rest)) { (all << car(rest)); rest = cdr(rest); }
         struct sockaddr_storage ss{};
-        socklen_t len = fill_sockaddr(all.data(), all.size(), &ss, "make-socket-address");
+        socklen_t len = fill_sockaddr(gcpp_data(all), static_cast<size_t>(N(all)), &ss, "make-socket-address");
         return sockaddr_to_scm(reinterpret_cast<const struct sockaddr*>(&ss), len);
     });
     define_proc("sockaddr:fam", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
-        if (!is_vector(a[0]) || as_obj<VectorObj>(a[0])->elts.empty()) wrong_type_arg("sockaddr:fam", 1, a[0], "socket address");
+        if (!is_vector(a[0]) || (N(as_obj<VectorObj>(a[0])->elts) == 0)) wrong_type_arg("sockaddr:fam", 1, a[0], "socket address");
         return as_obj<VectorObj>(a[0])->elts[0];
     });
     define_proc("sockaddr:addr", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
-        if (!is_vector(a[0]) || as_obj<VectorObj>(a[0])->elts.size() < 2) wrong_type_arg("sockaddr:addr", 1, a[0], "socket address");
+        if (!is_vector(a[0]) || static_cast<size_t>(N(as_obj<VectorObj>(a[0])->elts)) < 2) wrong_type_arg("sockaddr:addr", 1, a[0], "socket address");
         return as_obj<VectorObj>(a[0])->elts[1];
     });
     define_proc("sockaddr:port", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
-        if (!is_vector(a[0]) || as_obj<VectorObj>(a[0])->elts.size() < 3) wrong_type_arg("sockaddr:port", 1, a[0], "socket address");
+        if (!is_vector(a[0]) || static_cast<size_t>(N(as_obj<VectorObj>(a[0])->elts)) < 3) wrong_type_arg("sockaddr:port", 1, a[0], "socket address");
         return as_obj<VectorObj>(a[0])->elts[2];
     });
     define_proc("sockaddr:flowinfo", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
-        if (!is_vector(a[0]) || as_obj<VectorObj>(a[0])->elts.size() < 4) wrong_type_arg("sockaddr:flowinfo", 1, a[0], "socket address");
+        if (!is_vector(a[0]) || static_cast<size_t>(N(as_obj<VectorObj>(a[0])->elts)) < 4) wrong_type_arg("sockaddr:flowinfo", 1, a[0], "socket address");
         return as_obj<VectorObj>(a[0])->elts[3];
     });
     define_proc("sockaddr:scopeid", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
-        if (!is_vector(a[0]) || as_obj<VectorObj>(a[0])->elts.size() < 5) wrong_type_arg("sockaddr:scopeid", 1, a[0], "socket address");
+        if (!is_vector(a[0]) || static_cast<size_t>(N(as_obj<VectorObj>(a[0])->elts)) < 5) wrong_type_arg("sockaddr:scopeid", 1, a[0], "socket address");
         return as_obj<VectorObj>(a[0])->elts[4];
     });
     define_proc("sockaddr:path", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
-        if (!is_vector(a[0]) || as_obj<VectorObj>(a[0])->elts.size() < 2) wrong_type_arg("sockaddr:path", 1, a[0], "socket address");
+        if (!is_vector(a[0]) || static_cast<size_t>(N(as_obj<VectorObj>(a[0])->elts)) < 2) wrong_type_arg("sockaddr:path", 1, a[0], "socket address");
         return as_obj<VectorObj>(a[0])->elts[1];
     });
 
@@ -270,12 +270,12 @@ void VM::init_socket() {
     });
     define_proc("bind", 2, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
         int fd = port_or_fd(a[0], "bind", 1);
-        std::vector<SCM> addr_args;
-        addr_args.push_back(a[1]);
+        array<SCM> addr_args;
+        (addr_args << a[1]);
         SCM rest = nargs > 2 ? a[2] : SCM_EOL;
-        while (is_pair(rest)) { addr_args.push_back(car(rest)); rest = cdr(rest); }
+        while (is_pair(rest)) { (addr_args << car(rest)); rest = cdr(rest); }
         struct sockaddr_storage ss{};
-        socklen_t len = fill_sockaddr(addr_args.data(), addr_args.size(), &ss, "bind");
+        socklen_t len = fill_sockaddr(gcpp_data(addr_args), static_cast<size_t>(N(addr_args)), &ss, "bind");
         if (::bind(fd, reinterpret_cast<const struct sockaddr*>(&ss), len) != 0) syserror("bind", errno);
         return SCM_UNSPECIFIED;
     });
@@ -296,32 +296,32 @@ void VM::init_socket() {
     });
     define_proc("connect", 2, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
         int fd = port_or_fd(a[0], "connect", 1);
-        std::vector<SCM> addr_args;
-        addr_args.push_back(a[1]);
+        array<SCM> addr_args;
+        (addr_args << a[1]);
         SCM rest = nargs > 2 ? a[2] : SCM_EOL;
-        while (is_pair(rest)) { addr_args.push_back(car(rest)); rest = cdr(rest); }
+        while (is_pair(rest)) { (addr_args << car(rest)); rest = cdr(rest); }
         struct sockaddr_storage ss{};
-        socklen_t len = fill_sockaddr(addr_args.data(), addr_args.size(), &ss, "connect");
+        socklen_t len = fill_sockaddr(gcpp_data(addr_args), static_cast<size_t>(N(addr_args)), &ss, "connect");
         if (::connect(fd, reinterpret_cast<const struct sockaddr*>(&ss), len) != 0) syserror("connect", errno);
         return SCM_UNSPECIFIED;
     });
     define_proc("sendto", 3, 0, true, [this](const SCM* a, size_t nargs) -> SCM {
         int fd = port_or_fd(a[0], "sendto", 1);
         if (!is_string(a[1])) wrong_type_arg("sendto", 2, a[1], "string");
-        auto sv = as_obj<StringObj>(a[1])->view();
-        std::vector<SCM> addr_args;
-        addr_args.push_back(a[2]);
+        auto sv = as_obj<StringObj>(a[1])->str();
+        array<SCM> addr_args;
+        (addr_args << a[2]);
         SCM rest = nargs > 3 ? a[3] : SCM_EOL;
-        while (is_pair(rest)) { addr_args.push_back(car(rest)); rest = cdr(rest); }
+        while (is_pair(rest)) { (addr_args << car(rest)); rest = cdr(rest); }
         int flags = 0;
         // Optional flags if sockaddr vector followed by int: (sendto sock msg sockaddr [flags])
-        if (addr_args.size() >= 2 && is_vector(addr_args[0])) {
+        if (static_cast<size_t>(N(addr_args)) >= 2 && is_vector(addr_args[0])) {
             flags = static_cast<int>(scm_to_int64(addr_args[1], "sendto", 4));
-            addr_args.resize(1);
+            gcpp_resize(addr_args, 1);
         }
         struct sockaddr_storage ss{};
-        socklen_t len = fill_sockaddr(addr_args.data(), addr_args.size(), &ss, "sendto");
-        ssize_t n = ::sendto(fd, sv.data(), sv.size(), flags, reinterpret_cast<const struct sockaddr*>(&ss), len);
+        socklen_t len = fill_sockaddr(gcpp_data(addr_args), static_cast<size_t>(N(addr_args)), &ss, "sendto");
+        ssize_t n = ::sendto(fd, gcpp_data(sv), static_cast<size_t>(N(sv)), flags, reinterpret_cast<const struct sockaddr*>(&ss), len);
         if (n < 0) syserror("sendto", errno);
         return make_integer(n);
     });
@@ -358,8 +358,8 @@ void VM::init_socket() {
         int fd = port_or_fd(a[0], "send", 1);
         if (!is_string(a[1])) wrong_type_arg("send", 2, a[1], "string");
         int flags = (nargs >= 3 && !a[2].is_undefined()) ? static_cast<int>(scm_to_int64(a[2], "send", 3)) : 0;
-        auto sv = as_obj<StringObj>(a[1])->view();
-        ssize_t n = ::send(fd, sv.data(), sv.size(), flags);
+        auto sv = as_obj<StringObj>(a[1])->str();
+        ssize_t n = ::send(fd, gcpp_data(sv), static_cast<size_t>(N(sv)), flags);
         if (n < 0) syserror("send", errno);
         return make_integer(n);
     });
@@ -368,7 +368,7 @@ void VM::init_socket() {
     define_proc("getproto", 0, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
         struct protoent* pe = nullptr;
         if (nargs == 0 || a[0].is_undefined()) pe = ::getprotoent();
-        else if (is_string(a[0])) pe = ::getprotobyname(as_obj<StringObj>(a[0])->to_std_string().c_str());
+        else if (is_string(a[0])) pe = ::getprotobyname(((char*) c_string(as_obj<StringObj>(a[0])->str())));
         else pe = ::getprotobynumber(static_cast<int>(scm_to_int64(a[0], "getproto", 1)));
         if (!pe) misc_error("getproto", "protocol not found");
         auto* v = heap_.alloc<VectorObj>(3, SCM_BOOL_F);
@@ -382,7 +382,7 @@ void VM::init_socket() {
     define_proc("gethost", 0, 1, false, [this](const SCM* a, size_t nargs) -> SCM {
         struct hostent* he = nullptr;
         if (nargs == 0 || a[0].is_undefined()) he = ::gethostent();
-        else if (is_string(a[0])) he = ::gethostbyname(as_obj<StringObj>(a[0])->to_std_string().c_str());
+        else if (is_string(a[0])) he = ::gethostbyname(((char*) c_string(as_obj<StringObj>(a[0])->str())));
         else {
             uint32_t addr = htonl(static_cast<uint32_t>(scm_to_uint64(a[0], "gethost", 1)));
             he = ::gethostbyaddr(&addr, sizeof(addr), AF_INET);

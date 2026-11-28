@@ -160,31 +160,31 @@ struct UpvalInfo {
 struct NamedLoopInfo {
     SCM name;
     uint32_t start_pc;
-    std::vector<uint16_t> param_slots;
+    array<uint16_t> param_slots;
 };
 
 struct FnCompiler {
     FnCompiler* parent = nullptr;
     BytecodeObj* bc = nullptr;
     SCM eval_closure = SCM_BOOL_F;
-    const std::vector<OuterCekBinding>* cek_outer = nullptr;
+    array<OuterCekBinding>* cek_outer = nullptr;
 
-    std::vector<LocalVar> locals;
-    std::vector<UpvalInfo> upvals;
-    std::vector<NamedLoopInfo> loops;
-    std::vector<SCM> mutated_syms;  // any sym targeted by set! anywhere in subtree
-    std::vector<SCM> captured_syms; // any sym referenced inside an inner lambda
+    array<LocalVar> locals;
+    array<UpvalInfo> upvals;
+    array<NamedLoopInfo> loops;
+    array<SCM> mutated_syms;  // any sym targeted by set! anywhere in subtree
+    array<SCM> captured_syms; // any sym referenced inside an inner lambda
     uint16_t next_slot = 0;
     uint16_t max_slot = 0;
     bool failed = false;
 
-    static bool vec_has(const std::vector<SCM>& vec, SCM s) noexcept {
+    static bool vec_has(array<SCM> vec, SCM s) noexcept {
         for (SCM x : vec) if (x == s) return true;
         return false;
     }
-    static void vec_add(std::vector<SCM>& vec, SCM s) {
+    static void vec_add(array<SCM>& vec, SCM s) {
         for (SCM x : vec) if (x == s) return;
-        vec.push_back(s);
+        (vec << s);
     }
 
     uint16_t alloc_slot() {
@@ -193,16 +193,16 @@ struct FnCompiler {
         return s;
     }
 
-    void emit(uint32_t insn) { bc->code.push_back(insn); }
+    void emit(uint32_t insn) { bc->code << insn; bc->code_ptr = &bc->code[0]; }
 
     uint32_t emit_jump(Op op) {
-        uint32_t idx = static_cast<uint32_t>(bc->code.size());
+        uint32_t idx = static_cast<uint32_t>(static_cast<size_t>(N(bc->code)));
         emit(enc_s16(op, 0));
         return idx;
     }
 
     bool patch_jump(uint32_t idx) {
-        int32_t delta = static_cast<int32_t>(bc->code.size()) - static_cast<int32_t>(idx) - 1;
+        int32_t delta = static_cast<int32_t>(static_cast<size_t>(N(bc->code))) - static_cast<int32_t>(idx) - 1;
         if (delta < -32768 || delta > 32767) { failed = true; return false; }
         Op op = static_cast<Op>(dec_op(bc->code[idx]));
         bc->code[idx] = enc_s16(op, static_cast<int16_t>(delta));
@@ -210,29 +210,29 @@ struct FnCompiler {
     }
 
     uint32_t add_const(SCM v) {
-        for (size_t i = 0; i < bc->consts.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(bc->consts)); ++i) {
             if (bc->consts[i] == v) return static_cast<uint32_t>(i);
         }
-        uint32_t idx = static_cast<uint32_t>(bc->consts.size());
-        bc->consts.push_back(v);
+        uint32_t idx = static_cast<uint32_t>(static_cast<size_t>(N(bc->consts)));
+        (bc->consts << v);
         return idx;
     }
 
     uint16_t add_global(SCM sym) {
-        for (size_t i = 0; i < bc->global_syms.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(bc->global_syms)); ++i) {
             if (bc->global_syms[i] == sym) return static_cast<uint16_t>(i);
         }
-        uint16_t idx = static_cast<uint16_t>(bc->global_syms.size());
-        bc->global_syms.push_back(sym);
+        uint16_t idx = static_cast<uint16_t>(static_cast<size_t>(N(bc->global_syms)));
+        (bc->global_syms << sym);
         SCM var = vm().sym2var(sym, eval_closure, false);
-        bc->globals.push_back(is_variable(var) ? var : SCM_BOOL_F);
+        (bc->globals << (is_variable(var) ? var : SCM_BOOL_F));
         return idx;
     }
 
     // Lookup symbol in current locals (returns index in locals, or -1)
     int find_local(SCM sym) const {
-        for (int i = static_cast<int>(locals.size()) - 1; i >= 0; --i) {
-            if (locals[static_cast<size_t>(i)].sym == sym) return i;
+        for (int i = static_cast<int>(static_cast<size_t>(N(locals))) - 1; i >= 0; --i) {
+            if (A(locals)[i].sym == sym) return i;
         }
         return -1;
     }
@@ -249,7 +249,7 @@ struct FnCompiler {
     // Resolve as upvalue (recursively capturing through parent compilers or CEK outer bindings)
     // Returns upval index in `upvals`, or -1 if global
     int resolve_upval(SCM sym, UpvalKind& out_kind, bool& out_chk, SCM* out_known_bc = nullptr) {
-        for (size_t i = 0; i < upvals.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(upvals)); ++i) {
             if (upvals[i].sym == sym) {
                 out_kind = upvals[i].kind;
                 out_chk = upvals[i].check_undef;
@@ -262,12 +262,12 @@ struct FnCompiler {
             if (pl >= 0) {
                 const auto& lv = parent->locals[static_cast<size_t>(pl)];
                 UpvalKind k = lv.boxed ? UpvalKind::Box : UpvalKind::Val;
-                int idx = static_cast<int>(upvals.size());
-                upvals.push_back({sym, k, true, lv.slot, lv.check_undef, lv.known_bc});
-                bc->upval_descs.push_back((1u << 16) | lv.slot);
-                bc->upval_syms.push_back(sym);
-                bc->upval_kinds.push_back(static_cast<uint8_t>(k));
-                bc->upval_known_bc.push_back(lv.known_bc);
+                int idx = static_cast<int>(static_cast<size_t>(N(upvals)));
+                (upvals << UpvalInfo{sym, k, true, lv.slot, lv.check_undef, lv.known_bc});
+                (bc->upval_descs << ((1u << 16) | lv.slot));
+                (bc->upval_syms << sym);
+                (bc->upval_kinds << static_cast<uint8_t>(k));
+                (bc->upval_known_bc << lv.known_bc);
                 out_kind = k;
                 out_chk = lv.check_undef;
                 if (out_known_bc) *out_known_bc = lv.known_bc;
@@ -278,12 +278,12 @@ struct FnCompiler {
             SCM pknown = SCM_BOOL_F;
             int pu = parent->resolve_upval(sym, pk, pchk, &pknown);
             if (pu >= 0) {
-                int idx = static_cast<int>(upvals.size());
-                upvals.push_back({sym, pk, false, static_cast<uint16_t>(pu), pchk, pknown});
-                bc->upval_descs.push_back(static_cast<uint32_t>(pu));
-                bc->upval_syms.push_back(sym);
-                bc->upval_kinds.push_back(static_cast<uint8_t>(pk));
-                bc->upval_known_bc.push_back(pknown);
+                int idx = static_cast<int>(static_cast<size_t>(N(upvals)));
+                (upvals << UpvalInfo{sym, pk, false, static_cast<uint16_t>(pu), pchk, pknown});
+                (bc->upval_descs << static_cast<uint32_t>(pu));
+                (bc->upval_syms << sym);
+                (bc->upval_kinds << static_cast<uint8_t>(pk));
+                (bc->upval_known_bc << pknown);
                 out_kind = pk;
                 out_chk = pchk;
                 if (out_known_bc) *out_known_bc = pknown;
@@ -292,15 +292,15 @@ struct FnCompiler {
             return -1;
         }
         if (cek_outer) {
-            for (size_t i = 0; i < cek_outer->size(); ++i) {
+            for (size_t i = 0; i < static_cast<size_t>(N(*cek_outer)); ++i) {
                 if ((*cek_outer)[i].sym == sym) {
                     UpvalKind k = (*cek_outer)[i].is_cdr ? UpvalKind::CellCdr : UpvalKind::CellCar;
-                    int idx = static_cast<int>(upvals.size());
-                    upvals.push_back({sym, k, false, static_cast<uint16_t>(i), false, SCM_BOOL_F});
-                    bc->upval_descs.push_back((2u << 16) | static_cast<uint32_t>(i));
-                    bc->upval_syms.push_back(sym);
-                    bc->upval_kinds.push_back(static_cast<uint8_t>(k));
-                    bc->upval_known_bc.push_back(SCM_BOOL_F);
+                    int idx = static_cast<int>(static_cast<size_t>(N(upvals)));
+                    (upvals << UpvalInfo{sym, k, false, static_cast<uint16_t>(i), false, SCM_BOOL_F});
+                    (bc->upval_descs << ((2u << 16) | static_cast<uint32_t>(i)));
+                    (bc->upval_syms << sym);
+                    (bc->upval_kinds << static_cast<uint8_t>(k));
+                    (bc->upval_known_bc << SCM_BOOL_F);
                     out_kind = k;
                     out_chk = false;
                     if (out_known_bc) *out_known_bc = SCM_BOOL_F;
@@ -675,7 +675,7 @@ struct FnCompiler {
         emit(enc_ab(fb == FB_LT ? OP_LOCAL_LT_IMM_JF : OP_LOCAL_EQ_IMM_JF,
                     static_cast<uint8_t>(lv.slot),
                     static_cast<uint16_t>(static_cast<int16_t>(imm))));
-        out_jf_patch = static_cast<uint32_t>(bc->code.size());
+        out_jf_patch = static_cast<uint32_t>(static_cast<size_t>(N(bc->code)));
         emit(static_cast<uint32_t>(gi) << 16); // low 16 bits = signed jump delta (patched below!)
         return true;
     }
@@ -818,7 +818,7 @@ struct FnCompiler {
                         uint32_t jend = 0;
                         if (!tail) jend = emit_jump(OP_JUMP);
                         if (fused) {
-                            int32_t delta = static_cast<int32_t>(bc->code.size()) - static_cast<int32_t>(jf_idx) - 1;
+                            int32_t delta = static_cast<int32_t>(static_cast<size_t>(N(bc->code))) - static_cast<int32_t>(jf_idx) - 1;
                             if (delta < -32768 || delta > 32767) { failed = true; return false; }
                             bc->code[jf_idx] = (bc->code[jf_idx] & 0xFFFF0000u) | static_cast<uint16_t>(static_cast<int16_t>(delta));
                         } else {
@@ -858,17 +858,17 @@ struct FnCompiler {
                             if (tail) emit(enc0(OP_RETURN));
                             return true;
                         }
-                        std::vector<uint32_t> exits;
+                        array<uint32_t> exits;
                         SCM cur = arg_exprs;
                         while (is_pair(cur)) {
                             bool is_last = cdr(cur).is_null();
                             if (!compile_expr(car(cur), tail && is_last)) return false;
-                            if (!is_last) exits.push_back(emit_jump(OP_JUMP_IF_FALSE_KEEP));
+                            if (!is_last) (exits << emit_jump(OP_JUMP_IF_FALSE_KEEP));
                             cur = cdr(cur);
                         }
                         if (!cur.is_null()) { failed = true; return false; }
                         if (tail) {
-                            if (!exits.empty()) {
+                            if (!(N(exits) == 0)) {
                                 for (uint32_t j : exits) if (!patch_jump(j)) return false;
                                 emit(enc0(OP_RETURN));
                             }
@@ -883,17 +883,17 @@ struct FnCompiler {
                             if (tail) emit(enc0(OP_RETURN));
                             return true;
                         }
-                        std::vector<uint32_t> exits;
+                        array<uint32_t> exits;
                         SCM cur = arg_exprs;
                         while (is_pair(cur)) {
                             bool is_last = cdr(cur).is_null();
                             if (!compile_expr(car(cur), tail && is_last)) return false;
-                            if (!is_last) exits.push_back(emit_jump(OP_JUMP_IF_TRUE_KEEP));
+                            if (!is_last) (exits << emit_jump(OP_JUMP_IF_TRUE_KEEP));
                             cur = cdr(cur);
                         }
                         if (!cur.is_null()) { failed = true; return false; }
                         if (tail) {
-                            if (!exits.empty()) {
+                            if (!(N(exits) == 0)) {
                                 for (uint32_t j : exits) if (!patch_jump(j)) return false;
                                 emit(enc0(OP_RETURN));
                             }
@@ -908,7 +908,7 @@ struct FnCompiler {
                                              !is_variable(vm().sym2var(vm().sym_arrow, eval_closure, false));
                         bool else_unbound = !is_lexically_bound(vm().sym_else) &&
                                             !is_variable(vm().sym2var(vm().sym_else, eval_closure, false));
-                        std::vector<uint32_t> end_jumps;
+                        array<uint32_t> end_jumps;
                         SCM cur = arg_exprs;
                         bool saw_else = false;
                         while (is_pair(cur)) {
@@ -935,7 +935,7 @@ struct FnCompiler {
                                     if (!compile_expr(car(cdr(cbody)), false)) return false;
                                     emit(enc_u24(OP_LOCAL_REF, tmp));
                                     emit(enc_u24(tail ? OP_TAIL_CALL : OP_CALL, 1));
-                                    if (!tail) end_jumps.push_back(emit_jump(OP_JUMP));
+                                    if (!tail) (end_jumps << emit_jump(OP_JUMP));
                                     if (!patch_jump(jf)) return false;
                                     cur = cdr(cur);
                                     continue;
@@ -946,12 +946,12 @@ struct FnCompiler {
                             }
                             if (cbody.is_null()) {
                                 if (!compile_expr(test_e, false)) return false;
-                                end_jumps.push_back(emit_jump(OP_JUMP_IF_TRUE_KEEP));
+                                (end_jumps << emit_jump(OP_JUMP_IF_TRUE_KEEP));
                             } else {
                                 if (!compile_expr(test_e, false)) return false;
                                 uint32_t jf = emit_jump(OP_JUMP_IF_FALSE);
                                 if (!compile_body(cbody, tail)) return false;
-                                if (!tail) end_jumps.push_back(emit_jump(OP_JUMP));
+                                if (!tail) (end_jumps << emit_jump(OP_JUMP));
                                 if (!patch_jump(jf)) return false;
                             }
                             cur = cdr(cur);
@@ -964,7 +964,7 @@ struct FnCompiler {
                         for (uint32_t j : end_jumps) {
                             if (!patch_jump(j)) return false;
                         }
-                        if (tail && !end_jumps.empty()) emit(enc0(OP_RETURN));
+                        if (tail && !(N(end_jumps) == 0)) emit(enc0(OP_RETURN));
                         return true;
                     }
                     case BSyn::Lambda: {
@@ -988,8 +988,8 @@ struct FnCompiler {
                             if (!is_pair(body) || !is_pair(cdr(body))) { failed = true; return false; }
                             SCM bindings = car(body);
                             body = cdr(body);
-                            std::vector<SCM> names;
-                            std::vector<SCM> inits;
+                            array<SCM> names;
+                            array<SCM> inits;
                             SCM b = bindings;
                             while (is_pair(b)) {
                                 SCM e = car(b);
@@ -997,58 +997,58 @@ struct FnCompiler {
                                     failed = true; return false;
                                 }
                                 for (SCM s : names) if (s == car(e)) { failed = true; return false; }
-                                names.push_back(car(e));
-                                inits.push_back(car(cdr(e)));
+                                (names << car(e));
+                                (inits << car(cdr(e)));
                                 b = cdr(b);
                             }
                             if (!b.is_null()) { failed = true; return false; }
 
                             // Check if we can compile as ZERO-OVERHEAD INLINE LOOP!
-                            if (can_inline_named_let(loop_sym, names.size(), body, true)) {
+                            if (can_inline_named_let(loop_sym, static_cast<size_t>(N(names)), body, true)) {
                                 bc->has_loop = true;
                                 // Evaluate all inits in outer scope
                                 for (SCM init_e : inits) {
                                     if (!compile_expr(init_e, false)) return false;
                                 }
-                                size_t saved_locals = locals.size();
+                                size_t saved_locals = static_cast<size_t>(N(locals));
                                 uint16_t saved_slot = next_slot;
-                                std::vector<uint16_t> pslots;
-                                pslots.reserve(names.size());
+                                array<uint16_t> pslots;
+                                (void) 0;
                                 for (SCM nm : names) {
                                     uint16_t sl = alloc_slot();
-                                    pslots.push_back(sl);
+                                    (pslots << sl);
                                     bool boxed = vec_has(mutated_syms, nm);
-                                    locals.push_back({nm, sl, boxed, false, false, -1});
+                                    (locals << LocalVar{nm, sl, boxed, false, false, -1});
                                 }
                                 // Pop init values into slots in reverse order
-                                for (size_t i = names.size(); i > 0; --i) {
+                                for (size_t i = static_cast<size_t>(N(names)); i > 0; --i) {
                                     emit(enc_u24(OP_LOCAL_SET, pslots[i - 1]));
                                     if (locals[saved_locals + i - 1].boxed) {
                                         emit(enc_u24(OP_BOX_INIT, pslots[i - 1]));
                                     }
                                 }
-                                uint32_t loop_start = static_cast<uint32_t>(bc->code.size());
-                                int lid = static_cast<int>(loops.size());
-                                loops.push_back({loop_sym, loop_start, pslots});
-                                locals.push_back({loop_sym, 0, false, false, true, lid});
+                                uint32_t loop_start = static_cast<uint32_t>(static_cast<size_t>(N(bc->code)));
+                                int lid = static_cast<int>(static_cast<size_t>(N(loops)));
+                                (loops << NamedLoopInfo{loop_sym, loop_start, pslots});
+                                (locals << LocalVar{loop_sym, 0, false, false, true, lid});
 
                                 bool ok = compile_body(body, tail);
 
-                                loops.pop_back();
-                                locals.resize(saved_locals);
+                                loops->resize(N(loops) - 1);
+                                gcpp_resize(locals, saved_locals);
                                 next_slot = saved_slot;
                                 return ok;
                             }
 
                             // General named let: desugar to ((letrec ((loop (lambda names . body))) loop) . inits)
-                            SCM formals = vm().list_n(names.data(), names.size());
+                            SCM formals = vm().list_n(gcpp_data(names), static_cast<size_t>(N(names)));
                             SCM lam = vm().cons(vm().sym_lambda, vm().cons(formals, body));
                             SCM lr = vm().list3(vm().sym_letrec, vm().list1(vm().list2(loop_sym, lam)), loop_sym);
-                            SCM call_form = vm().cons(lr, vm().list_n(inits.data(), inits.size()));
+                            SCM call_form = vm().cons(lr, vm().list_n(gcpp_data(inits), static_cast<size_t>(N(inits))));
                             return compile_expr(call_form, tail);
                         }
                         // Regular let
-                        std::vector<SCM> names, inits;
+                        array<SCM> names, inits;
                         SCM b = first;
                         while (is_pair(b)) {
                             SCM e = car(b);
@@ -1056,34 +1056,34 @@ struct FnCompiler {
                                 failed = true; return false;
                             }
                             for (SCM s : names) if (s == car(e)) { failed = true; return false; }
-                            names.push_back(car(e));
-                            inits.push_back(car(cdr(e)));
+                            (names << car(e));
+                            (inits << car(cdr(e)));
                             b = cdr(b);
                         }
                         if (!b.is_null()) { failed = true; return false; }
                         for (SCM init_e : inits) {
                             if (!compile_expr(init_e, false)) return false;
                         }
-                        size_t saved_locals = locals.size();
+                        size_t saved_locals = static_cast<size_t>(N(locals));
                         uint16_t saved_slot = next_slot;
-                        std::vector<uint16_t> slots;
+                        array<uint16_t> slots;
                         for (SCM nm : names) {
                             uint16_t sl = alloc_slot();
-                            slots.push_back(sl);
+                            (slots << sl);
                             bool boxed = vec_has(mutated_syms, nm);
-                            locals.push_back({nm, sl, boxed, false, false, -1});
+                            (locals << LocalVar{nm, sl, boxed, false, false, -1});
                         }
-                        for (size_t i = names.size(); i > 0; --i) {
+                        for (size_t i = static_cast<size_t>(N(names)); i > 0; --i) {
                             emit(enc_u24(OP_LOCAL_SET, slots[i - 1]));
                             if (locals[saved_locals + i - 1].boxed) {
                                 emit(enc_u24(OP_BOX_INIT, slots[i - 1]));
                             }
                         }
                         bool ok = compile_body(body, tail);
-                        if (ok && !tail && !slots.empty() && saved_slot <= 255) {
-                            emit(enc_ab(OP_CLEAR_LOCALS, static_cast<uint8_t>(saved_slot), static_cast<uint16_t>(slots.size())));
+                        if (ok && !tail && !(N(slots) == 0) && saved_slot <= 255) {
+                            emit(enc_ab(OP_CLEAR_LOCALS, static_cast<uint8_t>(saved_slot), static_cast<uint16_t>(static_cast<size_t>(N(slots)))));
                         }
-                        locals.resize(saved_locals);
+                        gcpp_resize(locals, saved_locals);
                         next_slot = saved_slot;
                         return ok;
                     }
@@ -1091,7 +1091,7 @@ struct FnCompiler {
                         if (!is_pair(arg_exprs) || !is_pair(cdr(arg_exprs))) { failed = true; return false; }
                         SCM bindings = car(arg_exprs);
                         SCM body = cdr(arg_exprs);
-                        size_t saved_locals = locals.size();
+                        size_t saved_locals = static_cast<size_t>(N(locals));
                         uint16_t saved_slot = next_slot;
                         SCM b = bindings;
                         while (is_pair(b)) {
@@ -1103,7 +1103,7 @@ struct FnCompiler {
                             SCM nm = car(e);
                             uint16_t sl = alloc_slot();
                             bool boxed = vec_has(mutated_syms, nm);
-                            locals.push_back({nm, sl, boxed, false, false, -1});
+                            (locals << LocalVar{nm, sl, boxed, false, false, -1});
                             emit(enc_u24(OP_LOCAL_SET, sl));
                             if (boxed) emit(enc_u24(OP_BOX_INIT, sl));
                             b = cdr(b);
@@ -1113,7 +1113,7 @@ struct FnCompiler {
                         if (ok && !tail && next_slot > saved_slot && saved_slot <= 255) {
                             emit(enc_ab(OP_CLEAR_LOCALS, static_cast<uint8_t>(saved_slot), static_cast<uint16_t>(next_slot - saved_slot)));
                         }
-                        locals.resize(saved_locals);
+                        gcpp_resize(locals, saved_locals);
                         next_slot = saved_slot;
                         return ok;
                     }
@@ -1121,7 +1121,7 @@ struct FnCompiler {
                         if (!is_pair(arg_exprs) || !is_pair(cdr(arg_exprs))) { failed = true; return false; }
                         SCM bindings = car(arg_exprs);
                         SCM body = cdr(arg_exprs);
-                        std::vector<SCM> names, inits;
+                        array<SCM> names, inits;
                         SCM b = bindings;
                         while (is_pair(b)) {
                             SCM e = car(b);
@@ -1129,13 +1129,13 @@ struct FnCompiler {
                                 failed = true; return false;
                             }
                             for (SCM s : names) if (s == car(e)) { failed = true; return false; }
-                            names.push_back(car(e));
-                            inits.push_back(car(cdr(e)));
+                            (names << car(e));
+                            (inits << car(cdr(e)));
                             b = cdr(b);
                         }
                         if (!b.is_null()) { failed = true; return false; }
                         // Check if all inits are syntactic (lambda ...) forms -> immutable bindings can record known_bc!
-                        bool all_lambdas = !names.empty();
+                        bool all_lambdas = !(N(names) == 0);
                         for (SCM init_e : inits) {
                             if (!is_pair(init_e) || !is_symbol(car(init_e)) ||
                                 resolve_bsyn(car(init_e)) != BSyn::Lambda ||
@@ -1144,14 +1144,14 @@ struct FnCompiler {
                                 break;
                             }
                         }
-                        size_t saved_locals = locals.size();
+                        size_t saved_locals = static_cast<size_t>(N(locals));
                         uint16_t saved_slot = next_slot;
-                        std::vector<uint16_t> slots;
-                        std::vector<BytecodeObj*> prealloc_bcs(names.size(), nullptr);
-                        for (size_t i = 0; i < names.size(); ++i) {
+                        array<uint16_t> slots;
+                        array<BytecodeObj*> prealloc_bcs = array_fill<BytecodeObj*>(static_cast<size_t>(N(names)), nullptr);
+                        for (size_t i = 0; i < static_cast<size_t>(N(names)); ++i) {
                             SCM nm = names[i];
                             uint16_t sl = alloc_slot();
-                            slots.push_back(sl);
+                            (slots << sl);
                             // Always box letrec bindings so mutual recursion & internal defines always share live cells!
                             bool boxed = true;
                             SCM kbc = SCM_BOOL_F;
@@ -1159,11 +1159,11 @@ struct FnCompiler {
                                 prealloc_bcs[i] = vm().heap().alloc<BytecodeObj>();
                                 kbc = SCM::from_obj(prealloc_bcs[i]);
                             }
-                            locals.push_back({nm, sl, boxed, true, false, -1, kbc});
+                            (locals << LocalVar{nm, sl, boxed, true, false, -1, kbc});
                             emit(enc_u24(OP_BOX_NEW_UNDEF, sl));
                         }
                         // Evaluate ALL inits before assigning (R5RS / Petrofsky safe!)
-                        for (size_t i = 0; i < inits.size(); ++i) {
+                        for (size_t i = 0; i < static_cast<size_t>(N(inits)); ++i) {
                             if (prealloc_bcs[i]) {
                                 SCM arg_e = cdr(inits[i]);
                                 auto* child_bc = compile_lambda_proto(car(arg_e), cdr(arg_e), this,
@@ -1175,16 +1175,16 @@ struct FnCompiler {
                                 if (!compile_expr(inits[i], false)) return false;
                             }
                         }
-                        for (size_t i = names.size(); i > 0; --i) {
+                        for (size_t i = static_cast<size_t>(N(names)); i > 0; --i) {
                             if (locals[saved_locals + i - 1].boxed) emit(enc_u24(OP_BOX_SET, slots[i - 1]));
                             else emit(enc_u24(OP_LOCAL_SET, slots[i - 1]));
                         }
                         // After init, check_undef is no longer needed in body
-                        for (size_t i = 0; i < names.size(); ++i) {
+                        for (size_t i = 0; i < static_cast<size_t>(N(names)); ++i) {
                             locals[saved_locals + i].check_undef = false;
                         }
                         bool ok = compile_body(body, tail);
-                        locals.resize(saved_locals);
+                        gcpp_resize(locals, saved_locals);
                         next_slot = saved_slot;
                         return ok;
                     }
@@ -1197,7 +1197,7 @@ struct FnCompiler {
                         uint16_t saved_slot = next_slot;
                         uint16_t kslot = alloc_slot();
                         emit(enc_u24(OP_LOCAL_SET, kslot));
-                        std::vector<uint32_t> end_jumps;
+                        array<uint32_t> end_jumps;
                         SCM cur = cdr(arg_exprs);
                         bool saw_else = false;
                         while (is_pair(cur)) {
@@ -1231,7 +1231,7 @@ struct FnCompiler {
                             }
                             uint32_t jf = emit_jump(OP_JUMP_IF_FALSE);
                             if (!compile_body(cbody, tail)) return false;
-                            if (!tail) end_jumps.push_back(emit_jump(OP_JUMP));
+                            if (!tail) (end_jumps << emit_jump(OP_JUMP));
                             if (!patch_jump(jf)) return false;
                             cur = cdr(cur);
                         }
@@ -1255,7 +1255,7 @@ struct FnCompiler {
                         SCM test_clause = car(cdr(arg_exprs));
                         SCM cmds = cdr(cdr(arg_exprs));
                         if (!is_pair(test_clause)) { failed = true; return false; }
-                        std::vector<SCM> names, inits, steps;
+                        array<SCM> names, inits, steps;
                         SCM vs = var_specs;
                         while (is_pair(vs)) {
                             SCM sp = car(vs);
@@ -1273,9 +1273,9 @@ struct FnCompiler {
                                     set_cdr(cdr(sp), SCM_EOL);
                                 }
                             } else if (!step_rest.is_null()) { failed = true; return false; }
-                            names.push_back(nm);
-                            inits.push_back(init_e);
-                            steps.push_back(step_e);
+                            (names << nm);
+                            (inits << init_e);
+                            (steps << step_e);
                             vs = cdr(vs);
                         }
                         if (!vs.is_null()) { failed = true; return false; }
@@ -1283,21 +1283,21 @@ struct FnCompiler {
                         for (SCM ie : inits) {
                             if (!compile_expr(ie, false)) return false;
                         }
-                        size_t saved_locals = locals.size();
+                        size_t saved_locals = static_cast<size_t>(N(locals));
                         uint16_t saved_slot = next_slot;
-                        std::vector<uint16_t> pslots;
-                        pslots.reserve(names.size());
+                        array<uint16_t> pslots;
+                        (void) 0;
                         for (SCM nm : names) {
                             uint16_t sl = alloc_slot();
-                            pslots.push_back(sl);
+                            (pslots << sl);
                             bool boxed = vec_has(mutated_syms, nm) || vec_has(captured_syms, nm);
-                            locals.push_back({nm, sl, boxed, false, false, -1});
+                            (locals << LocalVar{nm, sl, boxed, false, false, -1});
                         }
-                        for (size_t i = names.size(); i > 0; --i) {
+                        for (size_t i = static_cast<size_t>(N(names)); i > 0; --i) {
                             emit(enc_u24(OP_LOCAL_SET, pslots[i - 1]));
                             if (locals[saved_locals + i - 1].boxed) emit(enc_u24(OP_BOX_INIT, pslots[i - 1]));
                         }
-                        uint32_t loop_start = static_cast<uint32_t>(bc->code.size());
+                        uint32_t loop_start = static_cast<uint32_t>(static_cast<size_t>(N(bc->code)));
                         if (!compile_expr(car(test_clause), false)) return false;
                         uint32_t jf = emit_jump(OP_JUMP_IF_FALSE);
                         // Test succeeded -> evaluate result exprs (or *unspecified*)
@@ -1322,18 +1322,18 @@ struct FnCompiler {
                         for (SCM se : steps) {
                             if (!compile_expr(se, false)) return false;
                         }
-                        for (size_t i = names.size(); i > 0; --i) {
+                        for (size_t i = static_cast<size_t>(N(names)); i > 0; --i) {
                             emit(enc_u24(OP_LOCAL_SET, pslots[i - 1]));
                             if (locals[saved_locals + i - 1].boxed) emit(enc_u24(OP_BOX_INIT, pslots[i - 1]));
                         }
-                        int32_t delta = static_cast<int32_t>(loop_start) - static_cast<int32_t>(bc->code.size()) - 1;
+                        int32_t delta = static_cast<int32_t>(loop_start) - static_cast<int32_t>(static_cast<size_t>(N(bc->code))) - 1;
                         if (delta < -32768 || delta > 32767) { failed = true; return false; }
                         emit(enc_s16(OP_JUMP, static_cast<int16_t>(delta)));
                         if (!tail && !patch_jump(jend)) return false;
-                        if (!tail && !pslots.empty() && saved_slot <= 255) {
-                            emit(enc_ab(OP_CLEAR_LOCALS, static_cast<uint8_t>(saved_slot), static_cast<uint16_t>(pslots.size())));
+                        if (!tail && !(N(pslots) == 0) && saved_slot <= 255) {
+                            emit(enc_ab(OP_CLEAR_LOCALS, static_cast<uint8_t>(saved_slot), static_cast<uint16_t>(static_cast<size_t>(N(pslots)))));
                         }
-                        locals.resize(saved_locals);
+                        gcpp_resize(locals, saved_locals);
                         next_slot = saved_slot;
                         return true;
                     }
@@ -1352,22 +1352,22 @@ struct FnCompiler {
                 if (!tail) { failed = true; return false; }
                 size_t loop_id = static_cast<size_t>(locals[static_cast<size_t>(li)].loop_id);
                 // Collect args
-                std::vector<SCM> cargs;
+                array<SCM> cargs;
                 SCM a = arg_exprs;
-                while (is_pair(a)) { cargs.push_back(car(a)); a = cdr(a); }
-                if (!a.is_null() || cargs.size() != loops[loop_id].param_slots.size()) { failed = true; return false; }
+                while (is_pair(a)) { (cargs << car(a)); a = cdr(a); }
+                if (!a.is_null() || static_cast<size_t>(N(cargs)) != static_cast<size_t>(N(loops[loop_id].param_slots))) { failed = true; return false; }
                 for (SCM ae : cargs) {
                     if (!compile_expr(ae, false)) return false;
                 }
                 // Re-index loops[loop_id] AFTER compiling args because nested
                 // named-lets inside argument expressions can reallocate `loops`.
                 const auto& lp = loops[loop_id];
-                for (size_t i = cargs.size(); i > 0; --i) {
-                    uint16_t sl = lp.param_slots[i - 1];
+                for (size_t i = static_cast<size_t>(N(cargs)); i > 0; --i) {
+                    uint16_t sl = A(lp.param_slots)[i - 1];
                     // If boxed (captured by inner lambda inside loop), allocate fresh box for next iteration!
                     // (Look up local entry by slot)
                     bool is_boxed = false;
-                    for (int k = static_cast<int>(locals.size()) - 1; k >= 0; --k) {
+                    for (int k = static_cast<int>(static_cast<size_t>(N(locals))) - 1; k >= 0; --k) {
                         if (!locals[static_cast<size_t>(k)].is_loop && locals[static_cast<size_t>(k)].slot == sl) {
                             is_boxed = locals[static_cast<size_t>(k)].boxed;
                             break;
@@ -1376,7 +1376,7 @@ struct FnCompiler {
                     emit(enc_u24(OP_LOCAL_SET, sl));
                     if (is_boxed) emit(enc_u24(OP_BOX_INIT, sl));
                 }
-                int32_t delta = static_cast<int32_t>(lp.start_pc) - static_cast<int32_t>(bc->code.size()) - 1;
+                int32_t delta = static_cast<int32_t>(lp.start_pc) - static_cast<int32_t>(static_cast<size_t>(N(bc->code))) - 1;
                 if (delta < -32768 || delta > 32767) { failed = true; return false; }
                 emit(enc_s16(OP_JUMP, static_cast<int16_t>(delta)));
                 return true;
@@ -1385,11 +1385,11 @@ struct FnCompiler {
             // Check fast inlined builtin calls!
             FastBuiltinId fb = resolve_fast_builtin(op_expr);
             if (fb != FB_NONE) {
-                std::vector<SCM> cargs;
+                array<SCM> cargs;
                 SCM a = arg_exprs;
-                while (is_pair(a)) { cargs.push_back(car(a)); a = cdr(a); }
+                while (is_pair(a)) { (cargs << car(a)); a = cdr(a); }
                 if (!a.is_null()) { failed = true; return false; }
-                size_t na = cargs.size();
+                size_t na = static_cast<size_t>(N(cargs));
 
                 // Fused `(+ local imm)` / `(- local imm)`!
                 if ((fb == FB_ADD || fb == FB_SUB) && na == 2 && is_symbol(cargs[0]) && cargs[1].is_fixnum()) {
@@ -1461,22 +1461,22 @@ struct FnCompiler {
         }
 
         // General procedure call
-        std::vector<SCM> cargs;
+        array<SCM> cargs;
         SCM a = arg_exprs;
-        while (is_pair(a)) { cargs.push_back(car(a)); a = cdr(a); }
-        if (!a.is_null() || cargs.size() > 250) { failed = true; return false; }
+        while (is_pair(a)) { (cargs << car(a)); a = cdr(a); }
+        if (!a.is_null() || static_cast<size_t>(N(cargs)) > 250) { failed = true; return false; }
 
         if (!compile_expr(op_expr, false)) return false;
         for (SCM ae : cargs) {
             if (!compile_expr(ae, false)) return false;
         }
-        emit(enc_u24(tail ? OP_TAIL_CALL : OP_CALL, static_cast<uint32_t>(cargs.size())));
+        emit(enc_u24(tail ? OP_TAIL_CALL : OP_CALL, static_cast<uint32_t>(static_cast<size_t>(N(cargs)))));
         return true;
     }
 
     static BytecodeObj* compile_lambda_proto(SCM formals, SCM body, FnCompiler* parent_c,
                                              SCM eval_clo = SCM_BOOL_F,
-                                             const std::vector<OuterCekBinding>* cek_outer = nullptr,
+                                             array<OuterCekBinding>* cek_outer = nullptr,
                                              BytecodeObj* prealloc_bc = nullptr) {
         auto* bc = prealloc_bc ? prealloc_bc : vm().heap().alloc<BytecodeObj>();
         bc->eval_closure = parent_c ? parent_c->eval_closure : eval_clo;
@@ -1491,20 +1491,20 @@ struct FnCompiler {
         fc.cek_outer = parent_c ? parent_c->cek_outer : cek_outer;
 
         // Parse formals
-        std::vector<SCM> params;
+        array<SCM> params;
         SCM f = formals;
         while (is_pair(f)) {
             if (!is_symbol(car(f))) return nullptr;
-            params.push_back(car(f));
+            (params << car(f));
             f = cdr(f);
         }
         bool has_rest = false;
         if (!f.is_null()) {
             if (!is_symbol(f)) return nullptr;
             has_rest = true;
-            params.push_back(f);
+            (params << f);
         }
-        bc->arity_req = static_cast<uint16_t>(has_rest ? params.size() - 1 : params.size());
+        bc->arity_req = static_cast<uint16_t>(has_rest ? static_cast<size_t>(N(params)) - 1 : static_cast<size_t>(N(params)));
         bc->has_rest = has_rest;
 
         // Prescan body for mutations & captures
@@ -1517,7 +1517,7 @@ struct FnCompiler {
         for (SCM p : params) {
             uint16_t sl = fc.alloc_slot();
             bool boxed = vec_has(fc.mutated_syms, p);
-            fc.locals.push_back({p, sl, boxed, false, false, -1});
+            (fc.locals << LocalVar{p, sl, boxed, false, false, -1});
             if (boxed) fc.emit(enc_u24(OP_BOX_INIT, sl));
         }
 
@@ -1526,7 +1526,7 @@ struct FnCompiler {
         }
 
         bc->max_locals = fc.max_slot;
-        bc->num_upvals = static_cast<uint16_t>(fc.upvals.size());
+        bc->num_upvals = static_cast<uint16_t>(static_cast<size_t>(N(fc.upvals)));
         return bc;
     }
 };
@@ -1549,6 +1549,10 @@ struct BytecodeEngine {
     array<SCM> stack;
     array<VmFrame> frames;
     VmFrame* frame_data = nullptr;  // A (frames), kept by ensure_frames
+    // (the data and the sizes, kept when they grow: A and N take the arrays
+    // by value, which changes their count of references at each call)
+    SCM* stack_data = nullptr;
+    size_t stack_n = 0, frames_n = 0;
     size_t active_sp = 0;
     size_t active_fp = 0;
     SCM foreach1_helper = SCM_BOOL_F;
@@ -1560,6 +1564,7 @@ struct BytecodeEngine {
         for (int i = 0; i < N(stack); i++) stack[i] = SCM_UNSPECIFIED;
         frames = array<VmFrame>(16384);
         frame_data = A(frames);
+        stack_data = A(stack); stack_n = N(stack); frames_n = N(frames);
     }
 
     SCM get_dynwind_helper() {
@@ -1571,7 +1576,7 @@ struct BytecodeEngine {
         dbc->max_locals = 5; // 0=before, 1=thunk, 2=after, 3=dw, 4=res
         dbc->num_upvals = 0;
         // (begin (before) (push-dw) (let ((res (thunk))) (pop-dw) (after) res))
-        dbc->code = {
+        dbc->code = array_list<uint32_t>({
             enc_u24(OP_LOCAL_REF, 0),
             enc_u24(OP_CALL, 0),
             enc0(OP_POP),
@@ -1585,7 +1590,8 @@ struct BytecodeEngine {
             enc0(OP_POP),
             enc_u24(OP_LOCAL_REF, 4),
             enc0(OP_RETURN),
-        };
+        });
+        dbc->code_ptr = &dbc->code[0];
         auto* dcl = v.heap().alloc<ClosureObj>(SCM_EOL, SCM_EOL, SCM_EOL);
         dcl->bytecode = SCM::from_obj(dbc);
         dynwind_helper = SCM::from_obj(dcl);
@@ -1599,7 +1605,7 @@ struct BytecodeEngine {
         SCM root_env = SCM_EOL;
         if (is_variable(v.the_root_module_var)) {
             SCM rm = as_obj<VariableObj>(v.the_root_module_var)->value;
-            if (is_struct(rm) && as_obj<StructObj>(rm)->slots.size() > 3) {
+            if (is_struct(rm) && static_cast<size_t>(N(as_obj<StructObj>(rm)->slots)) > 3) {
                 SCM ec{as_obj<StructObj>(rm)->slots[3]};
                 if (ec.is_true()) root_env = v.list1(ec);
             }
@@ -1626,7 +1632,7 @@ struct BytecodeEngine {
         SCM root_env = SCM_EOL;
         if (is_variable(v.the_root_module_var)) {
             SCM rm = as_obj<VariableObj>(v.the_root_module_var)->value;
-            if (is_struct(rm) && as_obj<StructObj>(rm)->slots.size() > 3) {
+            if (is_struct(rm) && static_cast<size_t>(N(as_obj<StructObj>(rm)->slots)) > 3) {
                 SCM ec{as_obj<StructObj>(rm)->slots[3]};
                 if (ec.is_true()) root_env = v.list1(ec);
             }
@@ -1648,7 +1654,7 @@ struct BytecodeEngine {
 
     // (the checks are inline, the growth is not: the VM checks at each call)
     inline void ensure_stack(size_t needed) {
-        if (GCPP_UNLIKELY(needed >= static_cast<size_t>(N(stack)))) grow_stack(needed);
+        if (GCPP_UNLIKELY(needed >= stack_n)) grow_stack(needed);
     }
 
     __attribute__((noinline)) void grow_stack(size_t needed) {
@@ -1657,15 +1663,17 @@ struct BytecodeEngine {
         int old_sz = N(stack);
         stack->resize(static_cast<int>(new_sz));
         for (int i = old_sz; i < N(stack); i++) stack[i] = SCM_UNSPECIFIED;
+        stack_data = A(stack); stack_n = N(stack);
     }
 
     inline void ensure_frames(size_t needed) {
-        if (GCPP_UNLIKELY(needed >= static_cast<size_t>(N(frames)))) grow_frames();
+        if (GCPP_UNLIKELY(needed >= frames_n)) grow_frames();
     }
 
     __attribute__((noinline)) void grow_frames() {
         frames->resize(N(frames) * 2);
         frame_data = A(frames);
+        frames_n = N(frames);
     }
 };
 
@@ -1704,7 +1712,7 @@ static inline size_t fast_hashv_val(SCM key, size_t sz) noexcept {
 }
 
 static inline SCM fast_hash_lookup(HashTableObj* ht, SCM key, bool is_hashq, SCM def_val) noexcept {
-    size_t sz = ht->buckets.size();
+    size_t sz = static_cast<size_t>(N(ht->buckets));
     if (sz == 0) return def_val;
     size_t idx = is_hashq ? fast_hashq_val(key, sz) : fast_hashv_val(key, sz);
     SCM cur = ht->buckets[idx];
@@ -1725,7 +1733,7 @@ static inline SCM fast_hash_lookup(HashTableObj* ht, SCM key, bool is_hashq, SCM
 }
 
 static inline void fast_hash_store(SCM ht_scm, HashTableObj* ht, SCM key, SCM val, bool is_hashq) {
-    size_t sz = ht->buckets.size();
+    size_t sz = static_cast<size_t>(N(ht->buckets));
     if (sz == 0 || ht->weak != WeakKind::None) { hash_set(ht_scm, key, val, is_hashq ? 1 : 2); return; }
     size_t idx = is_hashq ? fast_hashq_val(key, sz) : fast_hashv_val(key, sz);
     SCM cur = ht->buckets[idx];
@@ -1806,7 +1814,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
     const size_t entry_fp = eng.active_fp;
     const int my_vm_depth = ++v.next_bc_inv_id;
     ++v.bc_vm_depth;
-    v.active_bc_invs.push_back(my_vm_depth);
+    v.push_bc_inv(my_vm_depth);
 
     struct DepthGuard {
         VM& vm_ref;
@@ -1815,7 +1823,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
         ~DepthGuard() {
             eng_ref.active_sp = esp;
             eng_ref.active_fp = efp;
-            vm_ref.active_bc_invs.pop_back();
+            vm_ref.active_bc_n--;
             --vm_ref.bc_vm_depth;
         }
     } dguard{v, eng, entry_sp, entry_fp};
@@ -1823,6 +1831,8 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
     // Active registers
     ClosureObj* cl = nullptr;
     BytecodeObj* bc = nullptr;
+    SCM* bc_globals = nullptr;
+    SCM* bc_consts = nullptr;
     SCM* upvals_ptr = nullptr;
     const uint32_t* pc = nullptr;
     uint32_t base_off = static_cast<uint32_t>(entry_sp);
@@ -1837,9 +1847,11 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
     auto load_frame_regs = [&](ClosureObj* new_cl, BytecodeObj* new_bc) noexcept {
         cl = new_cl;
         bc = new_bc;
+        bc_globals = gcpp_data(bc->globals);  // (TeXmacs: raw pointers, one
+        bc_consts = gcpp_data(bc->consts);    // load per access as before)
         upvals_ptr = cl->inline_upval_cnt > 0
             ? cl->inline_upvals
-            : (is_vector(cl->upvals) ? as_obj<VectorObj>(cl->upvals)->elts.data() : nullptr);
+            : (is_vector(cl->upvals) ? gcpp_data(as_obj<VectorObj>(cl->upvals)->elts) : nullptr);
     };
 
     auto setup_closure_args = [&](ClosureObj* target_cl, BytecodeObj* target_bc,
@@ -1848,7 +1860,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
         if (!target_bc->has_rest) {
             if (na != req) { sync_gc(); v.wrong_num_args(nullptr, SCM::from_obj(target_cl)); }
             eng.ensure_stack(target_base + target_bc->max_locals + 64);
-            SCM* dst = A(eng.stack) + target_base;
+            SCM* dst = eng.stack_data + target_base;
             for (size_t i = 0; i < na; ++i) dst[i] = a[i];
             for (size_t i = na; i < target_bc->max_locals; ++i) dst[i] = SCM_UNSPECIFIED;
         } else {
@@ -1856,7 +1868,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
             sync_gc();
             SCM rest_lst = v.list_n(a + req, na - req);
             eng.ensure_stack(target_base + target_bc->max_locals + 64);
-            SCM* dst = A(eng.stack) + target_base;
+            SCM* dst = eng.stack_data + target_base;
             for (size_t i = 0; i < req; ++i) dst[i] = a[i];
             dst[req] = rest_lst;
             for (size_t i = req + 1; i < target_bc->max_locals; ++i) dst[i] = SCM_UNSPECIFIED;
@@ -1871,13 +1883,13 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
         }
         eng.ensure_stack(entry_sp + sn + 64);
         eng.ensure_frames(entry_fp + fn + 16);
-        std::memcpy(A(eng.stack) + entry_sp, resume_k->snap_stack_data(), sn * sizeof(SCM));
+        std::memcpy(eng.stack_data + entry_sp, resume_k->snap_stack_data(), sn * sizeof(SCM));
         const VmFrameSnap* fd = resume_k->snap_frames_data();
         for (size_t i = 0; i < fn; ++i) {
             const auto& sf = fd[i];
             auto* fbc = as_obj<BytecodeObj>(sf.bytecode);
             eng.frame_data[entry_fp + i] = {
-                sf.closure, sf.bytecode, fbc->code.data() + sf.pc_off,
+                sf.closure, sf.bytecode, fbc->code_ptr + sf.pc_off,
                 static_cast<uint32_t>(entry_sp + sf.base_off),
                 static_cast<uint32_t>(entry_sp + sf.ret_slot)
             };
@@ -1893,7 +1905,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
         auto* entry_bc = as_obj<BytecodeObj>(entry_cl->bytecode);
         setup_closure_args(entry_cl, entry_bc, base_off, entry_args, entry_nargs);
         load_frame_regs(entry_cl, entry_bc);
-        pc = bc->code.data();
+        pc = bc->code_ptr;
         sp_idx = base_off + bc->max_locals;
     }
 
@@ -1924,18 +1936,18 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                                    na > 2 ? args_p[2] : SCM_UNSPECIFIED, na);
     };
 
-    SCM* stk = A(eng.stack);
+    SCM* stk = eng.stack_data;
     uint32_t insn = 0;
 
     #define DISPATCH() do { insn = *pc++; goto *dispatch_table[dec_op(insn)]; } while (0)
-    #define RELOAD_STK() do { stk = A(eng.stack); } while (0)
+    #define RELOAD_STK() do { stk = eng.stack_data; } while (0)
 
     while (true) {
         try {
             DISPATCH();
 
         L_CONST:
-            stk[sp_idx++] = bc->consts[dec_u24(insn)];
+            stk[sp_idx++] = bc_consts[dec_u24(insn)];
             DISPATCH();
 
         L_FIXNUM:
@@ -2061,7 +2073,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
 
         L_GLOBAL_REF: {
             uint32_t gi = dec_u24(insn);
-            SCM gv = bc->globals[gi];
+            SCM gv = bc_globals[gi];
             if (GCPP_LIKELY(is_variable(gv))) {
                 SCM val = as_obj<VariableObj>(gv)->value;
                 if (GCPP_LIKELY(!val.is_undefined())) {
@@ -2074,7 +2086,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
             if (!is_variable(gv) || as_obj<VariableObj>(gv)->value.is_undefined()) {
                 v.error(v.sym_unbound_variable, nullptr, "Unbound variable: ~S", v.list1(bc->global_syms[gi]), SCM_BOOL_F);
             }
-            bc->globals[gi] = gv;
+            bc_globals[gi] = gv;
             stk[sp_idx++] = as_obj<VariableObj>(gv)->value;
             DISPATCH();
         }
@@ -2082,14 +2094,14 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
         L_GLOBAL_SET: {
             uint32_t gi = dec_u24(insn);
             SCM val = stk[--sp_idx];
-            SCM gv = bc->globals[gi];
+            SCM gv = bc_globals[gi];
             if (!is_variable(gv)) {
                 sync_gc();
                 gv = v.sym2var(bc->global_syms[gi], bc->eval_closure, false);
                 if (!is_variable(gv)) {
                     v.error(v.sym_unbound_variable, "set!", "Unbound variable: ~S", v.list1(bc->global_syms[gi]));
                 }
-                bc->globals[gi] = gv;
+                bc_globals[gi] = gv;
             }
             auto* vo = as_obj<VariableObj>(gv);
             vo->value = val;
@@ -2121,7 +2133,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
 
         L_MAKE_CLOSURE: {
             sync_gc();
-            SCM proto_scm = bc->consts[dec_u24(insn)];
+            SCM proto_scm = bc_consts[dec_u24(insn)];
             auto* proto = as_obj<BytecodeObj>(proto_scm);
             auto* ncl = v.heap().alloc<ClosureObj>(proto->source_formals, proto->source_body, proto->cached_env);
             ncl->bytecode = proto_scm;
@@ -2195,7 +2207,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                         load_frame_regs(tcl, tbc);
                         base_off = new_base;
                         sp_idx = new_base + tbc->max_locals;
-                        pc = tbc->code.data();
+                        pc = tbc->code_ptr;
                         DISPATCH();
                     }
                     eng.ensure_frames(fp_idx + 2);
@@ -2206,7 +2218,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     load_frame_regs(tcl, tbc);
                     base_off = new_base;
                     sp_idx = new_base + tbc->max_locals;
-                    pc = tbc->code.data();
+                    pc = tbc->code_ptr;
                     DISPATCH();
                 }
                 if (tcl->bytecode.is_false() && bytecode_should_compile(tcl)) {
@@ -2221,7 +2233,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                         load_frame_regs(tcl, tbc);
                         base_off = new_base;
                         sp_idx = new_base + tbc->max_locals;
-                        pc = tbc->code.data();
+                        pc = tbc->code_ptr;
                         DISPATCH();
                     }
                 }
@@ -2254,14 +2266,14 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                         auto* fbc = as_obj<BytecodeObj>(fr.bytecode);
                         k->push_frame_snap({
                             fr.closure, fr.bytecode,
-                            static_cast<uint32_t>(fr.pc - fbc->code.data()),
+                            static_cast<uint32_t>(fr.pc - fbc->code_ptr),
                             static_cast<uint32_t>(fr.base_off - entry_sp),
                             static_cast<uint32_t>(fr.ret_slot - entry_sp)
                         });
                     }
                     k->push_frame_snap({
                         SCM::from_obj(cl), SCM::from_obj(bc),
-                        static_cast<uint32_t>(pc - bc->code.data()),
+                        static_cast<uint32_t>(pc - bc->code_ptr),
                         static_cast<uint32_t>(base_off - entry_sp),
                         0
                     });
@@ -2369,7 +2381,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                         const auto& sf = fd[i];
                         auto* fbc = as_obj<BytecodeObj>(sf.bytecode);
                         eng.frame_data[entry_fp + i] = {
-                            sf.closure, sf.bytecode, fbc->code.data() + sf.pc_off,
+                            sf.closure, sf.bytecode, fbc->code_ptr + sf.pc_off,
                             static_cast<uint32_t>(entry_sp + sf.base_off),
                             static_cast<uint32_t>(entry_sp + sf.ret_slot)
                         };
@@ -2452,17 +2464,17 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                         for (size_t i = nargs; i < tbc->max_locals; ++i) stk[base_off + i] = SCM_UNSPECIFIED;
                         load_frame_regs(tcl, tbc);
                         sp_idx = base_off + tbc->max_locals;
-                        pc = tbc->code.data();
+                        pc = tbc->code_ptr;
                         DISPATCH();
                     }
                     {
-                        std::vector<SCM> tmp_args(stk + fn_slot + 1, stk + fn_slot + 1 + nargs);
-                        setup_closure_args(tcl, tbc, base_off, tmp_args.data(), nargs);
+                        array<SCM> tmp_args = array_from<SCM>(stk + fn_slot + 1, nargs);
+                        setup_closure_args(tcl, tbc, base_off, gcpp_data(tmp_args), nargs);
                     }
                     RELOAD_STK();
                     load_frame_regs(tcl, tbc);
                     sp_idx = base_off + tbc->max_locals;
-                    pc = tbc->code.data();
+                    pc = tbc->code_ptr;
                     DISPATCH();
                 }
                 if (tcl->bytecode.is_false() && bytecode_should_compile(tcl)) {
@@ -2470,13 +2482,13 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     if (bytecode_compile_closure(tcl)) {
                         auto* tbc = as_obj<BytecodeObj>(tcl->bytecode);
                         {
-                            std::vector<SCM> tmp_args(stk + fn_slot + 1, stk + fn_slot + 1 + nargs);
-                            setup_closure_args(tcl, tbc, base_off, tmp_args.data(), nargs);
+                            array<SCM> tmp_args = array_from<SCM>(stk + fn_slot + 1, nargs);
+                            setup_closure_args(tcl, tbc, base_off, gcpp_data(tmp_args), nargs);
                         }
                         RELOAD_STK();
                         load_frame_regs(tcl, tbc);
                         sp_idx = base_off + tbc->max_locals;
-                        pc = tbc->code.data();
+                        pc = tbc->code_ptr;
                         DISPATCH();
                     }
                 }
@@ -2513,7 +2525,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                             auto* fbc = as_obj<BytecodeObj>(fr.bytecode);
                             k->push_frame_snap({
                                 fr.closure, fr.bytecode,
-                                static_cast<uint32_t>(fr.pc - fbc->code.data()),
+                                static_cast<uint32_t>(fr.pc - fbc->code_ptr),
                                 static_cast<uint32_t>(fr.base_off - entry_sp),
                                 static_cast<uint32_t>(fr.ret_slot - entry_sp)
                             });
@@ -2622,7 +2634,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                         const auto& sf = fd[i];
                         auto* fbc = as_obj<BytecodeObj>(sf.bytecode);
                         eng.frame_data[entry_fp + i] = {
-                            sf.closure, sf.bytecode, fbc->code.data() + sf.pc_off,
+                            sf.closure, sf.bytecode, fbc->code_ptr + sf.pc_off,
                             static_cast<uint32_t>(entry_sp + sf.base_off),
                             static_cast<uint32_t>(entry_sp + sf.ret_slot)
                         };
@@ -3071,7 +3083,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
             if (GCPP_LIKELY(is_vector(vec) && idx.is_fixnum() && v.fast_core_ok)) {
                 int64_t k = idx.to_fixnum();
                 auto* vo = as_obj<VectorObj>(vec);
-                if (GCPP_LIKELY(k >= 0 && static_cast<size_t>(k) < vo->elts.size())) {
+                if (GCPP_LIKELY(k >= 0 && static_cast<size_t>(k) < static_cast<size_t>(N(vo->elts)))) {
                     stk[sp_idx - 2] = vo->elts[static_cast<size_t>(k)];
                     --sp_idx;
                     DISPATCH();
@@ -3089,7 +3101,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
             if (GCPP_LIKELY(is_vector(vec) && idx.is_fixnum() && v.fast_core_ok)) {
                 int64_t k = idx.to_fixnum();
                 auto* vo = as_obj<VectorObj>(vec);
-                if (GCPP_LIKELY(k >= 0 && static_cast<size_t>(k) < vo->elts.size())) {
+                if (GCPP_LIKELY(k >= 0 && static_cast<size_t>(k) < static_cast<size_t>(N(vo->elts)))) {
                     vo->elts[static_cast<size_t>(k)] = val;
                     stk[sp_idx - 3] = SCM_UNSPECIFIED;
                     sp_idx -= 2;
@@ -3129,7 +3141,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
             if (GCPP_LIKELY(is_struct(st) && idx.is_fixnum() && v.fast_core_ok)) {
                 int64_t k = idx.to_fixnum();
                 auto* so = as_obj<StructObj>(st);
-                if (GCPP_LIKELY(k >= 0 && static_cast<size_t>(k) < so->slots.size() && !so->has_tail)) {
+                if (GCPP_LIKELY(k >= 0 && static_cast<size_t>(k) < static_cast<size_t>(N(so->slots)) && !so->has_tail)) {
                     // Check layout slot type is 'p' or 's' (fast check via common GOOPS slots)
                     stk[sp_idx - 2] = struct_ref(st, static_cast<size_t>(k));
                     --sp_idx;
@@ -3147,7 +3159,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
             SCM val = stk[sp_idx - 1], idx = stk[sp_idx - 2], st = stk[sp_idx - 3];
             if (GCPP_LIKELY(is_struct(st) && idx.is_fixnum() && v.fast_core_ok)) {
                 int64_t k = idx.to_fixnum();
-                if (GCPP_LIKELY(k >= 0 && static_cast<size_t>(k) < as_obj<StructObj>(st)->slots.size())) {
+                if (GCPP_LIKELY(k >= 0 && static_cast<size_t>(k) < static_cast<size_t>(N(as_obj<StructObj>(st)->slots)))) {
                     sync_gc();
                     struct_set(st, static_cast<size_t>(k), val);
                     stk[sp_idx - 3] = val;
@@ -3253,13 +3265,13 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                 auto* fbc = as_obj<BytecodeObj>(fr.bytecode);
                 k->push_frame_snap({
                     fr.closure, fr.bytecode,
-                    static_cast<uint32_t>(fr.pc - fbc->code.data()),
+                    static_cast<uint32_t>(fr.pc - fbc->code_ptr),
                     static_cast<uint32_t>(fr.base_off - entry_sp),
                     static_cast<uint32_t>(fr.ret_slot - entry_sp)
                 });
             }
             // Current frame resumes right after OP_CALLCC (or at OP_RETURN if tail!)
-            uint32_t cur_pc_off = static_cast<uint32_t>(pc - bc->code.data());
+            uint32_t cur_pc_off = static_cast<uint32_t>(pc - bc->code_ptr);
             k->push_frame_snap({
                 SCM::from_obj(cl), SCM::from_obj(bc),
                 cur_pc_off,
@@ -3287,7 +3299,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                         load_frame_regs(tcl, tbc);
                         base_off = new_base;
                         sp_idx = new_base + tbc->max_locals;
-                        pc = tbc->code.data();
+                        pc = tbc->code_ptr;
                         DISPATCH();
                     }
                 }
@@ -3399,7 +3411,7 @@ static SCM run_bytecode_loop(ClosureObj* entry_cl, const SCM* entry_args, size_t
                     const auto& sf = fd[i];
                     auto* fbc = as_obj<BytecodeObj>(sf.bytecode);
                     eng.frame_data[entry_fp + i] = {
-                        sf.closure, sf.bytecode, fbc->code.data() + sf.pc_off,
+                        sf.closure, sf.bytecode, fbc->code_ptr + sf.pc_off,
                         static_cast<uint32_t>(entry_sp + sf.base_off),
                         static_cast<uint32_t>(entry_sp + sf.ret_slot)
                     };
@@ -3482,7 +3494,7 @@ bool bytecode_should_compile(ClosureObj* cl) noexcept {
 struct MemoMacroExpander {
     SCM eval_clo;
     SCM macro_env;
-    std::vector<SCM> bound; // only SymbolObjs (always rooted in intern table)
+    array<SCM> bound; // only SymbolObjs (always rooted in intern table)
     int budget = 512;
     bool ok = true;
 
@@ -3494,10 +3506,10 @@ struct MemoMacroExpander {
     void push_formals(SCM formals) {
         SCM f = formals;
         while (is_pair(f)) {
-            if (is_symbol(car(f))) bound.push_back(car(f));
+            if (is_symbol(car(f))) (bound << car(f));
             f = cdr(f);
         }
-        if (is_symbol(f)) bound.push_back(f);
+        if (is_symbol(f)) (bound << f);
     }
 
     SCM expand_list(SCM lst, int depth) {
@@ -3611,10 +3623,10 @@ struct MemoMacroExpander {
                 if (!is_pair(args) || !is_pair(cdr(args))) return expr;
                 SCM formals = car(args);
                 SCM body = cdr(args);
-                size_t saved = bound.size();
+                size_t saved = static_cast<size_t>(N(bound));
                 push_formals(formals);
                 SCM nbody = expand_list(body, depth + 1);
-                bound.resize(saved);
+                gcpp_resize(bound, saved);
                 return (nbody == body) ? expr : vm().cons(op, vm().cons(formals, nbody));
             }
             case BSyn::Let: {
@@ -3632,14 +3644,14 @@ struct MemoMacroExpander {
                 // Expand all binding init expressions in the OUTER scope
                 SCM nb_head = SCM_EOL, nb_tail = SCM_EOL;
                 bool b_changed = false;
-                size_t saved = bound.size();
-                std::vector<SCM> new_vars;
+                size_t saved = static_cast<size_t>(N(bound));
+                array<SCM> new_vars;
                 SCM b = bindings;
                 while (is_pair(b)) {
                     SCM e = car(b);
                     SCM ne = e;
                     if (is_pair(e) && is_symbol(car(e)) && is_pair(cdr(e)) && cdr(cdr(e)).is_null()) {
-                        new_vars.push_back(car(e));
+                        (new_vars << car(e));
                         SCM nv = expand_expr(car(cdr(e)), depth + 1);
                         if (!ok) return expr;
                         if (nv != car(cdr(e))) ne = vm().list2(car(e), nv);
@@ -3662,10 +3674,10 @@ struct MemoMacroExpander {
                     b = cdr(b);
                 }
                 SCM nbindings = b_changed ? nb_head : bindings;
-                if (is_symbol(loop_sym)) bound.push_back(loop_sym);
-                for (SCM s : new_vars) bound.push_back(s);
+                if (is_symbol(loop_sym)) (bound << loop_sym);
+                for (SCM s : new_vars) (bound << s);
                 SCM nbody = expand_list(body, depth + 1);
-                bound.resize(saved);
+                gcpp_resize(bound, saved);
                 if (!b_changed && nbody == body) return expr;
                 if (is_symbol(loop_sym)) return vm().cons(op, vm().cons(loop_sym, vm().cons(nbindings, nbody)));
                 return vm().cons(op, vm().cons(nbindings, nbody));
@@ -3676,16 +3688,16 @@ struct MemoMacroExpander {
                 SCM body = cdr(args);
                 SCM nb_head = SCM_EOL, nb_tail = SCM_EOL;
                 bool b_changed = false;
-                size_t saved = bound.size();
+                size_t saved = static_cast<size_t>(N(bound));
                 SCM b = bindings;
                 while (is_pair(b)) {
                     SCM e = car(b);
                     SCM ne = e;
                     if (is_pair(e) && is_symbol(car(e)) && is_pair(cdr(e)) && cdr(cdr(e)).is_null()) {
                         SCM nv = expand_expr(car(cdr(e)), depth + 1);
-                        if (!ok) { bound.resize(saved); return expr; }
+                        if (!ok) { gcpp_resize(bound, saved); return expr; }
                         if (nv != car(cdr(e))) ne = vm().list2(car(e), nv);
-                        bound.push_back(car(e));
+                        (bound << car(e));
                     }
                     if (!b_changed && ne != e) {
                         b_changed = true;
@@ -3706,7 +3718,7 @@ struct MemoMacroExpander {
                 }
                 SCM nbindings = b_changed ? nb_head : bindings;
                 SCM nbody = expand_list(body, depth + 1);
-                bound.resize(saved);
+                gcpp_resize(bound, saved);
                 if (!b_changed && nbody == body) return expr;
                 return vm().cons(op, vm().cons(nbindings, nbody));
             }
@@ -3714,10 +3726,10 @@ struct MemoMacroExpander {
                 if (!is_pair(args) || !is_pair(cdr(args))) return expr;
                 SCM bindings = car(args);
                 SCM body = cdr(args);
-                size_t saved = bound.size();
+                size_t saved = static_cast<size_t>(N(bound));
                 SCM b = bindings;
                 while (is_pair(b)) {
-                    if (is_pair(car(b)) && is_symbol(car(car(b)))) bound.push_back(car(car(b)));
+                    if (is_pair(car(b)) && is_symbol(car(car(b)))) (bound << car(car(b)));
                     b = cdr(b);
                 }
                 SCM nb_head = SCM_EOL, nb_tail = SCM_EOL;
@@ -3728,7 +3740,7 @@ struct MemoMacroExpander {
                     SCM ne = e;
                     if (is_pair(e) && is_symbol(car(e)) && is_pair(cdr(e)) && cdr(cdr(e)).is_null()) {
                         SCM nv = expand_expr(car(cdr(e)), depth + 1);
-                        if (!ok) { bound.resize(saved); return expr; }
+                        if (!ok) { gcpp_resize(bound, saved); return expr; }
                         if (nv != car(cdr(e))) ne = vm().list2(car(e), nv);
                     }
                     if (!b_changed && ne != e) {
@@ -3750,7 +3762,7 @@ struct MemoMacroExpander {
                 }
                 SCM nbindings = b_changed ? nb_head : bindings;
                 SCM nbody = expand_list(body, depth + 1);
-                bound.resize(saved);
+                gcpp_resize(bound, saved);
                 if (!b_changed && nbody == body) return expr;
                 return vm().cons(op, vm().cons(nbindings, nbody));
             }
@@ -3838,11 +3850,11 @@ struct MemoMacroExpander {
                 SCM test_clause = car(cdr(args));
                 SCM body = cdr(cdr(args));
                 // First expand inits in outer scope, collect var names
-                size_t saved = bound.size();
-                std::vector<SCM> names;
+                size_t saved = static_cast<size_t>(N(bound));
+                array<SCM> names;
                 SCM vcur = vars;
                 while (is_pair(vcur)) {
-                    if (is_pair(car(vcur)) && is_symbol(car(car(vcur)))) names.push_back(car(car(vcur)));
+                    if (is_pair(car(vcur)) && is_symbol(car(car(vcur)))) (names << car(car(vcur)));
                     vcur = cdr(vcur);
                 }
                 SCM nv_head = SCM_EOL, nv_tail = SCM_EOL;
@@ -3858,10 +3870,10 @@ struct MemoMacroExpander {
                         if (!ok) return expr;
                         SCM nstep_rest = step_rest;
                         if (is_pair(step_rest)) {
-                            size_t s2 = bound.size();
-                            for (SCM nm : names) bound.push_back(nm);
+                            size_t s2 = static_cast<size_t>(N(bound));
+                            for (SCM nm : names) (bound << nm);
                             nstep_rest = expand_list(step_rest, depth + 1);
-                            bound.resize(s2);
+                            gcpp_resize(bound, s2);
                             if (!ok) return expr;
                         }
                         if (ninit != init_e || nstep_rest != step_rest) {
@@ -3885,10 +3897,10 @@ struct MemoMacroExpander {
                     }
                     vcur = cdr(vcur);
                 }
-                for (SCM nm : names) bound.push_back(nm);
+                for (SCM nm : names) (bound << nm);
                 SCM ntest = expand_list(test_clause, depth + 1);
                 SCM nbody = expand_list(body, depth + 1);
-                bound.resize(saved);
+                gcpp_resize(bound, saved);
                 if (!ok) return expr;
                 if (!v_changed && ntest == test_clause && nbody == body) return expr;
                 return vm().cons(op, vm().cons(v_changed ? nv_head : vars, vm().cons(ntest, nbody)));
@@ -3905,15 +3917,15 @@ struct MemoMacroExpander {
                 SCM target = car(args);
                 SCM dbody = cdr(args);
                 if (is_pair(target)) {
-                    size_t saved = bound.size();
+                    size_t saved = static_cast<size_t>(N(bound));
                     SCM t = target;
                     while (is_pair(t)) {
                         push_formals(cdr(t));
                         t = car(t);
                     }
-                    if (is_symbol(t)) bound.push_back(t);
+                    if (is_symbol(t)) (bound << t);
                     SCM ndbody = expand_list(dbody, depth + 1);
-                    bound.resize(saved);
+                    gcpp_resize(bound, saved);
                     if (!ok) return expr;
                     return (ndbody == dbody) ? expr : vm().cons(op, vm().cons(target, ndbody));
                 }
@@ -3966,7 +3978,7 @@ bool bytecode_compile_closure(ClosureObj* cl) {
     }
 
     // Extract any outer CEK lexical bindings from cl->env (after macro expansion, so GC-safe!)
-    std::vector<OuterCekBinding> cek_outer;
+    array<OuterCekBinding> cek_outer;
     SCM e = cl->env;
     while (is_pair(e)) {
         SCM frame = car(e);
@@ -3977,7 +3989,7 @@ bool bytecode_compile_closure(ClosureObj* cl) {
         bool is_first = true;
         while (is_pair(vars)) {
             if (is_symbol(car(vars)) && is_pair(vals)) {
-                cek_outer.push_back({car(vars), vals, false});
+                (cek_outer << OuterCekBinding{car(vars), vals, false});
             }
             vars = cdr(vars);
             prev_val_pair = vals;
@@ -3985,7 +3997,7 @@ bool bytecode_compile_closure(ClosureObj* cl) {
             is_first = false;
         }
         if (is_symbol(vars)) {
-            cek_outer.push_back({vars, is_first ? frame : prev_val_pair, true});
+            (cek_outer << (OuterCekBinding{vars, is_first ? frame : prev_val_pair, true}));
         }
         e = cdr(e);
     }

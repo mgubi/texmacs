@@ -8,7 +8,7 @@ namespace guile {
     throw SchemeThrow(key, args);
 }
 
-[[noreturn]] void VM::error(SCM key, const char* subr, const std::string& msg, SCM args, SCM rest) {
+[[noreturn]] void VM::error(SCM key, const char* subr, string msg, SCM args, SCM rest) {
     SCM s_subr = subr ? make_string(subr) : SCM_BOOL_F;
     SCM s_msg = make_string(msg);
     SCM s_args = args;
@@ -16,12 +16,12 @@ namespace guile {
     throw_scm(key, list4(s_subr, s_msg, s_args, s_rest));
 }
 
-[[noreturn]] void VM::misc_error(const char* subr, const std::string& msg, SCM args) {
+[[noreturn]] void VM::misc_error(const char* subr, string msg, SCM args) {
     error(sym_misc_error, subr, msg, args, SCM_BOOL_F);
 }
 
 [[noreturn]] void VM::wrong_type_arg(const char* subr, int pos, SCM bad_val, const char* expected) {
-    std::string msg;
+    string msg;
     SCM margs;
     if (expected) {
         msg = "Wrong type argument in position ~A (expecting ~A): ~S";
@@ -37,7 +37,7 @@ namespace guile {
 }
 
 [[noreturn]] void VM::wrong_num_args(const char* subr, SCM proc) {
-    std::string msg = "Wrong number of arguments to ~A";
+    string msg = "Wrong number of arguments to ~A";
     SCM arg = proc.is_true() ? proc : (subr ? make_string(subr) : SCM_BOOL_F);
     error(sym_wrong_num_args, nullptr, msg, list1(arg), SCM_BOOL_F);
 }
@@ -46,9 +46,9 @@ namespace guile {
     error(sym_out_of_range, subr, "Value out of range: ~S", list1(bad_val), list1(bad_val));
 }
 
-[[noreturn]] void VM::syserror(const char* subr, int errnum, const std::string& extra) {
-    std::string emsg = std::strerror(errnum);
-    if (!extra.empty()) {
+[[noreturn]] void VM::syserror(const char* subr, int errnum, string extra) {
+    string emsg = std::strerror(errnum);
+    if (!(N(extra) == 0)) {
         error(sym_system_error, subr, "~A: ~S", list2(make_string(emsg), make_string(extra)),
               list1(make_integer(errnum)));
     } else {

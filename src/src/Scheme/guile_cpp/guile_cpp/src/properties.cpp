@@ -82,7 +82,7 @@ SCM VM::procedure_properties(SCM proc) {
         auto* s = as_obj<SubrObj>(proc);
         SCM p = s->props;
         // Ensure arity and name are present if queried
-        if (scm_assq(sym_name, p).is_false() && !s->name.empty()) {
+        if (scm_assq(sym_name, p).is_false() && !(N(s->name) == 0)) {
             p = cons(cons(sym_name, make_symbol(s->name)), p);
         }
         SCM sym_arity = make_symbol("arity");
@@ -365,7 +365,7 @@ void VM::init_properties() {
         if (!is_guardian(a[0])) wrong_type_arg("destroy-guardian!", 1, a[0], "guardian");
         auto* g = as_obj<GuardianObj>(a[0]);
         g->destroyed = true;
-        g->live.clear();
+        gcpp_clear(g->live);
         return SCM_UNSPECIFIED;
     });
 

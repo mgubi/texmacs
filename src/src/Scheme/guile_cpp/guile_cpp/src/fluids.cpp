@@ -7,12 +7,12 @@ SCM VM::make_fluid(SCM def) {
     SCM fl = heap_.alloc_scm<FluidObj>(id, def);
     if (is_dynamic_state(default_dynamic_state)) {
         auto* ds = as_obj<DynamicStateObj>(default_dynamic_state);
-        if (ds->values.size() <= id) ds->values.resize(id + 1, SCM_UNDEFINED);
+        if (static_cast<size_t>(N(ds->values)) <= id) gcpp_resize(ds->values, id + 1, SCM_UNDEFINED);
         ds->values[id] = def;
     }
     if (is_dynamic_state(current_dyn_state) && current_dyn_state != default_dynamic_state) {
         auto* ds = as_obj<DynamicStateObj>(current_dyn_state);
-        if (ds->values.size() <= id) ds->values.resize(id + 1, SCM_UNDEFINED);
+        if (static_cast<size_t>(N(ds->values)) <= id) gcpp_resize(ds->values, id + 1, SCM_UNDEFINED);
         ds->values[id] = def;
     }
     return fl;
@@ -23,7 +23,7 @@ SCM VM::fluid_ref(SCM fluid) {
     auto* f = as_obj<FluidObj>(fluid);
     if (is_dynamic_state(current_dyn_state)) {
         auto* ds = as_obj<DynamicStateObj>(current_dyn_state);
-        if (f->id < ds->values.size() && !ds->values[f->id].is_undefined()) {
+        if (f->id < static_cast<size_t>(N(ds->values)) && !ds->values[f->id].is_undefined()) {
             return ds->values[f->id];
         }
     }
@@ -35,7 +35,7 @@ void VM::fluid_set(SCM fluid, SCM val) {
     auto* f = as_obj<FluidObj>(fluid);
     if (is_dynamic_state(current_dyn_state)) {
         auto* ds = as_obj<DynamicStateObj>(current_dyn_state);
-        if (ds->values.size() <= f->id) ds->values.resize(f->id + 1, SCM_UNDEFINED);
+        if (static_cast<size_t>(N(ds->values)) <= f->id) gcpp_resize(ds->values, f->id + 1, SCM_UNDEFINED);
         ds->values[f->id] = val;
     }
 }
@@ -44,7 +44,7 @@ SCM VM::make_dynamic_state(SCM parent) {
     auto* ds = heap_.alloc<DynamicStateObj>();
     SCM src = parent.is_true() ? parent : default_dynamic_state;
     if (is_dynamic_state(src)) {
-        ds->values = as_obj<DynamicStateObj>(src)->values;
+        ds->values = copy(as_obj<DynamicStateObj>(src)->values);  // (owned: fluid-set! changes it)
     }
     return SCM::from_obj(ds);
 }

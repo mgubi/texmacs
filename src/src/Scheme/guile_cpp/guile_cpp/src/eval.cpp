@@ -8,7 +8,7 @@ namespace guile {
 // Subr / Closure / Macro / Values Constructors
 // ============================================================================
 
-SCM VM::make_subr(const std::string& name, int req, int opt, bool rst, SubrFn fn, SpecialSubr sp) {
+SCM VM::make_subr(string name, int req, int opt, bool rst, SubrFn fn, SpecialSubr sp) {
     return heap_.alloc_scm<SubrObj>(name, req, opt, rst, std::move(fn), sp);
 }
 
@@ -40,7 +40,7 @@ bool VM::is_procedure(SCM x) const {
     }
     if (is_smob(x)) {
         auto* sm = as_obj<SmobObj>(x);
-        return sm->smob_type < smob_types_.size() && static_cast<bool>(smob_types_[sm->smob_type].apply);
+        return sm->smob_type < static_cast<size_t>(N(smob_types_)) && static_cast<bool>(A(smob_types_)[sm->smob_type].apply);
     }
     return false;
 }
@@ -282,13 +282,13 @@ bool transform_internal_defines(SCM body, SCM env, SCM& out_expr) {
     SCM bindings_rev = SCM_EOL;
     SCM cur = body;
     // Flatten leading (define ...), (begin (define ...) ...), and macros expanding to them
-    std::vector<SCM> queue;
+    array<SCM> queue;
     while (is_pair(cur)) {
-        queue.push_back(car(cur));
+        (queue << car(cur));
         cur = cdr(cur);
     }
     size_t idx = 0;
-    while (idx < queue.size()) {
+    while (idx < static_cast<size_t>(N(queue))) {
         SCM form = maybe_expand_macro(queue[idx]);
         if (is_pair(form) && is_syntax_sym(car(form), BuiltinSyntax::Define, env)) {
             SCM nm = SCM_BOOL_F, ex = SCM_BOOL_F;
@@ -298,11 +298,10 @@ bool transform_internal_defines(SCM body, SCM env, SCM& out_expr) {
         } else if (is_pair(form) && is_syntax_sym(car(form), BuiltinSyntax::Begin, env)) {
             SCM sub = cdr(form);
             if (sub.is_null()) { ++idx; continue; }
-            std::vector<SCM> spliced;
-            while (is_pair(sub)) { spliced.push_back(car(sub)); sub = cdr(sub); }
-            if (!spliced.empty() && starts_with_def(spliced[0])) {
-                queue.erase(queue.begin() + static_cast<ptrdiff_t>(idx));
-                queue.insert(queue.begin() + static_cast<ptrdiff_t>(idx), spliced.begin(), spliced.end());
+            array<SCM> spliced;
+            while (is_pair(sub)) { (spliced << car(sub)); sub = cdr(sub); }
+            if (!(N(spliced) == 0) && starts_with_def(spliced[0])) {
+                queue = array_splice(queue, idx, 1, spliced);
             } else {
                 break;
             }
@@ -312,7 +311,7 @@ bool transform_internal_defines(SCM body, SCM env, SCM& out_expr) {
     }
     if (bindings_rev.is_null()) return false;
     SCM rem_body = SCM_EOL;
-    for (size_t i = queue.size(); i > idx; --i) {
+    for (size_t i = static_cast<size_t>(N(queue)); i > idx; --i) {
         rem_body = vm().cons(queue[i - 1], rem_body);
     }
     if (rem_body.is_null()) {
@@ -385,25 +384,25 @@ void switch_dynwind(SCM target_dw) {
     }
 
     // Collect ancestors of target_dw
-    std::vector<SCM> target_path;
+    array<SCM> target_path;
     SCM t = target_dw;
     while (is_a<DynWindObj>(t, ObjTag::DynWind)) {
-        target_path.push_back(t);
+        (target_path << t);
         t = as_obj<DynWindObj>(t)->parent;
     }
 
     // Find LCA by walking cur up
     SCM lca = SCM_EOL;
     SCM c = cur;
-    std::vector<SCM> unwind_list;
+    array<SCM> unwind_list;
     while (is_a<DynWindObj>(c, ObjTag::DynWind)) {
-        auto it = std::find(target_path.begin(), target_path.end(), c);
-        if (it != target_path.end()) {
+        auto it = std::find(begin(target_path), end(target_path), c);
+        if (it != end(target_path)) {
             lca = c;
-            target_path.erase(it, target_path.end());
+            target_path->resize(static_cast<int>(it - begin(target_path)));  // (local)
             break;
         }
-        unwind_list.push_back(c);
+        (unwind_list << c);
         c = as_obj<DynWindObj>(c)->parent;
     }
     if (lca.is_null()) {
@@ -426,8 +425,8 @@ void switch_dynwind(SCM target_dw) {
     }
 
     // 2. Rewind from lca down to target_dw (reverse order of target_path)
-    for (auto it = target_path.rbegin(); it != target_path.rend(); ++it) {
-        SCM node = *it;
+    for (int ti = N(target_path) - 1; ti >= 0; ti--) {
+        SCM node = target_path[ti];
         auto* dw = as_obj<DynWindObj>(node);
         if (dw->kind == DynWindKind::Wind) {
             vm().call0(dw->a); // before thunk (runs in outer dynwind!)
@@ -486,7 +485,7 @@ SCM eval_quasiquote(SCM form, SCM env, int depth) {
     if (is_vector(form)) {
         auto* v = as_obj<VectorObj>(form);
         ScmRootVec out(vm().heap());
-        for (size_t i = 0; i < v->elts.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(v->elts)); ++i) {
             SCM e = v->elts[i];
             if (is_pair(e) && car(e) == vm().sym_unquote_splicing) {
                 if (!is_pair(cdr(e)) || !cdr(cdr(e)).is_null()) {
@@ -495,15 +494,15 @@ SCM eval_quasiquote(SCM form, SCM env, int depth) {
                 if (depth == 0) {
                     SCM spliced = vm().eval(car(cdr(e)), env);
                     while (is_pair(spliced)) {
-                        out.push_back(car(spliced));
+                        (out << car(spliced));
                         spliced = cdr(spliced);
                     }
                     if (!spliced.is_null()) vm().wrong_type_arg("quasiquote", 1, spliced, "proper list");
                 } else {
-                    out.push_back(vm().list2(vm().sym_unquote_splicing, eval_quasiquote(car(cdr(e)), env, depth - 1)));
+                    (out << (vm().list2(vm().sym_unquote_splicing, eval_quasiquote(car(cdr(e)), env, depth - 1))));
                 }
             } else {
-                out.push_back(eval_quasiquote(e, env, depth));
+                (out << eval_quasiquote(e, env, depth));
             }
         }
         return vm().heap().alloc_scm<VectorObj>(out.vec);
@@ -523,7 +522,7 @@ struct CekState {
     SCM env = SCM_EOL;
     SCM val = SCM_UNSPECIFIED;
     SCM proc = SCM_BOOL_F;
-    std::vector<SCM> args;
+    array<SCM> args;
     SCM cont = SCM_EOL;
 };
 
@@ -552,12 +551,12 @@ void dispatch_throw(VM& v, CekState& st, SCM key, SCM throw_args, SCM base_dw, i
                     v.current_dynwind = fr;
                     SCM stk = build_stack_from_cont(st.cont);
                     v.fluid_set(v.the_last_stack_fluid, stk);
-                    std::vector<SCM> hargs;
-                    hargs.push_back(key);
+                    array<SCM> hargs;
+                    (hargs << key);
                     SCM a = throw_args;
-                    while (is_pair(a)) { hargs.push_back(car(a)); a = cdr(a); }
+                    while (is_pair(a)) { (hargs << car(a)); a = cdr(a); }
                     try {
-                        v.apply(dw->b, hargs.data(), hargs.size());
+                        v.apply(dw->b, gcpp_data(hargs), static_cast<size_t>(N(hargs)));
                     } catch (const SchemeThrow& inner_ex) {
                         key = inner_ex.key;
                         throw_args = inner_ex.args;
@@ -594,10 +593,10 @@ void dispatch_throw(VM& v, CekState& st, SCM key, SCM throw_args, SCM base_dw, i
             st.cont = SCM::from_obj(rcf);
             st.mode = StepMode::ApplyProc;
             st.proc = dw->b;
-            st.args.clear();
-            st.args.push_back(key);
+            gcpp_clear(st.args);
+            (st.args << key);
             SCM a = throw_args;
-            while (is_pair(a)) { st.args.push_back(car(a)); a = cdr(a); }
+            while (is_pair(a)) { (st.args << car(a)); a = cdr(a); }
             return;
         }
         if (dw->kind == DynWindKind::ThrowHandler) {
@@ -613,10 +612,10 @@ void dispatch_throw(VM& v, CekState& st, SCM key, SCM throw_args, SCM base_dw, i
             st.cont = SCM::from_obj(rcf);
             st.mode = StepMode::ApplyProc;
             st.proc = dw->b;
-            st.args.clear();
-            st.args.push_back(key);
+            gcpp_clear(st.args);
+            (st.args << key);
             SCM a = throw_args;
-            while (is_pair(a)) { st.args.push_back(car(a)); a = cdr(a); }
+            while (is_pair(a)) { (st.args << car(a)); a = cdr(a); }
             return;
         }
         // Regular catch:
@@ -634,10 +633,10 @@ void dispatch_throw(VM& v, CekState& st, SCM key, SCM throw_args, SCM base_dw, i
             st.cont = SCM::from_obj(pcf);
             st.mode = StepMode::ApplyProc;
             st.proc = dw->c;
-            st.args.clear();
-            st.args.push_back(key);
+            gcpp_clear(st.args);
+            (st.args << key);
             SCM a = throw_args;
-            while (is_pair(a)) { st.args.push_back(car(a)); a = cdr(a); }
+            while (is_pair(a)) { (st.args << car(a)); a = cdr(a); }
             return;
         }
         // 2. Unwind dynamic-wind chain to dw->parent (also resets any FlagReset nodes!)
@@ -646,11 +645,11 @@ void dispatch_throw(VM& v, CekState& st, SCM key, SCM throw_args, SCM base_dw, i
         st.cont = dw->d;
         st.mode = StepMode::ApplyProc;
         st.proc = dw->b;
-        st.args.clear();
-        st.args.push_back(key);
+        gcpp_clear(st.args);
+        (st.args << key);
         SCM a = throw_args;
         while (is_pair(a)) {
-            st.args.push_back(car(a));
+            (st.args << car(a));
             a = cdr(a);
         }
         return;
@@ -662,11 +661,11 @@ SCM run_cek(VM& v, CekState& st) {
     SCM base_dw = v.current_dynwind;
     int my_depth = ++v.trampoline_depth;
     // Root st.args across GC!
-    GcRootSpan args_span{st.args.data(), st.args.size(), nullptr};
+    GcRootSpan args_span{gcpp_data(st.args), static_cast<size_t>(N(st.args)), nullptr};
     v.heap().push_root_span(&args_span);
     auto sync_args = [&]() {
-        args_span.data = st.args.data();
-        args_span.count = st.args.size();
+        args_span.data = gcpp_data(st.args);
+        args_span.count = static_cast<size_t>(N(st.args));
     };
 
     struct DepthGuard {
@@ -758,7 +757,7 @@ SCM run_cek(VM& v, CekState& st) {
                                     if (!is_pair(formals)) {
                                         v.error(v.sym_syntax_error, "lambda", "Bad formals in ~S", v.list1(expr));
                                     }
-                                    std::vector<SCM> seen;
+                                    array<SCM> seen;
                                     SCM f = formals;
                                     while (is_pair(f)) {
                                         SCM sym = car(f);
@@ -768,7 +767,7 @@ SCM run_cek(VM& v, CekState& st) {
                                         for (SCM s : seen) {
                                             if (s == sym) v.error(v.sym_syntax_error, "lambda", "Duplicate formal ~S in ~S", v.list2(sym, expr));
                                         }
-                                        seen.push_back(sym);
+                                        (seen << sym);
                                         f = cdr(f);
                                     }
                                     if (!f.is_null()) {
@@ -906,7 +905,7 @@ SCM run_cek(VM& v, CekState& st) {
                                 }
                                 // Validate all bindings & check duplicates up front
                                 {
-                                    std::vector<SCM> seen;
+                                    array<SCM> seen;
                                     SCM b = bindings;
                                     while (is_pair(b)) {
                                         SCM entry = car(b);
@@ -919,7 +918,7 @@ SCM run_cek(VM& v, CekState& st) {
                                         for (SCM s : seen) {
                                             if (s == car(entry)) v.error(v.sym_syntax_error, "let", "Duplicate binding ~S in ~S", v.list2(car(entry), expr));
                                         }
-                                        seen.push_back(car(entry));
+                                        (seen << car(entry));
                                         b = cdr(b);
                                     }
                                     if (!b.is_null()) v.error(v.sym_syntax_error, "let", "Bad bindings in ~S", v.list1(expr));
@@ -931,7 +930,7 @@ SCM run_cek(VM& v, CekState& st) {
                                         as_obj<ClosureObj>(cl)->env = new_env;
                                         st.mode = StepMode::ApplyProc;
                                         st.proc = cl;
-                                        st.args.clear();
+                                        gcpp_clear(st.args);
                                         continue;
                                     }
                                     SCM transformed;
@@ -1035,7 +1034,7 @@ SCM run_cek(VM& v, CekState& st) {
                                 // Pre-allocate frame with SCM_UNDEFINED slots & validate bindings
                                 SCM names_h = SCM_EOL, names_t = SCM_EOL;
                                 SCM vals_h = SCM_EOL, vals_t = SCM_EOL;
-                                std::vector<SCM> seen;
+                                array<SCM> seen;
                                 SCM b = bindings;
                                 while (is_pair(b)) {
                                     SCM entry = car(b);
@@ -1048,7 +1047,7 @@ SCM run_cek(VM& v, CekState& st) {
                                     for (SCM s : seen) {
                                         if (s == car(entry)) v.error(v.sym_syntax_error, "letrec", "Duplicate binding ~S in ~S", v.list2(car(entry), expr));
                                     }
-                                    seen.push_back(car(entry));
+                                    (seen << car(entry));
                                     SCM nc = v.cons(car(entry), SCM_EOL);
                                     SCM vc = v.cons(SCM_UNDEFINED, SCM_EOL);
                                     if (names_h.is_null()) { names_h = names_t = nc; vals_h = vals_t = vc; }
@@ -1308,7 +1307,7 @@ SCM run_cek(VM& v, CekState& st) {
                             }
                             st.mode = StepMode::ApplyProc;
                             st.proc = mac->transformer;
-                            st.args = {expr, env};
+                            st.args = array_list<SCM>({expr, env});
                             continue;
                         }
                     } else if (!op_val.is_undefined()) {
@@ -1316,7 +1315,7 @@ SCM run_cek(VM& v, CekState& st) {
                         if (arg_exprs.is_null()) {
                             st.mode = StepMode::ApplyProc;
                             st.proc = op_val;
-                            st.args.clear();
+                            gcpp_clear(st.args);
                             continue;
                         }
                         if (!is_pair(arg_exprs)) {
@@ -1345,7 +1344,7 @@ SCM run_cek(VM& v, CekState& st) {
 
             if (st.mode == StepMode::ApplyProc) {
                 SCM proc = st.proc;
-                size_t nargs = st.args.size();
+                size_t nargs = static_cast<size_t>(N(st.args));
 
                 if (is_closure(proc)) {
                     auto* cl = as_obj<ClosureObj>(proc);
@@ -1358,11 +1357,11 @@ SCM run_cek(VM& v, CekState& st) {
                                        v.c_stack_used() > (v.c_stack_limit_bytes() >> 1));
                     if (!prefer_cek &&
                         (is_bytecode(cl->bytecode) || (cl->bytecode.is_false() && bytecode_should_compile(cl) && bytecode_compile_closure(cl)))) {
-                        st.val = bytecode_run_closure(cl, st.args.data(), nargs);
+                        st.val = bytecode_run_closure(cl, gcpp_data(st.args), nargs);
                         st.mode = StepMode::ApplyVal;
                         continue;
                     }
-                    SCM new_env = extend_env_formals(cl->formals, st.args.data(), nargs, cl->env, proc);
+                    SCM new_env = extend_env_formals(cl->formals, gcpp_data(st.args), nargs, cl->env, proc);
                     SCM body = cl->body;
                     SCM transformed;
                     if (transform_internal_defines(body, new_env, transformed)) {
@@ -1395,9 +1394,9 @@ SCM run_cek(VM& v, CekState& st) {
                             SCM target = st.args[0];
                             SCM last = st.args[nargs - 1];
                             if (scm_ilength(last) < 0) v.wrong_type_arg("apply", static_cast<int>(nargs), last, "proper list");
-                            std::vector<SCM> flat;
-                            for (size_t i = 1; i + 1 < nargs; ++i) flat.push_back(st.args[i]);
-                            while (is_pair(last)) { flat.push_back(car(last)); last = cdr(last); }
+                            array<SCM> flat;
+                            for (size_t i = 1; i + 1 < nargs; ++i) (flat << st.args[i]);
+                            while (is_pair(last)) { (flat << car(last)); last = cdr(last); }
                             st.proc = target;
                             st.args = std::move(flat);
                             continue;
@@ -1406,7 +1405,7 @@ SCM run_cek(VM& v, CekState& st) {
                             if (nargs != 1) v.wrong_num_args("call-with-current-continuation", proc);
                             SCM k = v.heap().alloc_scm<ContinuationObj>(st.cont, v.current_dynwind, my_depth);
                             st.proc = st.args[0];
-                            st.args = {k};
+                            st.args = array_list<SCM>({k});
                             continue;
                         }
                         case SpecialSubr::CallWithValues: {
@@ -1415,7 +1414,7 @@ SCM run_cek(VM& v, CekState& st) {
                             cf->expr = st.args[1]; // consumer
                             st.cont = SCM::from_obj(cf);
                             st.proc = st.args[0]; // producer
-                            st.args.clear();
+                            gcpp_clear(st.args);
                             continue;
                         }
                         case SpecialSubr::DynamicWind: {
@@ -1429,7 +1428,7 @@ SCM run_cek(VM& v, CekState& st) {
                             cf->aux3 = dw;
                             st.cont = SCM::from_obj(cf);
                             st.proc = before;
-                            st.args.clear();
+                            gcpp_clear(st.args);
                             continue;
                         }
                         case SpecialSubr::Catch: {
@@ -1442,7 +1441,7 @@ SCM run_cek(VM& v, CekState& st) {
                             cf->aux = dw;
                             st.cont = SCM::from_obj(cf);
                             st.proc = thunk;
-                            st.args.clear();
+                            gcpp_clear(st.args);
                             continue;
                         }
                         case SpecialSubr::LazyCatch: {
@@ -1454,7 +1453,7 @@ SCM run_cek(VM& v, CekState& st) {
                             cf->aux = dw;
                             st.cont = SCM::from_obj(cf);
                             st.proc = thunk;
-                            st.args.clear();
+                            gcpp_clear(st.args);
                             continue;
                         }
                         case SpecialSubr::WithThrowHandler: {
@@ -1466,7 +1465,7 @@ SCM run_cek(VM& v, CekState& st) {
                             cf->aux = dw;
                             st.cont = SCM::from_obj(cf);
                             st.proc = thunk;
-                            st.args.clear();
+                            gcpp_clear(st.args);
                             continue;
                         }
                         case SpecialSubr::WithFluidStar: {
@@ -1481,7 +1480,7 @@ SCM run_cek(VM& v, CekState& st) {
                             cf->aux = dw;
                             st.cont = SCM::from_obj(cf);
                             st.proc = thunk;
-                            st.args.clear();
+                            gcpp_clear(st.args);
                             continue;
                         }
                         case SpecialSubr::WithFluidsStar: {
@@ -1502,7 +1501,7 @@ SCM run_cek(VM& v, CekState& st) {
                                 vcur = cdr(vcur);
                             }
                             st.proc = thunk;
-                            st.args.clear();
+                            gcpp_clear(st.args);
                             continue;
                         }
                         case SpecialSubr::WithDynamicState: {
@@ -1516,7 +1515,7 @@ SCM run_cek(VM& v, CekState& st) {
                             cf->aux = dw;
                             st.cont = SCM::from_obj(cf);
                             st.proc = thunk;
-                            st.args.clear();
+                            gcpp_clear(st.args);
                             continue;
                         }
                         case SpecialSubr::PrimitiveEval: {
@@ -1591,7 +1590,7 @@ SCM run_cek(VM& v, CekState& st) {
                         case SpecialSubr::ForEach:
                         case SpecialSubr::AndMap:
                         case SpecialSubr::OrMap: {
-                            if (nargs < 2) v.wrong_num_args(sub->name.c_str(), proc);
+                            if (nargs < 2) v.wrong_num_args(((char*) c_string(sub->name)), proc);
                             SCM fn = st.args[0];
                             int mode = (sub->special == SpecialSubr::Map) ? 0
                                      : (sub->special == SpecialSubr::ForEach) ? 1
@@ -1599,7 +1598,7 @@ SCM run_cek(VM& v, CekState& st) {
                             // Validate all list args: for core map/for-each (mode 0/1), all must have equal length!
                             bool any_empty = false;
                             bool any_nonempty = false;
-                            std::vector<SCM> call_args;
+                            array<SCM> call_args;
                             SCM next_lists_h = SCM_EOL, next_lists_t = SCM_EOL;
                             for (size_t i = 1; i < nargs; ++i) {
                                 SCM l = st.args[i];
@@ -1607,10 +1606,10 @@ SCM run_cek(VM& v, CekState& st) {
                                     any_empty = true;
                                     continue;
                                 }
-                                if (!is_pair(l)) v.wrong_type_arg(sub->name.c_str(), static_cast<int>(i + 1), l, "list");
+                                if (!is_pair(l)) v.wrong_type_arg(((char*) c_string(sub->name)), static_cast<int>(i + 1), l, "list");
                                 any_nonempty = true;
                                 if (!any_empty) {
-                                    call_args.push_back(car(l));
+                                    (call_args << car(l));
                                     SCM c = v.cons(cdr(l), SCM_EOL);
                                     if (next_lists_h.is_null()) next_lists_h = next_lists_t = c;
                                     else { set_cdr(next_lists_t, c); next_lists_t = c; }
@@ -1618,7 +1617,7 @@ SCM run_cek(VM& v, CekState& st) {
                             }
                             if (any_empty) {
                                 if (any_nonempty && (mode == 0 || mode == 1)) {
-                                    v.out_of_range(sub->name.c_str(), st.args[1]);
+                                    v.out_of_range(((char*) c_string(sub->name)), st.args[1]);
                                 }
                                 st.val = (mode == 0) ? SCM_EOL : (mode == 1 ? SCM_UNSPECIFIED : (mode == 2 ? SCM_BOOL_T : SCM_BOOL_F));
                                 st.mode = StepMode::ApplyVal;
@@ -1642,38 +1641,38 @@ SCM run_cek(VM& v, CekState& st) {
                     // Normal C++ Subr invocation
                     int req = sub->req, opt = sub->opt;
                     if (static_cast<int>(nargs) < req || (!sub->rst && static_cast<int>(nargs) > req + opt)) {
-                        v.wrong_num_args(sub->name.c_str(), proc);
+                        v.wrong_num_args(((char*) c_string(sub->name)), proc);
                     }
                     // Record active subr frame for debugging stack traces if it throws
                     SCM saved_cont_for_subr = st.cont;
                     if (v.debug_opts.debug) {
                         auto* scf = v.heap().alloc<ContFrameObj>(ContKind::AppArgs, st.cont);
                         scf->aux = proc;
-                        scf->vals.assign_from(st.args.data(), nargs);
+                        scf->vals.assign_from(gcpp_data(st.args), nargs);
                         st.cont = SCM::from_obj(scf);
                         v.current_cont = st.cont;
                     }
                     if (sub->raw_varargs) {
-                        st.val = sub->raw_fn ? sub->raw_fn(st.args.data(), nargs) : sub->fn(st.args.data(), nargs);
+                        st.val = sub->raw_fn ? sub->raw_fn(gcpp_data(st.args), nargs) : sub->fn(gcpp_data(st.args), nargs);
                     } else if (!sub->rst) {
                         // Pad missing optional args with SCM_UNDEFINED
                         if (static_cast<int>(nargs) < req + opt) {
-                            st.args.resize(static_cast<size_t>(req + opt), SCM_UNDEFINED);
+                            gcpp_resize(st.args, static_cast<size_t>(req + opt), SCM_UNDEFINED);
                             sync_args();
                         }
-                        st.val = sub->raw_fn ? sub->raw_fn(st.args.data(), nargs) : sub->fn(st.args.data(), nargs);
+                        st.val = sub->raw_fn ? sub->raw_fn(gcpp_data(st.args), nargs) : sub->fn(gcpp_data(st.args), nargs);
                     } else {
                         // Pack rest args into a list at index req + opt
                         SCM rest_list = SCM_EOL;
                         for (size_t i = nargs; i > static_cast<size_t>(req + opt); --i) {
                             rest_list = v.cons(st.args[i - 1], rest_list);
                         }
-                        std::vector<SCM> packed(static_cast<size_t>(req + opt + 1), SCM_UNDEFINED);
+                        array<SCM> packed = array_fill<SCM>(static_cast<size_t>(req + opt + 1), SCM_UNDEFINED);
                         for (size_t i = 0; i < std::min<size_t>(nargs, static_cast<size_t>(req + opt)); ++i) {
                             packed[i] = st.args[i];
                         }
                         packed[static_cast<size_t>(req + opt)] = rest_list;
-                        st.val = sub->fn(packed.data(), packed.size());
+                        st.val = sub->fn(gcpp_data(packed), static_cast<size_t>(N(packed)));
                     }
                     st.cont = saved_cont_for_subr;
                     st.mode = StepMode::ApplyVal;
@@ -1683,7 +1682,7 @@ SCM run_cek(VM& v, CekState& st) {
                 if (is_continuation(proc)) {
                     auto* k = as_obj<ContinuationObj>(proc);
                     SCM ret_val = (nargs == 0) ? v.make_values(SCM_EOL)
-                                : (nargs == 1 ? st.args[0] : v.make_values(v.list_n(st.args.data(), nargs)));
+                                : (nargs == 1 ? st.args[0] : v.make_values(v.list_n(gcpp_data(st.args), nargs)));
                     if (k->has_vm_snap) {
                         if (k->vm_depth > 0 && v.is_bc_inv_active(k->vm_depth)) {
                             ContinuationEscape esc;
@@ -1756,7 +1755,7 @@ SCM run_cek(VM& v, CekState& st) {
                         }
                     } else if (nargs == 1) {
                         if (st.args[0].is_heap()) {
-                            g->live.push_back(st.args[0]);
+                            (g->live << st.args[0]);
                         }
                         st.val = SCM_UNSPECIFIED;
                     } else {
@@ -1770,7 +1769,7 @@ SCM run_cek(VM& v, CekState& st) {
                     auto* so = as_obj<StructObj>(proc);
                     uint32_t of = obj_class_flags(proc);
                     if ((of & CLASSF_PURE_GENERIC) != 0) {
-                        st.val = goops_apply_generic(proc, st.args.data(), nargs);
+                        st.val = goops_apply_generic(proc, gcpp_data(st.args), nargs);
                         st.mode = StepMode::ApplyVal;
                         continue;
                     }
@@ -1778,16 +1777,16 @@ SCM run_cek(VM& v, CekState& st) {
                         SCM target = SCM_BOOL_F;
                         if ((of & CLASSF_ENTITY) != 0 || so->is_entity) {
                             target = so->entity_proc;
-                        } else if (is_struct(so->vtable) && as_obj<StructObj>(so->vtable)->slots.size() > 3) {
+                        } else if (is_struct(so->vtable) && static_cast<size_t>(N(as_obj<StructObj>(so->vtable)->slots)) > 3) {
                             target = SCM(as_obj<StructObj>(so->vtable)->slots[3]);
                         }
                         if (target.is_true() && v.is_procedure(target)) {
                             // Guile 1.8: entity/operator procedure receives (self arg1 ...)
-                            std::vector<SCM> new_args;
-                            new_args.reserve(nargs + 1);
-                            new_args.push_back(proc);
-                            new_args.insert(new_args.end(), st.args.begin(), st.args.end());
-                            st.args.swap(new_args);
+                            array<SCM> new_args;
+                            (void) 0;
+                            (new_args << proc);
+                            array_append(new_args, A(st.args), N(st.args));
+                            st.args = new_args;
                             st.proc = target;
                             continue;
                         }
@@ -1799,10 +1798,10 @@ SCM run_cek(VM& v, CekState& st) {
                     auto* sm = as_obj<SmobObj>(proc);
                     auto& info = v.smob_info(sm->smob_type);
                     if (info.apply) {
-                        std::vector<SCM> full;
-                        full.push_back(proc);
-                        full.insert(full.end(), st.args.begin(), st.args.end());
-                        st.val = info.apply(full.data(), full.size());
+                        array<SCM> full;
+                        (full << proc);
+                        array_append(full, A(st.args), N(st.args));
+                        st.val = info.apply(gcpp_data(full), static_cast<size_t>(N(full)));
                         st.mode = StepMode::ApplyVal;
                         continue;
                     }
@@ -1910,7 +1909,7 @@ SCM run_cek(VM& v, CekState& st) {
                 if (rem_args.is_null()) {
                     st.mode = StepMode::ApplyProc;
                     st.proc = proc;
-                    st.args.clear();
+                    gcpp_clear(st.args);
                     continue;
                 }
                 if (!is_pair(rem_args)) v.wrong_num_args(nullptr, proc);
@@ -1930,8 +1929,8 @@ SCM run_cek(VM& v, CekState& st) {
                 if (cf->expr.is_null()) {
                     st.mode = StepMode::ApplyProc;
                     st.proc = cf->aux;
-                    st.args.assign(cf->vals.data(), cf->vals.data() + cf->vals.size());
-                    st.args.push_back(st.val);
+                    st.args = array_from(gcpp_data(cf->vals), static_cast<size_t>(N(cf->vals)));
+                    (st.args << st.val);
                     continue;
                 }
                 if (!is_pair(cf->expr)) v.wrong_num_args(nullptr, cf->aux);
@@ -1940,7 +1939,7 @@ SCM run_cek(VM& v, CekState& st) {
                 ncf->aux = cf->aux;
                 ncf->expr = cdr(cf->expr);
                 ncf->vals = cf->vals;
-                ncf->vals.push_back(st.val);
+                (ncf->vals << st.val);
                 st.cont = SCM::from_obj(ncf);
                 st.mode = StepMode::Eval;
                 st.env = cf->env;
@@ -1950,7 +1949,7 @@ SCM run_cek(VM& v, CekState& st) {
 
             case ContKind::LetInit: {
                 SmallScmVec evaled = cf->vals;
-                evaled.push_back(st.val);
+                (evaled << st.val);
                 if (is_pair(cf->expr)) {
                     SCM entry = car(cf->expr);
                     if (!is_pair(entry) || !is_symbol(car(entry)) || !is_pair(cdr(entry)) || !cdr(cdr(entry)).is_null()) {
@@ -1977,10 +1976,10 @@ SCM run_cek(VM& v, CekState& st) {
                     as_obj<ClosureObj>(cl)->env = loop_env;
                     st.mode = StepMode::ApplyProc;
                     st.proc = cl;
-                    st.args.assign(evaled.data(), evaled.data() + evaled.size());
+                    st.args = array_from(gcpp_data(evaled), static_cast<size_t>(N(evaled)));
                     continue;
                 }
-                SCM vals_list = v.list_n(evaled.data(), evaled.size());
+                SCM vals_list = v.list_n(gcpp_data(evaled), static_cast<size_t>(N(evaled)));
                 SCM new_env = v.cons(v.cons(names, vals_list), cf->env);
                 SCM body = cf->aux;
                 SCM transformed;
@@ -2047,7 +2046,7 @@ SCM run_cek(VM& v, CekState& st) {
             case ContKind::LetrecInit: {
                 // R5RS / Petrofsky-safe letrec: collect ALL init values into a fresh vector BEFORE assigning to frame!
                 SmallScmVec evaled = cf->vals;
-                evaled.push_back(st.val);
+                (evaled << st.val);
                 if (is_pair(cf->expr)) {
                     SCM entry = car(cf->expr);
                     auto* ncf = v.heap().alloc<ContFrameObj>(ContKind::LetrecInit, st.cont);
@@ -2063,7 +2062,7 @@ SCM run_cek(VM& v, CekState& st) {
                     continue;
                 }
                 SCM cell = cf->aux2;
-                for (size_t i = 0; i < evaled.size() && is_pair(cell); ++i) {
+                for (size_t i = 0; i < static_cast<size_t>(N(evaled)) && is_pair(cell); ++i) {
                     set_car(cell, evaled[i]);
                     cell = cdr(cell);
                 }
@@ -2141,15 +2140,15 @@ SCM run_cek(VM& v, CekState& st) {
                 // Check SRFI-61: (generator guard => receiver)
                 if (arrow_unbound && is_pair(body) && is_pair(cdr(body)) &&
                     car(cdr(body)) == v.sym_arrow && is_pair(cdr(cdr(body)))) {
-                    std::vector<SCM> gvals;
+                    array<SCM> gvals;
                     if (is_values(st.val)) {
                         SCM cur = as_obj<ValuesObj>(st.val)->values;
-                        while (is_pair(cur)) { gvals.push_back(car(cur)); cur = cdr(cur); }
+                        while (is_pair(cur)) { (gvals << car(cur)); cur = cdr(cur); }
                     } else {
-                        gvals.push_back(st.val);
+                        (gvals << st.val);
                     }
                     SCM guard_fn = v.eval(car(body), cf->env);
-                    SCM guard_res = v.apply(guard_fn, gvals.data(), gvals.size());
+                    SCM guard_res = v.apply(guard_fn, gcpp_data(gvals), static_cast<size_t>(N(gvals)));
                     if (guard_res.is_true()) {
                         SCM recv_fn = v.eval(car(cdr(cdr(body))), cf->env);
                         st.mode = StepMode::ApplyProc;
@@ -2221,7 +2220,7 @@ SCM run_cek(VM& v, CekState& st) {
             case ContKind::CondArrow: {
                 st.mode = StepMode::ApplyProc;
                 st.proc = st.val;
-                st.args = {cf->expr};
+                st.args = array_list<SCM>({cf->expr});
                 continue;
             }
 
@@ -2269,7 +2268,7 @@ SCM run_cek(VM& v, CekState& st) {
 
             case ContKind::DoInit: {
                 SmallScmVec inits = cf->vals;
-                inits.push_back(st.val);
+                (inits << st.val);
                 if (is_pair(cf->expr)) {
                     SCM spec = car(cf->expr);
                     auto* ncf = v.heap().alloc<ContFrameObj>(ContKind::DoInit, st.cont);
@@ -2294,7 +2293,7 @@ SCM run_cek(VM& v, CekState& st) {
                     else { set_cdr(names_t, nc); names_t = nc; }
                     vs = cdr(vs);
                 }
-                SCM vals_list = v.list_n(inits.data(), inits.size());
+                SCM vals_list = v.list_n(gcpp_data(inits), static_cast<size_t>(N(inits)));
                 SCM loop_env = v.cons(v.cons(names_h, vals_list), cf->env);
                 auto* tcf = v.heap().alloc<ContFrameObj>(ContKind::DoTest, st.cont);
                 tcf->env = loop_env;
@@ -2390,7 +2389,7 @@ SCM run_cek(VM& v, CekState& st) {
 
             case ContKind::DoStep: {
                 SmallScmVec new_vals = cf->vals;
-                new_vals.push_back(st.val);
+                (new_vals << st.val);
                 if (is_pair(cf->expr)) {
                     auto* ncf = v.heap().alloc<ContFrameObj>(ContKind::DoStep, st.cont);
                     ncf->env = cf->env;
@@ -2407,7 +2406,7 @@ SCM run_cek(VM& v, CekState& st) {
                 SCM do_args = cf->aux;
                 SCM outer_env = cdr(cf->env);
                 SCM names = car(car(cf->env));
-                SCM vals_list = v.list_n(new_vals.data(), new_vals.size());
+                SCM vals_list = v.list_n(gcpp_data(new_vals), static_cast<size_t>(N(new_vals)));
                 SCM next_env = v.cons(v.cons(names, vals_list), outer_env);
                 auto* tcf = v.heap().alloc<ContFrameObj>(ContKind::DoTest, st.cont);
                 tcf->env = next_env;
@@ -2459,12 +2458,12 @@ SCM run_cek(VM& v, CekState& st) {
             case ContKind::CallWithValues: {
                 st.mode = StepMode::ApplyProc;
                 st.proc = cf->expr;
-                st.args.clear();
+                gcpp_clear(st.args);
                 if (is_values(st.val)) {
                     SCM vl = as_obj<ValuesObj>(st.val)->values;
-                    while (is_pair(vl)) { st.args.push_back(car(vl)); vl = cdr(vl); }
+                    while (is_pair(vl)) { (st.args << car(vl)); vl = cdr(vl); }
                 } else {
-                    st.args.push_back(st.val);
+                    (st.args << st.val);
                 }
                 continue;
             }
@@ -2478,7 +2477,7 @@ SCM run_cek(VM& v, CekState& st) {
                 st.cont = SCM::from_obj(ecf);
                 st.mode = StepMode::ApplyProc;
                 st.proc = cf->expr; // main thunk
-                st.args.clear();
+                gcpp_clear(st.args);
                 continue;
             }
 
@@ -2492,7 +2491,7 @@ SCM run_cek(VM& v, CekState& st) {
                 st.cont = SCM::from_obj(rcf);
                 st.mode = StepMode::ApplyProc;
                 st.proc = cf->expr; // after thunk
-                st.args.clear();
+                gcpp_clear(st.args);
                 continue;
             }
 
@@ -2519,10 +2518,10 @@ SCM run_cek(VM& v, CekState& st) {
                 st.cont = dw->d;
                 st.mode = StepMode::ApplyProc;
                 st.proc = dw->b;
-                st.args.clear();
-                st.args.push_back(cf->aux2);
+                gcpp_clear(st.args);
+                (st.args << cf->aux2);
                 SCM a = cf->aux3;
-                while (is_pair(a)) { st.args.push_back(car(a)); a = cdr(a); }
+                while (is_pair(a)) { (st.args << car(a)); a = cdr(a); }
                 continue;
             }
 
@@ -2571,7 +2570,7 @@ SCM run_cek(VM& v, CekState& st) {
                 SCM rem = cf->aux2;
                 bool any_empty = false;
                 bool any_nonempty = false;
-                std::vector<SCM> call_args;
+                array<SCM> call_args;
                 SCM next_h = SCM_EOL, next_t = SCM_EOL;
                 while (is_pair(rem)) {
                     SCM l = car(rem);
@@ -2583,7 +2582,7 @@ SCM run_cek(VM& v, CekState& st) {
                     if (!is_pair(l)) v.wrong_type_arg("map", 2, l, "list");
                     any_nonempty = true;
                     if (!any_empty) {
-                        call_args.push_back(car(l));
+                        (call_args << car(l));
                         SCM c = v.cons(cdr(l), SCM_EOL);
                         if (next_h.is_null()) next_h = next_t = c;
                         else { set_cdr(next_t, c); next_t = c; }
@@ -2663,8 +2662,8 @@ SCM VM::primitive_eval(SCM expr) {
     return eval(expr, env);
 }
 
-SCM VM::eval_string(std::string_view code) {
-    SCM port = make_input_string_port(std::string(code));
+SCM VM::eval_string(string code) {
+    SCM port = make_input_string_port(string(code));
     SCM res = SCM_UNSPECIFIED;
     while (true) {
         SCM form = read_from_port(port);
@@ -2704,16 +2703,16 @@ SCM VM::apply(SCM proc, const SCM* args, size_t nargs) {
     CekState st;
     st.mode = StepMode::ApplyProc;
     st.proc = proc;
-    st.args.assign(args, args + nargs);
+    st.args = array_from(args, nargs);
     st.cont = SCM_EOL;
     return run_cek(*this, st);
 }
 
 SCM VM::apply_list(SCM proc, SCM arg_list) {
-    std::vector<SCM> v;
+    array<SCM> v;
     SCM cur = arg_list;
-    while (is_pair(cur)) { v.push_back(car(cur)); cur = cdr(cur); }
-    return apply(proc, v.data(), v.size());
+    while (is_pair(cur)) { (v << car(cur)); cur = cdr(cur); }
+    return apply(proc, gcpp_data(v), static_cast<size_t>(N(v)));
 }
 
 SCM VM::call0(SCM proc) { return apply(proc, nullptr, 0); }
@@ -2737,15 +2736,15 @@ SCM build_stack_from_cont(SCM cont, SCM id) {
             auto* fr = vm().heap().alloc<FrameObj>();
             fr->is_proc = (cf->kind == ContKind::AppArgs);
             fr->proc = (cf->kind == ContKind::AppArgs) ? cf->aux : SCM_BOOL_F;
-            fr->args = vm().list_n(cf->vals.data(), cf->vals.size());
+            fr->args = vm().list_n(gcpp_data(cf->vals), static_cast<size_t>(N(cf->vals)));
             fr->source = cf->expr;
-            st->frames.push_back(SCM::from_obj(fr));
+            (st->frames << SCM::from_obj(fr));
         }
         cur = cf->next;
     }
-    for (size_t i = 0; i < st->frames.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(N(st->frames)); ++i) {
         auto* fr = as_obj<FrameObj>(st->frames[i]);
-        if (i + 1 < st->frames.size()) fr->prev = st->frames[i + 1];
+        if (i + 1 < static_cast<size_t>(N(st->frames))) fr->prev = st->frames[i + 1];
         if (i > 0) fr->next = st->frames[i - 1];
     }
     return SCM::from_obj(st);
@@ -2756,12 +2755,12 @@ void display_backtrace_impl(SCM stack, SCM port, int first, int depth) {
     if (!is_stack(stack)) return;
     auto* st = as_obj<StackObj>(stack);
     port_puts(p, "Backtrace:\n");
-    int count = static_cast<int>(st->frames.size());
+    int count = static_cast<int>(static_cast<size_t>(N(st->frames)));
     int end = (depth > 0 && first + depth < count) ? (first + depth) : count;
     for (int i = first; i < end; ++i) {
         auto* fr = as_obj<FrameObj>(st->frames[static_cast<size_t>(i)]);
         port_puts(p, "  ");
-        port_puts(p, std::to_string(i));
+        port_puts(p, as_string(i));
         port_puts(p, ": ");
         if (fr->proc.is_true()) {
             vm().write_to_port(fr->proc, port, false);
@@ -2775,14 +2774,14 @@ void display_backtrace_impl(SCM stack, SCM port, int first, int depth) {
 void display_error_impl(SCM stack, SCM port, SCM subr, SCM message, SCM args, SCM rest) {
     auto* p = as_obj<PortObj>(port);
     if (is_string(subr)) {
-        port_puts(p, as_obj<StringObj>(subr)->view());
+        port_puts(p, as_obj<StringObj>(subr)->str());
         port_puts(p, ": ");
     } else if (is_symbol(subr)) {
         port_puts(p, as_obj<SymbolObj>(subr)->name);
         port_puts(p, ": ");
     }
     if (is_string(message)) {
-        simple_format_to_port(port, as_obj<StringObj>(message)->view(), is_pair(args) ? args : SCM_EOL);
+        simple_format_to_port(port, as_obj<StringObj>(message)->str(), is_pair(args) ? args : SCM_EOL);
     } else {
         vm().write_to_port(message, port, true);
     }
@@ -2929,14 +2928,14 @@ void VM::init_eval() {
             auto* cl = as_obj<ClosureObj>(a[0]);
             if (is_bytecode(cl->bytecode) && (cl->inline_upval_cnt > 0 || is_vector(cl->upvals))) {
                 auto* bc = as_obj<BytecodeObj>(cl->bytecode);
-                const SCM* uv_data = cl->inline_upval_cnt > 0 ? cl->inline_upvals : as_obj<VectorObj>(cl->upvals)->elts.data();
-                size_t uv_len = cl->inline_upval_cnt > 0 ? static_cast<size_t>(cl->inline_upval_cnt) : as_obj<VectorObj>(cl->upvals)->elts.size();
-                if (!bc->upval_syms.empty() && bc->upval_syms.size() == uv_len) {
+                const SCM* uv_data = cl->inline_upval_cnt > 0 ? cl->inline_upvals : gcpp_data(as_obj<VectorObj>(cl->upvals)->elts);
+                size_t uv_len = cl->inline_upval_cnt > 0 ? static_cast<size_t>(cl->inline_upval_cnt) : static_cast<size_t>(N(as_obj<VectorObj>(cl->upvals)->elts));
+                if (!(N(bc->upval_syms) == 0) && static_cast<size_t>(N(bc->upval_syms)) == uv_len) {
                     SCM names_h = SCM_EOL, names_t = SCM_EOL;
                     SCM vals_h = SCM_EOL, vals_t = SCM_EOL;
-                    for (size_t i = 0; i < bc->upval_syms.size(); ++i) {
+                    for (size_t i = 0; i < static_cast<size_t>(N(bc->upval_syms)); ++i) {
                         SCM val = uv_data[i];
-                        uint8_t k = i < bc->upval_kinds.size() ? bc->upval_kinds[i] : 0;
+                        uint8_t k = i < static_cast<size_t>(N(bc->upval_kinds)) ? bc->upval_kinds[i] : 0;
                         if (k == 1 && is_box(val)) val = as_obj<BoxObj>(val)->val;
                         else if (k == 2 && is_pair(val)) val = car(val);
                         else if (k == 3 && is_pair(val)) val = cdr(val);
@@ -2975,14 +2974,14 @@ void VM::init_eval() {
             }
             if ((of & CLASSF_OPERATOR) != 0 && is_struct(so->vtable)) {
                 auto* vt = as_obj<StructObj>(so->vtable);
-                if (vt->slots.size() > 4 && SCM(vt->slots[4]).is_true()) {
+                if (static_cast<size_t>(N(vt->slots)) > 4 && SCM(vt->slots[4]).is_true()) {
                     return SCM(vt->slots[4]);
                 }
             }
         }
         // Standard R5RS / Guile setters
         if (is_subr(a[0])) {
-            const std::string& nm = as_obj<SubrObj>(a[0])->name;
+            string nm = as_obj<SubrObj>(a[0])->name;
             auto get_var = [this](const char* s) -> SCM {
                 SCM v = lookup(s);
                 return is_variable(v) ? as_obj<VariableObj>(v)->value : SCM_BOOL_F;
@@ -3042,7 +3041,7 @@ void VM::init_eval() {
     });
     define_proc("eval-string", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("eval-string", 1, a[0], "string");
-        return eval_string(as_obj<StringObj>(a[0])->view());
+        return eval_string(as_obj<StringObj>(a[0])->str());
     });
 
     // Stack & Backtrace primitives
@@ -3055,19 +3054,19 @@ void VM::init_eval() {
                 auto* st = as_obj<StackObj>(stk_scm);
                 const VmFrameSnap* fd = k->snap_frames_data();
                 size_t fn = k->snap_frames_size();
-                std::vector<SCM> combined;
-                combined.reserve(fn + st->frames.size());
+                array<SCM> combined;
+                (void) 0;
                 for (size_t i = fn; i > 0; --i) {
                     auto* fr = heap_.alloc<FrameObj>();
                     fr->proc = fd[i - 1].closure;
                     fr->is_proc = true;
-                    combined.push_back(SCM::from_obj(fr));
+                    (combined << SCM::from_obj(fr));
                 }
-                for (SCM f : st->frames) combined.push_back(f);
-                st->frames.swap(combined);
-                for (size_t i = 0; i < st->frames.size(); ++i) {
+                for (SCM f : st->frames) (combined << f);
+                st->frames = combined;
+                for (size_t i = 0; i < static_cast<size_t>(N(st->frames)); ++i) {
                     auto* fr = as_obj<FrameObj>(st->frames[i]);
-                    fr->prev = (i + 1 < st->frames.size()) ? st->frames[i + 1] : SCM_BOOL_F;
+                    fr->prev = (i + 1 < static_cast<size_t>(N(st->frames))) ? st->frames[i + 1] : SCM_BOOL_F;
                     fr->next = (i > 0) ? st->frames[i - 1] : SCM_BOOL_F;
                 }
             }
@@ -3084,13 +3083,13 @@ void VM::init_eval() {
     });
     define_proc("stack-length", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_stack(a[0])) wrong_type_arg("stack-length", 1, a[0], "stack");
-        return make_uinteger(as_obj<StackObj>(a[0])->frames.size());
+        return make_uinteger(static_cast<size_t>(N(as_obj<StackObj>(a[0])->frames)));
     });
     define_proc("stack-ref", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_stack(a[0])) wrong_type_arg("stack-ref", 1, a[0], "stack");
         int64_t idx = scm_to_int64(a[1], "stack-ref", 2);
         auto* st = as_obj<StackObj>(a[0]);
-        if (idx < 0 || static_cast<size_t>(idx) >= st->frames.size()) out_of_range("stack-ref", a[1]);
+        if (idx < 0 || static_cast<size_t>(idx) >= static_cast<size_t>(N(st->frames))) out_of_range("stack-ref", a[1]);
         return st->frames[static_cast<size_t>(idx)];
     });
     define_proc("frame?", 1, 0, false, [](const SCM* a, size_t) -> SCM { return SCM::from_bool(is_frame(a[0])); });
@@ -3122,8 +3121,8 @@ void VM::init_eval() {
         SCM cont = is_continuation(a[0]) ? as_obj<ContinuationObj>(a[0])->cont_frame : current_cont;
         SCM stk = build_stack_from_cont(cont, a[0]);
         auto* s = as_obj<StackObj>(stk);
-        if (s->frames.empty()) return SCM_BOOL_F;
-        return cons(s->frames.front(), SCM_EOL);
+        if ((N(s->frames) == 0)) return SCM_BOOL_F;
+        return cons(s->frames[0], SCM_EOL);
     });
     define_proc("display-backtrace", 2, 2, false, [](const SCM* a, size_t nargs) -> SCM {
         int first = (nargs >= 3 && !a[2].is_undefined() && a[2].is_true()) ? static_cast<int>(scm_to_int64(a[2], "display-backtrace", 3)) : 0;
@@ -3156,7 +3155,7 @@ void VM::init_eval() {
             }
             SCM bindings = car(cdr(form));
             SCM body = cdr(cdr(form));
-            std::vector<SCM> vars, vals, tmps, olds;
+            array<SCM> vars, vals, tmps, olds;
             SCM cur = bindings;
             while (is_pair(cur)) {
                 SCM b = car(cur);
@@ -3167,27 +3166,27 @@ void VM::init_eval() {
                 for (SCM prev : vars) {
                     if (prev == v) error(sym_syntax_error, "@bind", "Duplicate binding: ~S", list1(v));
                 }
-                vars.push_back(v);
-                vals.push_back(car(cdr(b)));
-                tmps.push_back(make_uninterned_symbol("bind-tmp"));
-                olds.push_back(make_uninterned_symbol("bind-old"));
+                (vars << v);
+                (vals << car(cdr(b)));
+                (tmps << make_uninterned_symbol("bind-tmp"));
+                (olds << make_uninterned_symbol("bind-old"));
                 cur = cdr(cur);
             }
             if (!cur.is_null()) error(sym_syntax_error, "@bind", "Bad binding: ~S", list1(bindings));
             // Build (let ((tmp val) ...) (dynamic-wind swap (lambda () body ...) swap))
             SCM let_binds = SCM_EOL;
-            for (size_t i = vars.size(); i > 0; --i) {
+            for (size_t i = static_cast<size_t>(N(vars)); i > 0; --i) {
                 let_binds = cons(list2(tmps[i - 1], vals[i - 1]), let_binds);
             }
             SCM swap_binds = SCM_EOL;
             SCM swap_body = SCM_EOL;
-            for (size_t i = vars.size(); i > 0; --i) {
+            for (size_t i = static_cast<size_t>(N(vars)); i > 0; --i) {
                 swap_binds = cons(list2(olds[i - 1], vars[i - 1]), swap_binds);
                 swap_body = cons(list3(sym_set_x, tmps[i - 1], olds[i - 1]), swap_body);
                 swap_body = cons(list3(sym_set_x, vars[i - 1], tmps[i - 1]), swap_body);
             }
             SCM swap_thunk = list3(sym_lambda, SCM_EOL,
-                vars.empty() ? SCM_BOOL_F : cons(sym_let, cons(swap_binds, swap_body)));
+                (N(vars) == 0) ? SCM_BOOL_F : cons(sym_let, cons(swap_binds, swap_body)));
             SCM body_thunk = cons(sym_lambda, cons(SCM_EOL, body));
             SCM dw_call = list4(make_symbol("dynamic-wind"), swap_thunk, body_thunk, swap_thunk);
             return list3(sym_let, let_binds, dw_call);

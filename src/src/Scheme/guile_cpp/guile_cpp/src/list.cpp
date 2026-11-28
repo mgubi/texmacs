@@ -199,7 +199,7 @@ static SCM copy_tree_rec(SCM obj, hashset<SCM>& visiting, int depth) {
         }
         visiting->insert(obj);
         auto* vec = as_obj<VectorObj>(obj);
-        size_t n = vec->elts.size();
+        size_t n = static_cast<size_t>(N(vec->elts));
         SCM nv = vm().make_vector(n, SCM_UNSPECIFIED);
         auto* nvec = as_obj<VectorObj>(nv);
         for (size_t i = 0; i < n; ++i) {
@@ -272,11 +272,11 @@ void VM::init_list() {
     });
 
     // car/cdr and all 2..4 letter combinations
-    auto reg_cxr = [this](const std::string& name, const char* ops) {
+    auto reg_cxr = [this](string name, const char* ops) {
         define_proc(name, 1, 0, false, [this, name, ops](const SCM* args, size_t) -> SCM {
             SCM cur = args[0];
             for (const char* p = ops; *p; ++p) {
-                if (!is_pair(cur)) wrong_type_arg(name.c_str(), 1, args[0], "pair");
+                if (!is_pair(cur)) wrong_type_arg(((char*) c_string(name)), 1, args[0], "pair");
                 cur = (*p == 'a') ? car(cur) : cdr(cur);
             }
             return cur;
@@ -349,11 +349,11 @@ void VM::init_list() {
         // Collect into vector to append right-to-left
         ScmRootVec items(heap_);
         while (is_pair(lsts)) {
-            items.push_back(car(lsts));
+            (items << car(lsts));
             lsts = cdr(lsts);
         }
-        SCM res = items[items.size() - 1];
-        for (size_t i = items.size() - 1; i > 0; --i) {
+        SCM res = items[static_cast<size_t>(N(items)) - 1];
+        for (size_t i = static_cast<size_t>(N(items)) - 1; i > 0; --i) {
             res = scm_append2(items[i - 1], res);
         }
         return res;
@@ -596,8 +596,8 @@ void VM::init_list() {
     make_ass("sloppy-assv", true, [](SCM a, SCM b) { return scm_eqv(a, b); });
     make_ass("sloppy-assoc", true, [](SCM a, SCM b) { return scm_equal(a, b); });
 
-    auto make_ass_ops = [this](const std::string& pfx, auto pred) {
-        define_proc(pfx + "-ref", 2, 0, false, [pred](const SCM* args, size_t) -> SCM {
+    auto make_ass_ops = [this](string pfx, auto pred) {
+        define_proc(pfx * "-ref", 2, 0, false, [pred](const SCM* args, size_t) -> SCM {
             SCM cur = args[0];
             while (is_pair(cur)) {
                 SCM e = car(cur);
@@ -606,7 +606,7 @@ void VM::init_list() {
             }
             return SCM_BOOL_F;
         });
-        define_proc(pfx + "-set!", 3, 0, false, [this, pred](const SCM* args, size_t) -> SCM {
+        define_proc(pfx * "-set!", 3, 0, false, [this, pred](const SCM* args, size_t) -> SCM {
             SCM cur = args[0];
             while (is_pair(cur)) {
                 SCM e = car(cur);
@@ -618,7 +618,7 @@ void VM::init_list() {
             }
             return cons(cons(args[1], args[2]), args[0]);
         });
-        define_proc(pfx + "-remove!", 2, 0, false, [pred](const SCM* args, size_t) -> SCM {
+        define_proc(pfx * "-remove!", 2, 0, false, [pred](const SCM* args, size_t) -> SCM {
             SCM cur = args[0], prev = SCM_EOL, head = args[0];
             while (is_pair(cur)) {
                 SCM e = car(cur);

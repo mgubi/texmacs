@@ -4,9 +4,6 @@
 #include <algorithm>
 #include <new>
 #include <type_traits>
-#include <vector>
-#include <string>
-#include <string_view>
 
 namespace guile {
 
@@ -58,8 +55,8 @@ public:
         uintptr_t hi = lo + sizeof(T) * SlabCount;
         if (lo < min_addr_) min_addr_ = lo;
         if (hi > max_addr_) max_addr_ = hi;
-        ranges_.push_back({lo, hi});
-        std::sort(ranges_.begin(), ranges_.end(), [](const Range& a, const Range& b) { return a.lo < b.lo; });
+        ranges_ << Range{lo, hi};
+        std::sort(begin(ranges_), end(ranges_), [](const Range& a, const Range& b) { return a.lo < b.lo; });
         for (size_t i = SlabCount; i > 0; --i) {
             T* slot = reinterpret_cast<T*>(s->storage + (i - 1) * sizeof(T));
             slot->gc_mark = 0;
@@ -81,10 +78,10 @@ public:
 
     inline bool contains_live(uintptr_t ptr) const noexcept {
         if (ptr < min_addr_ || ptr >= max_addr_) return false;
-        size_t n = ranges_.size();
+        size_t n = static_cast<size_t>(N(ranges_));
         if (n <= 8) {
             for (size_t i = 0; i < n; ++i) {
-                const auto& r = ranges_[i];
+                const auto& r = A(ranges_)[i];
                 if (ptr < r.lo) return false;
                 if (ptr < r.hi) {
                     if ((ptr - r.lo) % sizeof(T) != 0) return false;
@@ -97,12 +94,12 @@ public:
         size_t lo = 0, hi = n;
         while (lo < hi) {
             size_t mid = lo + ((hi - lo) >> 1);
-            if (ptr < ranges_[mid].lo) {
+            if (ptr < A(ranges_)[mid].lo) {
                 hi = mid;
-            } else if (ptr >= ranges_[mid].hi) {
+            } else if (ptr >= A(ranges_)[mid].hi) {
                 lo = mid + 1;
             } else {
-                if ((ptr - ranges_[mid].lo) % sizeof(T) != 0) return false;
+                if ((ptr - A(ranges_)[mid].lo) % sizeof(T) != 0) return false;
                 auto* o = reinterpret_cast<const Obj*>(ptr);
                 return (o->flags & OBJ_FLAG_FREE) == 0;
             }
@@ -143,7 +140,7 @@ private:
     size_t live_ = 0;
     uintptr_t min_addr_ = UINTPTR_MAX;
     uintptr_t max_addr_ = 0;
-    std::vector<Range> ranges_;
+    array<Range> ranges_;
 };
 
 struct GcRootSpan {
@@ -199,13 +196,13 @@ public:
             obj->gc_next = head_;
             head_ = obj;
             if constexpr (std::is_same_v<T, WeakVectorObj> || std::is_same_v<T, EnvironmentObj>) {
-                weak_containers_.push_back(obj);
+                (weak_containers_ << static_cast<Obj*>(obj));
             } else if constexpr (std::is_same_v<T, HashTableObj>) {
-                if (obj->weak != WeakKind::None) weak_containers_.push_back(obj);
+                if (obj->weak != WeakKind::None) (weak_containers_ << static_cast<Obj*>(obj));
             } else if constexpr (std::is_same_v<T, GuardianObj>) {
-                guardians_.push_back(obj);
+                (guardians_ << obj);
             } else if constexpr (std::is_same_v<T, PortObj>) {
-                ports_.push_back(obj);
+                (ports_ << obj);
             }
             return obj;
         }
@@ -252,7 +249,7 @@ public:
 
     // For iterating non-slab live objects (ports, structs, hash tables, etc.)
     Obj* all_objects() const noexcept { return head_; }
-    const std::vector<PortObj*>& open_ports() const noexcept { return ports_; }
+    array<PortObj*> open_ports() const noexcept { return ports_; }
 
     // Custom mark callback for VM internal tables
     // (TeXmacs: function pointers, called with the VM)
@@ -261,11 +258,21 @@ public:
     void* callback_data = nullptr;
 
     // (public for the callbacks of the collector, see gc.cpp)
-    void mark_scm(SCM x, std::vector<Obj*>& worklist);
+    void mark_scm(SCM x, array<Obj*>& worklist);
+    // (TeXmacs: the worklist of the marking is a stack in an array which
+    // never shrinks during a collection: wl_top_ elements, wl_cap_ in the
+    // array; resizing the array at each push and pop reallocated it)
+    int wl_top_ = 0;
+    int wl_cap_ = 0;
+    inline void wl_push(array<Obj*>& w, Obj* o) {
+        if (wl_top_ == wl_cap_) { w << o; wl_cap_++; }
+        else w[wl_top_] = o;
+        wl_top_++;
+    }
 private:
-    void trace_obj(Obj* obj, std::vector<Obj*>& worklist);
-    void drain_worklist(std::vector<Obj*>& worklist);
-    void process_guardians(std::vector<Obj*>& worklist);
+    void trace_obj(Obj* obj, array<Obj*>& worklist);
+    void drain_worklist(array<Obj*>& worklist);
+    void process_guardians(array<Obj*>& worklist);
     void clear_weak_refs();
     void sweep();
     static void destroy_obj(Obj* cur);
@@ -285,12 +292,12 @@ private:
     SlabPool<StringObj, 2048> string_pool_;
     SlabPool<SymbolObj, 1024> symbol_pool_;
 
-    std::vector<uintptr_t> non_slab_ptrs_;
-    std::vector<Obj*> weak_containers_;
-    std::vector<GuardianObj*> guardians_;
-    std::vector<PortObj*> ports_;
-    std::vector<SCM*> explicit_roots_;
-    std::vector<SCM> permanent_roots_;
+    array<uintptr_t> non_slab_ptrs_;
+    array<Obj*> weak_containers_;
+    array<GuardianObj*> guardians_;
+    array<PortObj*> ports_;
+    array<SCM*> explicit_roots_;
+    array<SCM> permanent_roots_;
     GcRootSpan* root_spans_ = nullptr;
     void* stack_base_ = nullptr;
 
@@ -305,36 +312,43 @@ private:
     bool in_gc_ = false;
 };
 
-// RAII guard to root a std::vector<SCM> across GC
+// RAII guard to root a array<SCM> across GC
 struct ScmRootVec {
-    std::vector<SCM> vec;
+    array<SCM> vec;
     GcRootSpan span;
     Heap* heap;
 
     explicit ScmRootVec(Heap& h, size_t reserve_n = 0) : heap(&h) {
-        if (reserve_n) vec.reserve(reserve_n);
-        span.data = vec.data();
-        span.count = vec.size();
+        if (reserve_n) (void) 0;
+        span.data = gcpp_data(vec);
+        span.count = static_cast<size_t>(N(vec));
         heap->push_root_span(&span);
     }
     ~ScmRootVec() {
         heap->pop_root_span();
     }
     void push_back(SCM x) {
-        vec.push_back(x);
-        span.data = vec.data();
-        span.count = vec.size();
+        (vec << x);
+        span.data = gcpp_data(vec);
+        span.count = static_cast<size_t>(N(vec));
     }
     void sync() {
-        span.data = vec.data();
-        span.count = vec.size();
+        span.data = gcpp_data(vec);
+        span.count = static_cast<size_t>(N(vec));
     }
     SCM& operator[](size_t i) { return vec[i]; }
-    const SCM& operator[](size_t i) const { return vec[i]; }
-    size_t size() const noexcept { return vec.size(); }
-    bool empty() const noexcept { return vec.empty(); }
-    const SCM* data() const noexcept { return vec.data(); }
+    const SCM& operator[](size_t i) const { return const_cast<array<SCM>&>(vec)[static_cast<int>(i)]; }
+    size_t size() const noexcept { return static_cast<size_t>(N(vec)); }
+    bool empty() const noexcept { return (N(vec) == 0); }
+    const SCM* data() const noexcept { return gcpp_data(vec); }
 };
+// (TeXmacs: ScmRootVec as the arrays, for the code converted from
+// std::vector)
+inline ScmRootVec& operator<<(ScmRootVec& v, SCM x) { v.push_back(x); return v; }
+inline int N(const ScmRootVec& v) { return static_cast<int>(v.size()); }
+inline const SCM* gcpp_data(const ScmRootVec& v) { return v.data(); }
+inline const SCM* begin(const ScmRootVec& v) { return v.data(); }
+inline const SCM* end(const ScmRootVec& v) { return v.data() + v.size(); }
 
 // ============================================================================
 // Options structs
@@ -400,13 +414,20 @@ public:
     SCM list3(SCM a, SCM b, SCM c);
     SCM list4(SCM a, SCM b, SCM c, SCM d);
     SCM list_n(const SCM* elts, size_t n);
-    SCM make_symbol(std::string_view name);
+    // (TeXmacs: the names are TeXmacs strings, or characters and a length)
     SCM make_symbol(string name);
-    SCM make_symbol(const char* name) { return make_symbol(std::string_view(name)); }
-    SCM make_uninterned_symbol(std::string_view name);
+    SCM make_symbol(const char* name) { return make_symbol(string(name)); }
+    SCM make_symbol(const char* p, size_t n) { return make_symbol(string(p, static_cast<int>(n))); }
+    SCM make_uninterned_symbol(string name);
     SCM make_keyword(SCM sym);
-    SCM make_keyword(std::string_view name);
-    SCM make_string(std::string_view sv, bool read_only = false);
+    SCM make_keyword(string name);
+    SCM make_keyword(const char* name) { return make_keyword(string(name)); }
+    // a Scheme string with a copy of the characters
+    SCM make_string(const char* p, size_t n, bool read_only = false);
+    SCM make_string(const char* s) { return make_string(s, strlen(s)); }
+    SCM make_string(string s, bool read_only = false);
+    // a Scheme string which owns s, which nothing else may change or keep
+    SCM make_string_owned(string s, bool read_only = false);
     SCM make_vector(size_t n, SCM fill = SCM_UNSPECIFIED);
     SCM make_real(double v);
     SCM make_complex(double r, double i);
@@ -415,7 +436,7 @@ public:
     SCM make_bignum(BigInt v);
     SCM make_fraction(SCM num, SCM den);
     SCM make_variable(SCM val = SCM_UNDEFINED);
-    SCM make_subr(const std::string& name, int req, int opt, bool rst, SubrFn fn, SpecialSubr sp = SpecialSubr::None);
+    SCM make_subr(string name, int req, int opt, bool rst, SubrFn fn, SpecialSubr sp = SpecialSubr::None);
     SCM make_closure(SCM formals, SCM body, SCM env);
     SCM make_macro(MacroKind kind, SCM transformer, SCM name = SCM_BOOL_F);
     SCM make_hashtable(size_t nbuckets = 31, WeakKind weak = WeakKind::None);
@@ -423,10 +444,10 @@ public:
     SCM make_values(SCM list_of_vals);
 
     // Defining / Looking up bindings
-    SCM define(const std::string& name, SCM val);
+    SCM define(string name, SCM val);
     SCM define_sym(SCM sym, SCM val);
-    SCM define_proc(const std::string& name, int req, int opt, bool rst, SubrFn fn, SpecialSubr sp = SpecialSubr::None);
-    SCM lookup(const std::string& name);
+    SCM define_proc(string name, int req, int opt, bool rst, SubrFn fn, SpecialSubr sp = SpecialSubr::None);
+    SCM lookup(string name);
     SCM lookup_sym(SCM sym);
     SCM sym2var(SCM sym, SCM eval_closure, bool definep);
 
@@ -473,7 +494,7 @@ public:
     // Evaluation & Application (CEK Machine)
     SCM eval(SCM expr, SCM env);
     SCM primitive_eval(SCM expr);
-    SCM eval_string(std::string_view code);
+    SCM eval_string(string code);
     SCM apply(SCM proc, const SCM* args, size_t nargs);
     SCM apply_list(SCM proc, SCM arg_list);
     SCM call0(SCM proc);
@@ -485,13 +506,13 @@ public:
 
     // Reader & Printer
     SCM read_from_port(SCM port);
-    SCM read_from_string(std::string_view s);
+    SCM read_from_string(string s);
     void write_to_port(SCM obj, SCM port, bool display_mode = false);
-    std::string write_to_string(SCM obj, bool display_mode = false);
+    string write_to_string(SCM obj, bool display_mode = false);
 
     // Error throwing
     [[noreturn]] void throw_scm(SCM key, SCM args);
-    [[noreturn]] void error(SCM key, const char* subr, const std::string& msg, SCM args = SCM_EOL, SCM rest = SCM_BOOL_F);
+    [[noreturn]] void error(SCM key, const char* subr, string msg, SCM args = SCM_EOL, SCM rest = SCM_BOOL_F);
     inline size_t c_stack_used() const {
         volatile char probe = 0;
         void* base = heap_.stack_base();
@@ -513,24 +534,24 @@ public:
             error(make_symbol("stack-overflow"), nullptr, "Stack overflow", SCM_EOL, SCM_BOOL_F);
         }
     }
-    [[noreturn]] void misc_error(const char* subr, const std::string& msg, SCM args = SCM_EOL);
+    [[noreturn]] void misc_error(const char* subr, string msg, SCM args = SCM_EOL);
     [[noreturn]] void wrong_type_arg(const char* subr, int pos, SCM bad_val, const char* expected = nullptr);
     [[noreturn]] void wrong_num_args(const char* subr, SCM proc = SCM_BOOL_F);
     [[noreturn]] void out_of_range(const char* subr, SCM bad_val);
-    [[noreturn]] void syserror(const char* subr, int errnum, const std::string& extra = "");
+    [[noreturn]] void syserror(const char* subr, int errnum, string extra = "");
     [[noreturn]] void num_overflow(const char* subr);
 
     // Extensions & SMOBs
-    void register_extension(const std::string& lib, const std::string& init_fn, void (*fn)());
-    void load_extension(const std::string& lib, const std::string& init_fn);
+    void register_extension(string lib, string init_fn, void (*fn)());
+    void load_extension(string lib, string init_fn);
     size_t make_smob_type(const SmobTypeInfo& info);
-    SmobTypeInfo& smob_info(size_t idx) { return smob_types_.at(idx); }
+    SmobTypeInfo& smob_info(size_t idx) { return smob_types_[static_cast<int>(idx)]; }
 
     // Load path & startup
     void init_load_path();
-    SCM search_load_path(const std::string& filename);
-    SCM primitive_load(const std::string& filename);
-    SCM primitive_load_path(const std::string& filename);
+    SCM search_load_path(string filename);
+    SCM primitive_load(string filename);
+    SCM primitive_load_path(string filename);
     void load_startup_files();
     void set_program_arguments(int argc, char** argv);
     void set_program_arguments_list(SCM args);
@@ -760,12 +781,20 @@ public:
     ModVarCacheEntry mod_var_cache[MOD_VAR_CACHE_SIZE];
     int bc_vm_depth = 0;
     int next_bc_inv_id = 0;
-    std::vector<int> active_bc_invs;
+    // (TeXmacs: a stack of active_bc_n elements in an array which never
+    // shrinks: resizing it at each entry of the VM reallocated it)
+    array<int> active_bc_invs;
+    int active_bc_n = 0;
+    int active_bc_cap = 0;
+    void push_bc_inv(int id) {
+        if (active_bc_n < active_bc_cap) active_bc_invs[active_bc_n] = id;
+        else { active_bc_invs << id; active_bc_cap++; }
+        active_bc_n++;
+    }
 
     bool is_bc_inv_active(int inv_id) const noexcept {
-        for (int id : active_bc_invs) {
-            if (id == inv_id) return true;
-        }
+        const int* ids = gcpp_data(active_bc_invs);
+        for (int i = 0; i < active_bc_n; i++) if (ids[i] == inv_id) return true;
         return false;
     }
 
@@ -781,13 +810,13 @@ public:
     hashmap<SCM, SCM> goops_cmethod_closures{SCM_BOOL_F}; // cmethod -> ClosureObj (cleared on GC)
     void init_bytecode_builtins();
 
-    std::vector<SCM> permanent_roots;
-    SCM permanent_object(SCM x) { permanent_roots.push_back(x); return x; }
+    array<SCM> permanent_roots;
+    SCM permanent_object(SCM x) { (permanent_roots << x); return x; }
 
     hashmap<string, SCM> symbol_table{SCM_BOOL_F};
     array<SCM> interned_symbols;  // the values of symbol_table, for the collector
     hashmap<string, pointer> extensions{(pointer) nullptr};  // (void (*)())
-    std::vector<SmobTypeInfo> smob_types_;
+    array<SmobTypeInfo> smob_types_;
 
     // Subsystem initializers
     void init_symbols();
@@ -845,7 +874,8 @@ bool scm_eqv(SCM a, SCM b);
 bool scm_equal(SCM a, SCM b);
 
 // Hashing (hashtab.cpp)
-uint64_t scm_hash_string(std::string_view s);
+uint64_t scm_hash_string(const char* p, size_t n);
+inline uint64_t scm_hash_string(string s) { return scm_hash_string(N(s) == 0 ? "" : &s[0], N(s)); }
 uint64_t scm_ihashq(SCM obj, uint64_t n);
 uint64_t scm_ihashv(SCM obj, uint64_t n);
 uint64_t scm_ihash(SCM obj, uint64_t n);
@@ -874,8 +904,8 @@ SCM scm_num_mul(SCM a, SCM b);
 SCM scm_num_div(SCM a, SCM b);
 int scm_num_cmp(SCM a, SCM b); // <0, 0, >0 (for real numbers)
 bool scm_num_eq(SCM a, SCM b);
-SCM scm_string_to_number(std::string_view s, int radix = 10);
-std::string scm_number_to_string(SCM n, int radix = 10);
+SCM scm_string_to_number(string s, int radix = 10);
+string scm_number_to_string(SCM n, int radix = 10);
 SCM scm_exact_to_inexact(SCM n);
 SCM scm_inexact_to_exact(SCM n);
 SCM scm_quotient(SCM a, SCM b);
@@ -905,9 +935,9 @@ SCM scm_memq(SCM key, SCM lst);
 // Ports (ports.cpp)
 int port_getc(PortObj* p);
 inline int port_getc_fast(PortObj* p) {
-    if (GCPP_LIKELY(p && !p->closed && p->is_input && p->unread_buf.empty())) {
+    if (GCPP_LIKELY(p && !p->closed && p->is_input && (N(p->unread_buf) == 0))) {
         if (p->kind == PortKind::File) {
-            if (GCPP_LIKELY(p->read_pos < p->read_buf.size())) {
+            if (GCPP_LIKELY(p->read_pos < static_cast<size_t>(N(p->read_buf)))) {
                 int c = static_cast<unsigned char>(p->read_buf[p->read_pos++]);
                 if (c == '\n') { ++p->line; p->column = 0; }
                 else if (c == '\t') { p->column = (p->column + 8) & ~7L; }
@@ -915,7 +945,7 @@ inline int port_getc_fast(PortObj* p) {
                 return c;
             }
         } else if (p->kind == PortKind::String) {
-            if (GCPP_LIKELY(p->str_pos < p->str_buf.size())) {
+            if (GCPP_LIKELY(p->str_pos < static_cast<size_t>(N(p->str_buf)))) {
                 int c = static_cast<unsigned char>(p->str_buf[p->str_pos++]);
                 if (c == '\n') { ++p->line; p->column = 0; }
                 else if (c == '\t') { p->column = (p->column + 8) & ~7L; }
@@ -930,11 +960,11 @@ int port_peekc(PortObj* p);
 void port_ungetc(PortObj* p, int c);
 inline int port_peekc_fast(PortObj* p) {
     if (GCPP_LIKELY(p && !p->closed && p->is_input)) {
-        if (!p->unread_buf.empty()) return static_cast<unsigned char>(p->unread_buf.back());
-        if (GCPP_LIKELY(p->kind == PortKind::File && p->read_pos < p->read_buf.size())) {
+        if (!(N(p->unread_buf) == 0)) return static_cast<unsigned char>(p->unread_buf[N(p->unread_buf) - 1]);
+        if (GCPP_LIKELY(p->kind == PortKind::File && p->read_pos < static_cast<size_t>(N(p->read_buf)))) {
             return static_cast<unsigned char>(p->read_buf[p->read_pos]);
         }
-        if (GCPP_LIKELY(p->kind == PortKind::String && p->str_pos < p->str_buf.size())) {
+        if (GCPP_LIKELY(p->kind == PortKind::String && p->str_pos < static_cast<size_t>(N(p->str_buf)))) {
             return static_cast<unsigned char>(p->str_buf[p->str_pos]);
         }
     }
@@ -942,7 +972,7 @@ inline int port_peekc_fast(PortObj* p) {
 }
 inline void port_ungetc_fast(PortObj* p, int c) {
     if (c == EOF || !p) return;
-    if (GCPP_LIKELY(p->unread_buf.empty() && c != '\n' && c != '\t' && p->column > 0)) {
+    if (GCPP_LIKELY((N(p->unread_buf) == 0) && c != '\n' && c != '\t' && p->column > 0)) {
         if (GCPP_LIKELY(p->kind == PortKind::File && p->read_pos > 0 &&
             static_cast<unsigned char>(p->read_buf[p->read_pos - 1]) == static_cast<unsigned char>(c))) {
             --p->read_pos;
@@ -958,16 +988,18 @@ inline void port_ungetc_fast(PortObj* p, int c) {
     }
     port_ungetc(p, c);
 }
-void port_ungets(PortObj* p, std::string_view s);
+void port_ungets(PortObj* p, const char* s, size_t n);
 void port_putc(PortObj* p, char c);
-void port_puts(PortObj* p, std::string_view s);
+void port_puts(PortObj* p, const char* s, size_t n);
+inline void port_puts(PortObj* p, const char* s) { port_puts(p, s, strlen(s)); }
+inline void port_puts(PortObj* p, string s) { port_puts(p, N(s) == 0 ? "" : &s[0], N(s)); }
 void port_flush(PortObj* p);
 void port_close(PortObj* p);
-SCM make_file_port(int fd, std::string_view filename, std::string_view mode, bool owns_fd = true);
-SCM make_input_string_port(std::string s);
+SCM make_file_port(int fd, string filename, string mode, bool owns_fd = true);
+SCM make_input_string_port(string s);  // (s is not changed: may be shared)
 SCM make_output_string_port();
 void flush_all_ports();
-void simple_format_to_port(SCM port, std::string_view fmt, SCM args);
+void simple_format_to_port(SCM port, string fmt, SCM args);
 
 // Structs (struct.cpp)
 bool is_struct_vtable(SCM x);
@@ -992,7 +1024,7 @@ SCM read_uniform_vector_body(UniformType ut, SCM list_val);
 
 // Chars (chars.cpp)
 const char* char_to_name(uint32_t c);
-int name_to_char(std::string_view name);
+int name_to_char(string name);
 
 // Strings (strings.cpp)
 SCM make_shared_substring(SCM str, size_t start, size_t end, bool read_only = false);

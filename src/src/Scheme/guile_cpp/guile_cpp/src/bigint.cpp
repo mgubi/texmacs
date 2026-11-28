@@ -1,9 +1,6 @@
 #include "guile_cpp/bigint.hpp"
 #include "basic.hpp"
 #include "guile_cpp/compat.hpp"
-#include <vector>
-#include <array>
-#include <memory>
 #include <cassert>
 
 #if defined(_MSC_VER) && defined(_M_X64)
@@ -263,10 +260,10 @@ struct ScratchArena {
         size_t cap = 0;
         size_t used = 0;
     };
-    std::vector<Chunk> chunks;
+    array<Chunk> chunks;
 
     ScratchArena() {
-        chunks.push_back({tm_new_array<uint64_t>(131072), 131072, 0});
+        (chunks << Chunk{tm_new_array<uint64_t>(131072), 131072, 0});
     }
     ~ScratchArena() {
         for (Chunk& ch : chunks) tm_delete_array(ch.data);
@@ -278,24 +275,24 @@ struct ScratchArena {
     };
 
     Mark mark() const noexcept {
-        size_t idx = chunks.size() - 1;
-        return {idx, chunks[idx].used};
+        size_t idx = static_cast<size_t>(N(chunks)) - 1;
+        return {idx, A(chunks)[idx].used};
     }
 
     void restore(Mark m) noexcept {
-        for (size_t i = m.chunk_idx + 1; i < chunks.size(); ++i) {
+        for (size_t i = m.chunk_idx + 1; i < static_cast<size_t>(N(chunks)); ++i) {
             chunks[i].used = 0;
         }
         chunks[m.chunk_idx].used = m.used;
-        while (chunks.size() > m.chunk_idx + 1 && chunks.back().cap > 131072) {
-            tm_delete_array(chunks.back().data);
-            chunks.pop_back();
+        while (static_cast<size_t>(N(chunks)) > m.chunk_idx + 1 && chunks[N(chunks) - 1].cap > 131072) {
+            tm_delete_array(chunks[N(chunks) - 1].data);
+            chunks->resize(N(chunks) - 1);
         }
     }
 
     uint64_t* alloc(size_t n) {
         if (n == 0) n = 1;
-        for (size_t i = chunks.size(); i > 0; --i) {
+        for (size_t i = static_cast<size_t>(N(chunks)); i > 0; --i) {
             auto& ch = chunks[i - 1];
             if (ch.used + n <= ch.cap) {
                 uint64_t* p = ch.data + ch.used;
@@ -305,8 +302,8 @@ struct ScratchArena {
             if (ch.used > 0) break;
         }
         size_t new_cap = std::max(n * 2, size_t(131072));
-        chunks.push_back({tm_new_array<uint64_t>(new_cap), new_cap, n});
-        return chunks.back().data;
+        (chunks << Chunk{tm_new_array<uint64_t>(new_cap), new_cap, n});
+        return chunks[N(chunks) - 1].data;
     }
 };
 
@@ -1056,16 +1053,16 @@ static void mpn_sqr_toom3(uint64_t* r, const uint64_t* a, size_t n) {
 
 struct FFTPlan {
     size_t M = 0; // complex FFT size (= N / 2)
-    std::vector<double> w1r, w1i;
+    array<double> w1r, w1i;
     // Bit-reversed real-to-complex unpack twiddles: rw_br[p] = exp(-pi*i * bitrev(p) / M)
-    std::vector<double> rwr_br, rwi_br;
+    array<double> rwr_br, rwi_br;
 
     void init(size_t m) {
         M = m;
         constexpr double PI = 3.141592653589793238462643383279502884;
         size_t tsz = std::max(M, size_t(4));
-        w1r.assign(tsz, 1.0);
-        w1i.assign(tsz, 0.0);
+        gcpp_assign(w1r, tsz, 1.0);
+        gcpp_assign(w1i, tsz, 0.0);
         for (size_t q = 1; q * 4 <= M; q <<= 1) {
             double ang = -PI / static_cast<double>(2 * q); // -2*pi / (4*q)
             for (size_t j = 0; j < q; ++j) {
@@ -1074,8 +1071,8 @@ struct FFTPlan {
                 w1i[q + j] = std::sin(a);
             }
         }
-        rwr_br.resize(M);
-        rwi_br.resize(M);
+        gcpp_resize(rwr_br, M);
+        gcpp_resize(rwi_br, M);
         unsigned logm = static_cast<unsigned>(gcpp_countr_zero(M));
         double rang = -PI / static_cast<double>(M);
         for (size_t p = 0; p < M; ++p) {
@@ -1092,8 +1089,8 @@ struct FFTPlan {
 
 struct FFTCache {
     FFTPlan plans[22];
-    std::vector<double> ar, ai;
-    std::vector<double> br, bi;
+    array<double> ar, ai;
+    array<double> br, bi;
 
     const FFTPlan& get(size_t M) {
         unsigned k = static_cast<unsigned>(gcpp_countr_zero(M));
@@ -1102,8 +1099,8 @@ struct FFTCache {
     }
 
     void ensure(size_t M, bool need_b) {
-        if (ar.size() < M) { ar.resize(M); ai.resize(M); }
-        if (need_b && br.size() < M) { br.resize(M); bi.resize(M); }
+        if (static_cast<size_t>(N(ar)) < M) { gcpp_resize(ar, M); gcpp_resize(ai, M); }
+        if (need_b && static_cast<size_t>(N(br)) < M) { gcpp_resize(br, M); gcpp_resize(bi, M); }
     }
 };
 
@@ -1132,8 +1129,8 @@ static void fft_dif_inplace(double* __restrict__ ar, double* __restrict__ ai,
         return;
     }
 
-    const double* __restrict__ w1r_all = plan.w1r.data();
-    const double* __restrict__ w1i_all = plan.w1i.data();
+    const double* __restrict__ w1r_all = gcpp_data(plan.w1r);
+    const double* __restrict__ w1i_all = gcpp_data(plan.w1i);
 
     if (len > 2048) {
         size_t q = len >> 2;
@@ -1272,8 +1269,8 @@ static void fft_dit_inv_inplace(double* __restrict__ ar, double* __restrict__ ai
         return;
     }
 
-    const double* __restrict__ w1r_all = plan.w1r.data();
-    const double* __restrict__ w1i_all = plan.w1i.data();
+    const double* __restrict__ w1r_all = gcpp_data(plan.w1r);
+    const double* __restrict__ w1i_all = gcpp_data(plan.w1i);
 
     if (len > 2048) {
         size_t q = len >> 2;
@@ -1675,8 +1672,8 @@ static bool mpn_mul_fft(uint64_t* r, const uint64_t* a, size_t na, const uint64_
     size_t M = N >> 1;
     const FFTPlan& plan = g_fft.get(M);
     g_fft.ensure(M, !is_sqr);
-    double* __restrict__ ar = g_fft.ar.data();
-    double* __restrict__ ai = g_fft.ai.data();
+    double* __restrict__ ar = gcpp_data(g_fft.ar);
+    double* __restrict__ ai = gcpp_data(g_fft.ai);
 
     limbs_to_fft_soa(a, na_eff, bits, ar, ai, M);
     if (bits == 16 && 4 * (na_eff + nb_eff) >= N) {
@@ -1688,8 +1685,8 @@ static bool mpn_mul_fft(uint64_t* r, const uint64_t* a, size_t na, const uint64_
     }
     fft_dif_inplace(ar, ai, M, plan);
 
-    const double* __restrict__ rwr = plan.rwr_br.data();
-    const double* __restrict__ rwi = plan.rwi_br.data();
+    const double* __restrict__ rwr = gcpp_data(plan.rwr_br);
+    const double* __restrict__ rwi = gcpp_data(plan.rwi_br);
     const double inv_m = 1.0 / static_cast<double>(M);
     const double half_inv_m = 0.5 * inv_m;
     // Note: factoring 0.5 out of E, D doubles X & Y -> C is 4x larger -> multiply by 0.125 * inv_m!
@@ -1715,8 +1712,8 @@ static bool mpn_mul_fft(uint64_t* r, const uint64_t* a, size_t na, const uint64_
                              rwr + base, rwi + base, half_blk, scale_pair);
         }
     } else {
-        double* __restrict__ br = g_fft.br.data();
-        double* __restrict__ bi = g_fft.bi.data();
+        double* __restrict__ br = gcpp_data(g_fft.br);
+        double* __restrict__ bi = gcpp_data(g_fft.bi);
         limbs_to_fft_soa(b, nb_eff, bits, br, bi, M);
         if (bits == 16 && 4 * (na_eff + nb_eff) >= N) {
             size_t last_idx = 2 * nb_eff;
@@ -1780,8 +1777,8 @@ static uint64_t powmod(uint64_t a, uint64_t e, uint64_t p) noexcept {
     return r;
 }
 
-static void ntt(std::vector<uint64_t>& a, uint64_t p, uint64_t g, bool inv) {
-    size_t n = a.size();
+static void ntt(array<uint64_t>& a, uint64_t p, uint64_t g, bool inv) {
+    size_t n = static_cast<size_t>(N(a));
     for (size_t i = 1, j = 0; i < n; ++i) {
         size_t bit = n >> 1;
         for (; j & bit; bit >>= 1) j ^= bit;
@@ -1824,7 +1821,7 @@ static void mpn_mul_ntt3(uint64_t* r, const uint64_t* a, size_t na, const uint64
     while (n < la + lb) n <<= 1;
 
     auto conv = [&](uint64_t p, uint64_t g) {
-        std::vector<uint64_t> fa(n, 0), fb(n, 0);
+        array<uint64_t> fa = array_fill<uint64_t>(n, 0), fb = array_fill<uint64_t>(n, 0);
         for (size_t i = 0; i < na; ++i) {
             fa[2 * i] = a[i] & 0xFFFFFFFFULL;
             fa[2 * i + 1] = a[i] >> 32;
@@ -2678,9 +2675,9 @@ struct HgcdMat {
     // Cuts the matrix-vector multiplication size in HALF!
     void apply_split(BigInt& a, BigInt& b, size_t s, const BigInt& a_hi_red, const BigInt& b_hi_red) const {
         auto low_slice = [&](const BigInt& x) -> BigIntView {
-            size_t l = std::min(x.size(), s);
-            l = mpn_norm(x.data(), l);
-            return {x.data(), l, false};
+            size_t l = std::min(static_cast<size_t>(N(x)), s);
+            l = mpn_norm(gcpp_data(x), l);
+            return {gcpp_data(x), l, false};
         };
         BigIntView alo = low_slice(a);
         BigIntView blo = low_slice(b);
@@ -2743,7 +2740,7 @@ static HgcdMat hgcd_rec(BigInt& a, BigInt& b);
 // Flat-array zero-allocation hgcd_basecase: keeps M = (u00, u01, u10, u11) on ScratchArena!
 static HgcdMat hgcd_basecase(BigInt& a, BigInt& b, size_t target_limbs) {
     ScratchMark mark;
-    size_t cap = a.size() + 4;
+    size_t cap = static_cast<size_t>(N(a)) + 4;
     uint64_t* u00 = tl_scratch.alloc(cap); size_t l00 = 1; u00[0] = 1;
     uint64_t* u01 = tl_scratch.alloc(cap); size_t l01 = 0;
     uint64_t* u10 = tl_scratch.alloc(cap); size_t l10 = 0;
@@ -2780,9 +2777,9 @@ static HgcdMat hgcd_basecase(BigInt& a, BigInt& b, size_t target_limbs) {
         BigInt bx(BigIntView{x, lx, false}), by(BigIntView{y, ly, false});
         BigInt nx = BigInt::add(BigInt::mul_ui(bx, L.u00), BigInt::mul_ui(by, L.u01));
         BigInt ny = BigInt::add(BigInt::mul_ui(bx, L.u10), BigInt::mul_ui(by, L.u11));
-        lx = nx.size(); ly = ny.size();
-        if (lx > 0) std::memcpy(x, nx.data(), lx * sizeof(uint64_t));
-        if (ly > 0) std::memcpy(y, ny.data(), ly * sizeof(uint64_t));
+        lx = static_cast<size_t>(N(nx)); ly = static_cast<size_t>(N(ny));
+        if (lx > 0) std::memcpy(x, gcpp_data(nx), lx * sizeof(uint64_t));
+        if (ly > 0) std::memcpy(y, gcpp_data(ny), ly * sizeof(uint64_t));
 #endif
     };
 
@@ -2795,10 +2792,10 @@ static HgcdMat hgcd_basecase(BigInt& a, BigInt& b, size_t target_limbs) {
                 ly = lx; lx = 0;
                 return;
             }
-            size_t ql = q.size();
+            size_t ql = static_cast<size_t>(N(q));
             size_t pl = ql + ly;
-            if (ql >= ly) mpn_mul_dispatch(t0, q.data(), ql, y, ly);
-            else mpn_mul_dispatch(t0, y, ly, q.data(), ql);
+            if (ql >= ly) mpn_mul_dispatch(t0, gcpp_data(q), ql, y, ly);
+            else mpn_mul_dispatch(t0, y, ly, gcpp_data(q), ql);
             pl = mpn_norm(t0, pl);
             // t0 += x
             if (lx > 0) {
@@ -2847,12 +2844,12 @@ static HgcdMat hgcd_basecase(BigInt& a, BigInt& b, size_t target_limbs) {
         step_col1(u01, l01, u11, l11);
     };
 
-    while (b.size() > target_limbs) {
+    while (static_cast<size_t>(N(b)) > target_limbs) {
         if (BigInt::cmp_abs(a, b) < 0) break;
         LehmerMat lm;
-        if (a.size() >= 2 && a.size() <= b.size() + 1 && b.size() >= target_limbs + 2 && lehmer_step_auto(a.data(), a.size(), b.data(), b.size(), lm)) {
-            size_t na = a.size(), nb = b.size();
-            apply_lehmer(a.data(), na, b.data(), nb, lm);
+        if (static_cast<size_t>(N(a)) >= 2 && static_cast<size_t>(N(a)) <= static_cast<size_t>(N(b)) + 1 && static_cast<size_t>(N(b)) >= target_limbs + 2 && lehmer_step_auto(gcpp_data(a), static_cast<size_t>(N(a)), gcpp_data(b), static_cast<size_t>(N(b)), lm)) {
+            size_t na = static_cast<size_t>(N(a)), nb = static_cast<size_t>(N(b));
+            apply_lehmer(gcpp_data(a), na, gcpp_data(b), nb, lm);
             a.set_size_and_normalize(na, false);
             b.set_size_and_normalize(nb, false);
             odd = (odd != lm.odd_steps);
@@ -2861,10 +2858,10 @@ static HgcdMat hgcd_basecase(BigInt& a, BigInt& b, size_t target_limbs) {
             continue;
         }
         // Near target_limbs: use exact unshifted top-limb Lehmer so we NEVER overshoot target_limbs!
-        if (a.size() == target_limbs + 1 && b.size() == target_limbs + 1 &&
-            lehmer_step64_raw(a.data()[target_limbs], b.data()[target_limbs], lm)) {
-            size_t na = a.size(), nb = b.size();
-            apply_lehmer(a.data(), na, b.data(), nb, lm);
+        if (static_cast<size_t>(N(a)) == target_limbs + 1 && static_cast<size_t>(N(b)) == target_limbs + 1 &&
+            lehmer_step64_raw(gcpp_data(a)[target_limbs], gcpp_data(b)[target_limbs], lm)) {
+            size_t na = static_cast<size_t>(N(a)), nb = static_cast<size_t>(N(b));
+            apply_lehmer(gcpp_data(a), na, gcpp_data(b), nb, lm);
             a.set_size_and_normalize(na, false);
             b.set_size_and_normalize(nb, false);
             odd = (odd != lm.odd_steps);
@@ -2875,7 +2872,7 @@ static HgcdMat hgcd_basecase(BigInt& a, BigInt& b, size_t target_limbs) {
         // Fast q = 1 check (avoids Knuth D division completely on Fibonacci-like steps!)
         BigInt diff = BigInt::sub(a, b);
         if (BigInt::cmp_abs(diff, b) < 0) {
-            if (diff.size() <= target_limbs) break;
+            if (static_cast<size_t>(N(diff)) <= target_limbs) break;
             apply_q1();
             a = std::move(b);
             b = std::move(diff);
@@ -2883,7 +2880,7 @@ static HgcdMat hgcd_basecase(BigInt& a, BigInt& b, size_t target_limbs) {
         }
         BigInt q, r;
         BigInt::tdiv_qr(a, b, q, r);
-        if (r.size() <= target_limbs) break;
+        if (static_cast<size_t>(N(r)) <= target_limbs) break;
         apply_q(q);
         a = std::move(b);
         b = std::move(r);
@@ -2899,9 +2896,9 @@ static HgcdMat hgcd_basecase(BigInt& a, BigInt& b, size_t target_limbs) {
 }
 
 static HgcdMat hgcd_rec(BigInt& a, BigInt& b) {
-    size_t n = a.size();
+    size_t n = static_cast<size_t>(N(a));
     size_t s = (n + 1) >> 1;
-    if (b.size() <= s) return HgcdMat::identity();
+    if (static_cast<size_t>(N(b)) <= s) return HgcdMat::identity();
     if (n < HGCD_THRESH) {
         return hgcd_basecase(a, b, s);
     }
@@ -2911,21 +2908,21 @@ static HgcdMat hgcd_rec(BigInt& a, BigInt& b) {
     BigInt b_hi = BigInt::tdiv_q_2exp(b, s * 64);
     HgcdMat M1 = hgcd_rec(a_hi, b_hi);
     M1.apply_split(a, b, s, a_hi, b_hi);
-    if (a.is_neg() || b.is_neg() || b.size() <= s) return M1;
+    if (a.is_neg() || b.is_neg() || static_cast<size_t>(N(b)) <= s) return M1;
     if (BigInt::cmp_abs(a, b) < 0) return M1;
 
     // 2. One Euclidean quotient step on full (a, b)
     BigInt q, r;
     BigInt::tdiv_qr(a, b, q, r);
-    if (r.size() <= s) return M1;
+    if (static_cast<size_t>(N(r)) <= s) return M1;
     M1.left_mul_quotient(q);
     a = std::move(b);
     b = std::move(r);
-    if (b.size() <= s) return M1;
+    if (static_cast<size_t>(N(b)) <= s) return M1;
 
     // 3. Second recursive HGCD on remaining excess above s
-    size_t shift = (2 * s > a.size()) ? (2 * s - a.size()) : 0;
-    if (shift >= a.size() || b.size() <= shift) return M1;
+    size_t shift = (2 * s > static_cast<size_t>(N(a))) ? (2 * s - static_cast<size_t>(N(a))) : 0;
+    if (shift >= static_cast<size_t>(N(a)) || static_cast<size_t>(N(b)) <= shift) return M1;
     BigInt a2 = BigInt::tdiv_q_2exp(a, shift * 64);
     BigInt b2 = BigInt::tdiv_q_2exp(b, shift * 64);
     if (BigInt::cmp_abs(a2, b2) < 0) return M1;
@@ -2937,9 +2934,9 @@ static HgcdMat hgcd_rec(BigInt& a, BigInt& b) {
 // Top-level Half-GCD reduction for BigInt::gcd: reduces (a, b) from n limbs down to ~n/2 limbs
 // WITHOUT computing the expensive top-level HgcdMat::compose(M2, M1) (8 large multiplications saved!).
 static void hgcd_reduce_inplace(BigInt& a, BigInt& b) {
-    size_t n = a.size();
+    size_t n = static_cast<size_t>(N(a));
     size_t s = (n + 1) >> 1;
-    if (b.size() <= s) return;
+    if (static_cast<size_t>(N(b)) <= s) return;
     if (n < HGCD_THRESH) {
         (void)hgcd_basecase(a, b, s);
         a.abs_inplace();
@@ -2956,17 +2953,17 @@ static void hgcd_reduce_inplace(BigInt& a, BigInt& b) {
     a.abs_inplace();
     b.abs_inplace();
     if (BigInt::cmp_abs(a, b) < 0) std::swap(a, b);
-    if (b.is_zero() || b.size() <= s) return;
+    if (b.is_zero() || static_cast<size_t>(N(b)) <= s) return;
 
     // 2. One Euclidean remainder step (no matrix update needed!)
     BigInt r = BigInt::tdiv_r(a, b);
     a = std::move(b);
     b = std::move(r);
-    if (b.is_zero() || b.size() <= s) return;
+    if (b.is_zero() || static_cast<size_t>(N(b)) <= s) return;
 
     // 3. Second HGCD on remaining excess above s (no compose!)
-    size_t shift = (2 * s > a.size()) ? (2 * s - a.size()) : 0;
-    if (shift >= a.size() || b.size() <= shift) return;
+    size_t shift = (2 * s > static_cast<size_t>(N(a))) ? (2 * s - static_cast<size_t>(N(a))) : 0;
+    if (shift >= static_cast<size_t>(N(a)) || static_cast<size_t>(N(b)) <= shift) return;
     BigInt a2 = BigInt::tdiv_q_2exp(a, shift * 64);
     BigInt b2 = BigInt::tdiv_q_2exp(b, shift * 64);
     if (BigInt::cmp_abs(a2, b2) < 0) return;
@@ -3088,8 +3085,8 @@ static inline uint64_t mpn_divrem_1_preinv(uint64_t* a, size_t n, uint64_t dn, u
 
 struct DecPow10Entry {
     BigInt val;
-    std::vector<uint64_t> b_norm;
-    std::vector<uint64_t> inv;
+    array<uint64_t> b_norm;
+    array<uint64_t> inv;
     size_t zero_limbs = 0; // trailing zero limbs in b_norm (30% of limbs for 10^D!)
     unsigned shift = 0;
     bool has_inv = false;
@@ -3097,8 +3094,8 @@ struct DecPow10Entry {
 };
 
 static void tdiv_qr_dec_pow10(const BigInt& a, DecPow10Entry& d, BigInt& q, BigInt& r) {
-    size_t na = a.size();
-    size_t nb = d.val.size();
+    size_t na = static_cast<size_t>(N(a));
+    size_t nb = static_cast<size_t>(N(d.val));
     if (nb < 96 || na < nb || (na - nb) < 16) {
         BigInt::tdiv_qr(a, d.val, q, r);
         return;
@@ -3106,32 +3103,32 @@ static void tdiv_qr_dec_pow10(const BigInt& a, DecPow10Entry& d, BigInt& q, BigI
     ++d.uses;
     // Build & cache Barrett reciprocal for all reused levels (and large levels on 2nd call)
     if (!d.has_inv && (d.uses >= 2 || nb <= 1200)) {
-        d.shift = static_cast<unsigned>(gcpp_countl_zero(d.val.data()[nb - 1]));
-        d.b_norm.resize(nb);
-        if (d.shift == 0) std::memcpy(d.b_norm.data(), d.val.data(), nb * sizeof(uint64_t));
-        else mpn_lshift(d.b_norm.data(), d.val.data(), nb, d.shift);
+        d.shift = static_cast<unsigned>(gcpp_countl_zero(gcpp_data(d.val)[nb - 1]));
+        gcpp_resize(d.b_norm, nb);
+        if (d.shift == 0) std::memcpy(gcpp_data(d.b_norm), gcpp_data(d.val), nb * sizeof(uint64_t));
+        else mpn_lshift(gcpp_data(d.b_norm), gcpp_data(d.val), nb, d.shift);
         size_t zl = 0;
         while (zl < nb && d.b_norm[zl] == 0) ++zl;
         d.zero_limbs = zl;
-        d.inv.resize(nb);
-        mpn_invert_appr(d.inv.data(), d.b_norm.data(), nb);
+        gcpp_resize(d.inv, nb);
+        mpn_invert_appr(gcpp_data(d.inv), gcpp_data(d.b_norm), nb);
         d.has_inv = true;
     }
     if (!d.has_inv) {
         // 1-use root on cold call: use Burnikel-Ziegler (with q==0 skip) instead of throwing away a huge invert_appr!
         ScratchMark mark;
-        unsigned s = static_cast<unsigned>(gcpp_countl_zero(d.val.data()[nb - 1]));
+        unsigned s = static_cast<unsigned>(gcpp_countl_zero(gcpp_data(d.val)[nb - 1]));
         uint64_t* u = tl_scratch.alloc(na + 1);
-        const uint64_t* bn = d.val.data();
+        const uint64_t* bn = gcpp_data(d.val);
         size_t una = na;
         if (s == 0) {
-            std::memcpy(u, a.data(), na * sizeof(uint64_t));
+            std::memcpy(u, gcpp_data(a), na * sizeof(uint64_t));
             u[na] = 0;
         } else {
             uint64_t* bbuf = tl_scratch.alloc(nb);
-            mpn_lshift(bbuf, d.val.data(), nb, s);
+            mpn_lshift(bbuf, gcpp_data(d.val), nb, s);
             bn = bbuf;
-            uint64_t hi = mpn_lshift(u, a.data(), na, s);
+            uint64_t hi = mpn_lshift(u, gcpp_data(a), na, s);
             u[na] = hi;
             if (hi) ++una;
         }
@@ -3177,9 +3174,9 @@ static void tdiv_qr_dec_pow10(const BigInt& a, DecPow10Entry& d, BigInt& q, BigI
     size_t una = na;
     uint64_t* u = tl_scratch.alloc(na + 1);
     if (d.shift == 0) {
-        std::memcpy(u, a.data(), na * sizeof(uint64_t));
+        std::memcpy(u, gcpp_data(a), na * sizeof(uint64_t));
     } else {
-        uint64_t hi = mpn_lshift(u, a.data(), na, d.shift);
+        uint64_t hi = mpn_lshift(u, gcpp_data(a), na, d.shift);
         if (hi) u[una++] = hi;
     }
     size_t t = (una + nb - 1) / nb;
@@ -3190,8 +3187,8 @@ static void tdiv_qr_dec_pow10(const BigInt& a, DecPow10Entry& d, BigInt& q, BigI
     if (work_len > una) std::memset(up + una, 0, (work_len - una) * sizeof(uint64_t));
 
     uint64_t top_q = 0;
-    if (mpn_cmp(up + (t - 1) * nb, d.b_norm.data(), nb) >= 0) {
-        mpn_sub_n(up + (t - 1) * nb, up + (t - 1) * nb, d.b_norm.data(), nb);
+    if (mpn_cmp(up + (t - 1) * nb, gcpp_data(d.b_norm), nb) >= 0) {
+        mpn_sub_n(up + (t - 1) * nb, up + (t - 1) * nb, gcpp_data(d.b_norm), nb);
         top_q = 1;
     }
     uint64_t* qfull = tl_scratch.alloc((t - 1) * nb);
@@ -3204,15 +3201,15 @@ static void tdiv_qr_dec_pow10(const BigInt& a, DecPow10Entry& d, BigInt& q, BigI
         uint64_t* qb = qfull + pos;
         const uint64_t* u_hi = ub + nb;
         // 1. q_est = u_hi + floor(u_hi * inv / B^nb)
-        mpn_mul_dispatch(prod, u_hi, nb, d.inv.data(), nb);
+        mpn_mul_dispatch(prod, u_hi, nb, gcpp_data(d.inv), nb);
         uint64_t qc = mpn_add_n(qb, u_hi, prod + nb, nb);
         if (qc != 0) for (size_t j = 0; j < nb; ++j) qb[j] = ~0ULL;
         // 2. Skip trailing zero limbs of 10^D when computing q * b_norm!
         if (zl > 0) std::memset(prod, 0, zl * sizeof(uint64_t));
-        mpn_mul_dispatch(prod + zl, qb, nb, d.b_norm.data() + zl, bnz);
+        mpn_mul_dispatch(prod + zl, qb, nb, gcpp_data(d.b_norm) + zl, bnz);
         mpn_sub_n(ub, ub, prod, nb + 1);
-        while (ub[nb] > 0 || mpn_cmp(ub, d.b_norm.data(), nb) >= 0) {
-            uint64_t sb = mpn_sub_n(ub, ub, d.b_norm.data(), nb);
+        while (ub[nb] > 0 || mpn_cmp(ub, gcpp_data(d.b_norm), nb) >= 0) {
+            uint64_t sb = mpn_sub_n(ub, ub, gcpp_data(d.b_norm), nb);
             ub[nb] -= sb;
             mpn_add_1(qb, qb, nb, 1);
         }
@@ -3234,22 +3231,22 @@ static void tdiv_qr_dec_pow10(const BigInt& a, DecPow10Entry& d, BigInt& q, BigI
 }
 
 // Subquadratic base-conversion helper for to_string
-static void to_string_dc(const BigInt& x, std::vector<DecPow10Entry>* dec_pows,
-                         const std::vector<BigInt>* gen_pows, size_t level,
+static void to_string_dc(const BigInt& x, array<DecPow10Entry>* dec_pows,
+                         array<BigInt>* gen_pows, size_t level,
                          unsigned dpl, int radix, const char* digs,
                          uint64_t dn, uint64_t inv, unsigned s_shift,
-                         std::string& out, bool pad_zeros, size_t expected_digits) {
-    if (x.size() <= 16 || level == 0) {
+                         string& out, bool pad_zeros, size_t expected_digits) {
+    if (static_cast<size_t>(N(x)) <= 16 || level == 0) {
         ScratchMark mark;
-        size_t n = x.size();
+        size_t n = static_cast<size_t>(N(x));
         if (n == 0) {
-            if (pad_zeros) out.append(expected_digits, '0');
-            else out.push_back('0');
+            if (pad_zeros) str_append_n(out, expected_digits, '0');
+            else out << '0';
             return;
         }
         uint64_t* tmp = tl_scratch.alloc(n);
         uint64_t* chunks = tl_scratch.alloc(n * 2 + 4);
-        std::memcpy(tmp, x.data(), n * sizeof(uint64_t));
+        std::memcpy(tmp, gcpp_data(x), n * sizeof(uint64_t));
         size_t total_chunks = 0;
         while (n > 0) {
             chunks[total_chunks++] = mpn_divrem_1_preinv(tmp, n, dn, inv, s_shift);
@@ -3259,19 +3256,19 @@ static void to_string_dc(const BigInt& x, std::vector<DecPow10Entry>* dec_pows,
         if (pad_zeros) {
             size_t total_out_digits = total_chunks * dpl;
             if (total_out_digits < expected_digits) {
-                out.append(expected_digits - total_out_digits, '0');
+                str_append_n(out, expected_digits - total_out_digits, '0');
             }
             size_t top_idx = total_chunks - 1;
             size_t rem_digits = expected_digits - (total_chunks - 1) * dpl;
             if (rem_digits > dpl) {
-                out.append(rem_digits - dpl, '0');
+                str_append_n(out, rem_digits - dpl, '0');
                 rem_digits = dpl;
             }
             format_u64_radix_padded(chunks[top_idx], radix, digs, buf, static_cast<unsigned>(rem_digits));
-            out.append(buf, rem_digits);
+            str_append(out, buf, rem_digits);
             for (size_t i = top_idx; i > 0; --i) {
                 format_u64_radix_padded(chunks[i - 1], radix, digs, buf, dpl);
-                out.append(buf, dpl);
+                str_append(out, buf, dpl);
             }
         } else {
             uint64_t top = chunks[total_chunks - 1];
@@ -3280,10 +3277,10 @@ static void to_string_dc(const BigInt& x, std::vector<DecPow10Entry>* dec_pows,
                 buf[len++] = digs[top % static_cast<uint64_t>(radix)];
                 top /= static_cast<uint64_t>(radix);
             } while (top > 0);
-            for (int i = len - 1; i >= 0; --i) out.push_back(buf[i]);
+            for (int i = len - 1; i >= 0; --i) out << buf[i];
             for (size_t i = total_chunks - 1; i > 0; --i) {
                 format_u64_radix_padded(chunks[i - 1], radix, digs, buf, dpl);
-                out.append(buf, dpl);
+                str_append(out, buf, dpl);
             }
         }
         return;
@@ -3293,7 +3290,7 @@ static void to_string_dc(const BigInt& x, std::vector<DecPow10Entry>* dec_pows,
     const BigInt& dv = (radix == 10) ? (*dec_pows)[level - 1].val : (*gen_pows)[level - 1];
     if (BigInt::cmp_abs(x, dv) < 0) {
         if (pad_zeros && expected_digits > low_digits) {
-            out.append(expected_digits - low_digits, '0');
+            str_append_n(out, expected_digits - low_digits, '0');
         }
         to_string_dc(x, dec_pows, gen_pows, level - 1, dpl, radix, digs, dn, inv, s_shift, out, pad_zeros, low_digits);
         return;
@@ -3412,9 +3409,9 @@ static BigInt powm_odd(BigIntView base, BigIntView exp, BigIntView m) {
 
     std::memcpy(m_limbs, m.limbs, n * sizeof(uint64_t));
     std::memset(r2_limbs, 0, n * sizeof(uint64_t));
-    if (r2.size() > 0) std::memcpy(r2_limbs, r2.data(), r2.size() * sizeof(uint64_t));
+    if (static_cast<size_t>(N(r2)) > 0) std::memcpy(r2_limbs, gcpp_data(r2), static_cast<size_t>(N(r2)) * sizeof(uint64_t));
     std::memset(b_pad, 0, n * sizeof(uint64_t));
-    std::memcpy(b_pad, bmod.data(), bmod.size() * sizeof(uint64_t));
+    std::memcpy(b_pad, gcpp_data(bmod), static_cast<size_t>(N(bmod)) * sizeof(uint64_t));
 
     auto do_mont_sqr = [&](uint64_t* out_r, const uint64_t* a) {
         if (n < KARATSUBA_SQR_THRESH) mpn_sqr_basecase(prod, a, n);
@@ -3515,9 +3512,9 @@ static BigInt powm_2exp(BigIntView base, BigIntView exp, size_t k) {
     BigInt acc(int64_t(1));
     size_t ebits = exp.bit_length_abs();
     auto mask_to_k = [&](BigInt& x) {
-        if (x.size() > nlimbs) x.set_size_and_normalize(nlimbs, false);
-        if (x.size() == nlimbs) {
-            x.data()[nlimbs - 1] &= top_mask;
+        if (static_cast<size_t>(N(x)) > nlimbs) x.set_size_and_normalize(nlimbs, false);
+        if (static_cast<size_t>(N(x)) == nlimbs) {
+            gcpp_data(x)[nlimbs - 1] &= top_mask;
             x.normalize();
         }
     };
@@ -3938,22 +3935,22 @@ BigInt BigInt::gcd(BigIntView a_in, BigIntView b_in) {
     if (cmp_abs(a, b) < 0) std::swap(a, b);
 
     while (!b.is_zero()) {
-        if (a.size() == 1) {
-            a.set_ui(gcd_u64(a.data()[0], b.data()[0]));
+        if (static_cast<size_t>(N(a)) == 1) {
+            a.set_ui(gcd_u64(gcpp_data(a)[0], gcpp_data(b)[0]));
             break;
         }
-        if (b.size() == 1) {
-            uint64_t r = mpn_mod_1(a.data(), a.size(), b.data()[0]);
-            a.set_ui(gcd_u64(b.data()[0], r));
+        if (static_cast<size_t>(N(b)) == 1) {
+            uint64_t r = mpn_mod_1(gcpp_data(a), static_cast<size_t>(N(a)), gcpp_data(b)[0]);
+            a.set_ui(gcd_u64(gcpp_data(b)[0], r));
             break;
         }
         // Use Half-GCD reduce for large inputs (skips top-level matrix compose!)
-        if (a.size() >= HGCD_THRESH && b.size() > (a.size() >> 1)) {
-            size_t old_sum = a.size() + b.size();
+        if (static_cast<size_t>(N(a)) >= HGCD_THRESH && static_cast<size_t>(N(b)) > (static_cast<size_t>(N(a)) >> 1)) {
+            size_t old_sum = static_cast<size_t>(N(a)) + static_cast<size_t>(N(b));
             hgcd_reduce_inplace(a, b);
             if (b.is_zero()) break;
-            if (a.size() + b.size() < old_sum) {
-                if (a.size() > b.size() + 1) {
+            if (static_cast<size_t>(N(a)) + static_cast<size_t>(N(b)) < old_sum) {
+                if (static_cast<size_t>(N(a)) > static_cast<size_t>(N(b)) + 1) {
                     a = tdiv_r(a, b);
                     std::swap(a, b);
                 }
@@ -3962,11 +3959,11 @@ BigInt BigInt::gcd(BigIntView a_in, BigIntView b_in) {
             // Fall through to Lehmer / division if HGCD made no progress
         }
         // Double-limb Lehmer step when a and b have similar sizes
-        if (a.size() <= b.size() + 1) {
+        if (static_cast<size_t>(N(a)) <= static_cast<size_t>(N(b)) + 1) {
             LehmerMat lm;
-            if (lehmer_step_auto(a.data(), a.size(), b.data(), b.size(), lm)) {
-                size_t na = a.size(), nb = b.size();
-                apply_lehmer(a.data(), na, b.data(), nb, lm);
+            if (lehmer_step_auto(gcpp_data(a), static_cast<size_t>(N(a)), gcpp_data(b), static_cast<size_t>(N(b)), lm)) {
+                size_t na = static_cast<size_t>(N(a)), nb = static_cast<size_t>(N(b));
+                apply_lehmer(gcpp_data(a), na, gcpp_data(b), nb, lm);
                 a.set_size_and_normalize(na, false);
                 b.set_size_and_normalize(nb, false);
                 if (cmp_abs(a, b) < 0) std::swap(a, b);
@@ -4007,7 +4004,7 @@ bool BigInt::modinv(BigIntView a_in, BigIntView m_in, BigInt& out) {
         t0 = std::move(t1);
         t1 = std::move(t2);
     }
-    if (r0.size() != 1 || r0.data()[0] != 1) return false;
+    if (static_cast<size_t>(N(r0)) != 1 || gcpp_data(r0)[0] != 1) return false;
     if (t0.is_neg()) t0 = add(t0, m_in);
     out = std::move(t0);
     return true;
@@ -4061,7 +4058,7 @@ BigInt BigInt::powm(BigIntView base, BigIntView exp, BigIntView m) {
     // Even modulus: split m = 2^k * m_odd and combine via CRT
     size_t k = scan1(m, 0);
     BigInt m_odd = tdiv_q_2exp(m, k);
-    if (m_odd.size() == 1 && m_odd.data()[0] == 1) {
+    if (static_cast<size_t>(N(m_odd)) == 1 && gcpp_data(m_odd)[0] == 1) {
         return powm_2exp(base, exp, k);
     }
     BigInt r_odd = powm_odd(base, exp, m_odd);
@@ -4320,7 +4317,7 @@ bool BigInt::to_be_bytes(BigIntView a, uint8_t* out, size_t len) noexcept {
     return true;
 }
 
-std::string BigInt::to_string(BigIntView a, int radix) {
+string BigInt::to_string(BigIntView a, int radix) {
     bool upper = false;
     if (radix < 0) { upper = true; radix = -radix; }
     assert(radix >= 2 && radix <= 36);
@@ -4335,9 +4332,9 @@ std::string BigInt::to_string(BigIntView a, int radix) {
         unsigned bpd = ri.bits_per_digit;
         size_t bits = a.bit_length_abs();
         size_t ndigits = (bits + bpd - 1) / bpd;
-        std::string out;
-        out.resize(ndigits + (a.neg ? 1 : 0));
-        char* p = out.data();
+        string out;
+        out->resize(static_cast<int>(ndigits + (a.neg ? 1 : 0)));
+        char* p = str_mut(out);
         if (a.neg) *p++ = '-';
 
         if (bpd == 4) {
@@ -4393,10 +4390,9 @@ std::string BigInt::to_string(BigIntView a, int radix) {
                 v = q;
             }
         }
-        std::string out;
-        out.reserve(static_cast<size_t>(len) + (a.neg ? 1 : 0));
-        if (a.neg) out.push_back('-');
-        for (int i = len - 1; i >= 0; --i) out.push_back(buf[i]);
+        string out;
+        if (a.neg) out << '-';
+        for (int i = len - 1; i >= 0; --i) out << buf[i];
         return out;
     }
 
@@ -4415,9 +4411,8 @@ std::string BigInt::to_string(BigIntView a, int radix) {
             chunks[total_chunks++] = mpn_divrem_1_preinv(tmp, n, dn, inv, s_shift);
             n = mpn_norm(tmp, n);
         }
-        std::string out;
-        out.reserve(total_chunks * ri.digits_per_limb + 2);
-        if (a.neg) out.push_back('-');
+        string out;
+        if (a.neg) out << '-';
         char buf[64];
         uint64_t top = chunks[total_chunks - 1];
         int len = 0;
@@ -4425,44 +4420,43 @@ std::string BigInt::to_string(BigIntView a, int radix) {
             buf[len++] = digs[top % static_cast<uint64_t>(radix)];
             top /= static_cast<uint64_t>(radix);
         } while (top > 0);
-        for (int i = len - 1; i >= 0; --i) out.push_back(buf[i]);
+        for (int i = len - 1; i >= 0; --i) out << buf[i];
         for (size_t i = total_chunks - 1; i > 0; --i) {
             format_u64_radix_padded(chunks[i - 1], radix, digs, buf, ri.digits_per_limb);
-            out.append(buf, ri.digits_per_limb);
+            str_append(out, buf, ri.digits_per_limb);
         }
         return out;
     }
 
     // Large numbers: subquadratic Divide-and-Conquer base conversion
     // For radix 10: cache pow10[k] = (10^19)^(2^k) + Barrett reciprocal (t == 2 ALWAYS!)
-    static std::vector<DecPow10Entry> dec_pow10;
-    std::vector<BigInt> local_pows;
+    static array<DecPow10Entry> dec_pow10;
+    array<BigInt> local_pows;
     size_t start_level = 1;
     if (radix == 10) {
-        if (dec_pow10.empty()) {
+        if ((N(dec_pow10) == 0)) {
             DecPow10Entry e;
             e.val = BigInt(ri.big_base); // 10^19
-            dec_pow10.push_back(std::move(e));
+            (dec_pow10 << (std::move(e)));
         }
         // Only build up to largest k such that pow10[k] <= a (never build unused k+1!)
-        while (2 * dec_pow10.back().val.size() <= a.len + 1) {
+        while (2 * static_cast<size_t>(N(dec_pow10[N(dec_pow10) - 1].val)) <= a.len + 1) {
             DecPow10Entry e;
-            e.val = sqr(dec_pow10.back().val);
-            dec_pow10.push_back(std::move(e));
+            e.val = sqr(dec_pow10[N(dec_pow10) - 1].val);
+            (dec_pow10 << (std::move(e)));
         }
-        while (start_level < dec_pow10.size() && dec_pow10[start_level - 1].val.size() <= a.len) ++start_level;
+        while (start_level < static_cast<size_t>(N(dec_pow10)) && static_cast<size_t>(N(dec_pow10[start_level - 1].val)) <= a.len) ++start_level;
     } else {
-        local_pows.emplace_back(ri.big_base);
-        while (2 * local_pows.back().size() <= a.len + 1) {
-            local_pows.push_back(sqr(local_pows.back()));
+        (local_pows << BigInt(ri.big_base));
+        while (2 * static_cast<size_t>(N(local_pows[N(local_pows) - 1])) <= a.len + 1) {
+            (local_pows << (sqr(local_pows[N(local_pows) - 1])));
         }
-        while (start_level < local_pows.size() && local_pows[start_level - 1].size() <= a.len) ++start_level;
+        while (start_level < static_cast<size_t>(N(local_pows)) && static_cast<size_t>(N(local_pows[start_level - 1])) <= a.len) ++start_level;
     }
 
-    std::string out;
-    size_t est = static_cast<size_t>(static_cast<double>(a.bit_length_abs()) * (std::log(2.0) / std::log(static_cast<double>(radix)))) + 4;
-    out.reserve(est);
-    if (a.neg) out.push_back('-');
+    string out;
+    
+    if (a.neg) out << '-';
     BigInt abs_a(a.abs_view());
     to_string_dc(abs_a, radix == 10 ? &dec_pow10 : nullptr, radix == 10 ? nullptr : &local_pows,
                  start_level, ri.digits_per_limb, radix, digs, dn, inv, s_shift, out, false, 0);
@@ -4477,37 +4471,37 @@ static inline int parse_digit(char c, int radix) noexcept {
     return (d >= 0 && d < radix) ? d : -1;
 }
 
-bool BigInt::from_string_unsigned(std::string_view s, int radix, BigInt& out) {
-    if (s.empty() || radix < 2 || radix > 36) return false;
+bool BigInt::from_string_unsigned(const char* s, size_t sn, int radix, BigInt& out) {
+    if ((sn == 0) || radix < 2 || radix > 36) return false;
     // Validate & strip leading zeros
     size_t first_nz = 0;
-    while (first_nz < s.size() && s[first_nz] == '0') ++first_nz;
-    if (first_nz == s.size()) {
+    while (first_nz < sn && s[first_nz] == '0') ++first_nz;
+    if (first_nz == sn) {
         out.set_zero();
         return true;
     }
-    s.remove_prefix(first_nz);
+    s += first_nz; sn -= first_nz;
 
     RadixInfo ri = get_radix_info(radix);
 
     // Fast O(n) path for power-of-2 radices (2, 4, 8, 16, 32)
     if (ri.bits_per_digit > 0) {
         unsigned bpd = ri.bits_per_digit;
-        size_t total_bits = s.size() * bpd;
+        size_t total_bits = sn * bpd;
         size_t nlimbs = (total_bits + 63) >> 6;
         BigInt res;
         uint64_t* rp = res.alloc_uninit(nlimbs);
         std::memset(rp, 0, nlimbs * sizeof(uint64_t));
 
         if (bpd == 4) {
-            size_t len = s.size();
+            size_t len = sn;
             for (size_t i = 0; i < len; ++i) {
                 int d = parse_digit(s[len - 1 - i], 16);
                 if (d < 0) return false;
                 rp[i >> 4] |= static_cast<uint64_t>(d) << ((i & 15) * 4);
             }
         } else {
-            size_t len = s.size();
+            size_t len = sn;
             for (size_t i = 0; i < len; ++i) {
                 int d = parse_digit(s[len - 1 - i], radix);
                 if (d < 0) return false;
@@ -4527,9 +4521,9 @@ bool BigInt::from_string_unsigned(std::string_view s, int radix, BigInt& out) {
 
     // Fast chunked path for small strings
     unsigned dpl = ri.digits_per_limb;
-    if (s.size() <= dpl) {
+    if (sn <= dpl) {
         uint64_t v = 0;
-        for (char c : s) {
+        for (size_t si = 0; si < sn; si++) { char c = s[si];
             int d = parse_digit(c, radix);
             if (d < 0) return false;
             v = v * static_cast<uint64_t>(radix) + static_cast<uint64_t>(d);
@@ -4539,9 +4533,9 @@ bool BigInt::from_string_unsigned(std::string_view s, int radix, BigInt& out) {
     }
 
     // Parse into chunks of size dpl (aligned to the right so every chunk except top has exact width dpl)
-    size_t n = s.size();
+    size_t n = sn;
     size_t num_chunks = (n + dpl - 1) / dpl;
-    std::vector<uint64_t> chunks(num_chunks);
+    array<uint64_t> chunks(num_chunks);
     size_t top_len = n - (num_chunks - 1) * dpl;
     size_t pos = 0;
     for (size_t ci = 0; ci < num_chunks; ++ci) {
@@ -4557,7 +4551,7 @@ bool BigInt::from_string_unsigned(std::string_view s, int radix, BigInt& out) {
 
     // Small/medium: simple Horner accumulation in uint64_t chunks
     if (num_chunks <= 32) {
-        BigInt acc(chunks.back());
+        BigInt acc(chunks[N(chunks) - 1]);
         for (size_t i = num_chunks - 1; i > 0; --i) {
             acc = mul_ui(acc, ri.big_base);
             if (chunks[i - 1] != 0) acc = add_ui(acc, chunks[i - 1]);
@@ -4567,23 +4561,23 @@ bool BigInt::from_string_unsigned(std::string_view s, int radix, BigInt& out) {
     }
 
     // Large: subquadratic Divide-and-Conquer bottom-up binary tree!
-    std::vector<BigInt> level;
-    level.reserve(num_chunks);
-    for (uint64_t c : chunks) level.emplace_back(c);
+    array<BigInt> level;
+    (void) 0;
+    for (uint64_t c : chunks) (level << BigInt(c));
 
     BigInt base_pow(ri.big_base);
-    while (level.size() > 1) {
-        size_t pairs = level.size() >> 1;
-        bool has_odd = (level.size() & 1) != 0;
-        std::vector<BigInt> next;
-        next.reserve(pairs + (has_odd ? 1 : 0));
+    while (static_cast<size_t>(N(level)) > 1) {
+        size_t pairs = static_cast<size_t>(N(level)) >> 1;
+        bool has_odd = (static_cast<size_t>(N(level)) & 1) != 0;
+        array<BigInt> next;
+        (void) 0;
         for (size_t i = 0; i < pairs; ++i) {
             BigInt hi = mul(level[2 * i + 1], base_pow);
-            next.push_back(add(level[2 * i], hi));
+            (next << (add(level[2 * i], hi)));
         }
-        if (has_odd) next.push_back(std::move(level.back()));
+        if (has_odd) (next << (std::move(level[N(level) - 1])));
         level = std::move(next);
-        if (level.size() > 1) base_pow = sqr(base_pow);
+        if (static_cast<size_t>(N(level)) > 1) base_pow = sqr(base_pow);
     }
     out = std::move(level[0]);
     return true;
@@ -4602,9 +4596,9 @@ void BigRat::canonicalize() {
         num.negate();
         den.abs_inplace();
     }
-    if (den.size() == 1 && den.data()[0] == 1) return;
+    if (static_cast<size_t>(N(den)) == 1 && gcpp_data(den)[0] == 1) return;
     BigInt g = BigInt::gcd(num, den);
-    if (g.size() > 1 || (g.size() == 1 && g.data()[0] > 1)) {
+    if (static_cast<size_t>(N(g)) > 1 || (static_cast<size_t>(N(g)) == 1 && gcpp_data(g)[0] > 1)) {
         num = BigInt::divexact(num, g);
         den = BigInt::divexact(den, g);
     }
@@ -4637,7 +4631,7 @@ BigRat BigRat::add_views(BigIntView an, BigIntView ad, BigIntView bn, BigIntView
         return r;
     }
     BigInt g = BigInt::gcd(ad, bd);
-    if (g.size() == 1 && g.data()[0] == 1) {
+    if (static_cast<size_t>(N(g)) == 1 && gcpp_data(g)[0] == 1) {
         BigInt n = BigInt::add(BigInt::mul(an, bd), BigInt::mul(bn, ad));
         BigInt d = BigInt::mul(ad, bd);
         return BigRat(std::move(n), std::move(d)); // already coprime!
@@ -4646,7 +4640,7 @@ BigRat BigRat::add_views(BigIntView an, BigIntView ad, BigIntView bn, BigIntView
     BigInt bd_q = BigInt::divexact(bd, g);
     BigInt t = BigInt::add(BigInt::mul(an, bd_q), BigInt::mul(bn, ad_q));
     BigInt g2 = BigInt::gcd(t, g);
-    if (g2.size() > 1 || (g2.size() == 1 && g2.data()[0] > 1)) {
+    if (static_cast<size_t>(N(g2)) > 1 || (static_cast<size_t>(N(g2)) == 1 && gcpp_data(g2)[0] > 1)) {
         t = BigInt::divexact(t, g2);
         BigInt ad_r = BigInt::divexact(ad, g2);
         return BigRat(std::move(t), BigInt::mul(ad_r, bd_q));
@@ -4670,8 +4664,8 @@ BigRat BigRat::mul_views(BigIntView an, BigIntView ad, BigIntView bn, BigIntView
     if (an.is_zero() || bn.is_zero()) return BigRat();
     BigInt g1 = BigInt::gcd(an, bd);
     BigInt g2 = BigInt::gcd(bn, ad);
-    bool r1 = (g1.size() > 1 || g1.low_u64() > 1);
-    bool r2 = (g2.size() > 1 || g2.low_u64() > 1);
+    bool r1 = (static_cast<size_t>(N(g1)) > 1 || g1.low_u64() > 1);
+    bool r2 = (static_cast<size_t>(N(g2)) > 1 || g2.low_u64() > 1);
     BigInt an_o, bd_o, bn_o, ad_o;
     BigIntView an_v = r1 ? (an_o = BigInt::divexact(an, g1)).view() : an;
     BigIntView bd_v = r1 ? (bd_o = BigInt::divexact(bd, g1)).view() : bd;

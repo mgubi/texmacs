@@ -9,7 +9,7 @@ namespace guile {
 // the callback which marks an object for the hooks of the collector
 struct MarkCtx {
     Heap* heap;
-    std::vector<Obj*>* worklist;
+    array<Obj*>* worklist;
 };
 
 static void mark_into(void* data, SCM x) {
@@ -81,30 +81,30 @@ Heap::~Heap() {
 }
 
 void Heap::add_root(SCM* slot) {
-    explicit_roots_.push_back(slot);
+    (explicit_roots_ << slot);
 }
 
 void Heap::remove_root(SCM* slot) {
-    auto it = std::find(explicit_roots_.begin(), explicit_roots_.end(), slot);
-    if (it != explicit_roots_.end()) {
-        *it = explicit_roots_.back();
-        explicit_roots_.pop_back();
+    auto it = std::find(begin(explicit_roots_), end(explicit_roots_), slot);
+    if (it != end(explicit_roots_)) {
+        *it = explicit_roots_[N(explicit_roots_) - 1];
+        explicit_roots_->resize(N(explicit_roots_) - 1);
     }
 }
 
 void Heap::add_permanent(SCM val) {
-    permanent_roots_.push_back(val);
+    (permanent_roots_ << val);
 }
 
-void Heap::mark_scm(SCM x, std::vector<Obj*>& worklist) {
+void Heap::mark_scm(SCM x, array<Obj*>& worklist) {
     if (!x.is_heap()) return;
     Obj* obj = x.to_obj();
     if (!obj || obj->gc_mark) return;
     obj->gc_mark = 1;
-    worklist.push_back(obj);
+    wl_push(worklist, obj);
 }
 
-void Heap::trace_obj(Obj* obj, std::vector<Obj*>& worklist) {
+void Heap::trace_obj(Obj* obj, array<Obj*>& worklist) {
     switch (obj->tag) {
     case ObjTag::Pair: {
         auto* p = static_cast<PairObj*>(obj);
@@ -274,12 +274,12 @@ void Heap::trace_obj(Obj* obj, std::vector<Obj*>& worklist) {
         // Trace pointer ('p') and self ('s') slots according to layout
         if (is_struct(st->vtable)) {
             auto* vt = as_obj<StructObj>(st->vtable);
-            if (!vt->slots.empty()) {
+            if (!(N(vt->slots) == 0)) {
                 SCM layout = SCM(vt->slots[VTABLE_INDEX_LAYOUT]);
                 if (is_symbol(layout)) {
-                    const std::string& desc = as_obj<SymbolObj>(layout)->name;
-                    size_t nfields = desc.size() / 2;
-                    for (size_t i = 0; i < st->slots.size(); ++i) {
+                    string desc = as_obj<SymbolObj>(layout)->name;
+                    size_t nfields = static_cast<size_t>(N(desc)) / 2;
+                    for (size_t i = 0; i < static_cast<size_t>(N(st->slots)); ++i) {
                         char ftype = 'p';
                         if (st->has_tail && i == st->tail_start) {
                             continue; // tail length word is raw integer
@@ -288,7 +288,7 @@ void Heap::trace_obj(Obj* obj, std::vector<Obj*>& worklist) {
                         if (st->has_tail && i > st->tail_start) {
                             fi = nfields - 1;
                         }
-                        if (fi * 2 < desc.size()) {
+                        if (fi * 2 < static_cast<size_t>(N(desc))) {
                             ftype = desc[fi * 2];
                         }
                         if (ftype == 'p' || ftype == 's') {
@@ -438,10 +438,9 @@ void Heap::trace_obj(Obj* obj, std::vector<Obj*>& worklist) {
     }
 }
 
-void Heap::drain_worklist(std::vector<Obj*>& worklist) {
-    while (!worklist.empty()) {
-        Obj* obj = worklist.back();
-        worklist.pop_back();
+void Heap::drain_worklist(array<Obj*>& worklist) {
+    while (wl_top_ > 0) {
+        Obj* obj = worklist[--wl_top_];
         // Fast inline cdr-chaining for PairObj (~85% of live heap objects): zero worklist push/pop on spine!
         while (obj->tag == ObjTag::Pair) {
             auto* p = static_cast<PairObj*>(obj);
@@ -451,7 +450,7 @@ void Heap::drain_worklist(std::vector<Obj*>& worklist) {
                 Obj* ao = a.to_obj();
                 if (ao && !ao->gc_mark) {
                     ao->gc_mark = 1;
-                    worklist.push_back(ao);
+                    wl_push(worklist, ao);
                 }
             }
             if (!d.is_heap()) goto next_item;
@@ -470,11 +469,11 @@ static bool is_alive(SCM x) noexcept {
     return x.to_obj()->gc_mark != 0;
 }
 
-void Heap::process_guardians(std::vector<Obj*>& worklist) {
+void Heap::process_guardians(array<Obj*>& worklist) {
     // Ephemeron fixed-point over ONLY weak_containers_ (typically <10 objects instead of 150k+!)
-    if (!weak_containers_.empty()) {
+    if (!(N(weak_containers_) == 0)) {
         bool changed = true;
-        auto process_weak_buckets = [&](std::vector<SCM>& buckets, WeakKind wk) {
+        auto process_weak_buckets = [&](array<SCM>& buckets, WeakKind wk) {
             if (wk == WeakKind::KeyAlist) {
                 for (SCM b : buckets) {
                     SCM p = b;
@@ -518,23 +517,23 @@ void Heap::process_guardians(std::vector<Obj*>& worklist) {
     }
 
     // Now process live guardians (typically 0 objects!)
-    if (!guardians_.empty()) {
-        std::vector<SCM> new_zombies;
+    if (!(N(guardians_) == 0)) {
+        array<SCM> new_zombies;
         for (GuardianObj* g : guardians_) {
             if (!g->gc_mark || g->destroyed) continue;
-            std::vector<SCM> still_live;
-            still_live.reserve(g->live.size());
+            array<SCM> still_live;
+            (void) 0;
             for (SCM item : g->live) {
                 if (!is_alive(item)) {
                     g->zombies << item;
-                    new_zombies.push_back(item);
+                    (new_zombies << item);
                 } else {
-                    still_live.push_back(item);
+                    (still_live << item);
                 }
             }
-            g->live.swap(still_live);
+            g->live = still_live;
         }
-        if (!new_zombies.empty()) {
+        if (!(N(new_zombies) == 0)) {
             for (SCM z : new_zombies) {
                 mark_scm(z, worklist);
             }
@@ -553,11 +552,11 @@ void Heap::process_guardians(std::vector<Obj*>& worklist) {
                 Obj* fo = e.filename.to_obj();
                 if (fo && !fo->gc_mark) {
                     fo->gc_mark = 1;
-                    worklist.push_back(fo);
+                    wl_push(worklist, fo);
                 }
             }
         }
-        if (!worklist.empty()) drain_worklist(worklist);
+        if (wl_top_ > 0) drain_worklist(worklist);
     }
 }
 
@@ -597,13 +596,13 @@ void Heap::clear_weak_refs() {
             }
         } else if (cur->tag == ObjTag::Environment) {
             auto* en = static_cast<EnvironmentObj*>(cur);
-            if (!en->weak_observers.empty()) {
-                std::vector<SCM> kept;
-                kept.reserve(en->weak_observers.size());
+            if (!(N(en->weak_observers) == 0)) {
+                array<SCM> kept;
+                (void) 0;
                 for (SCM o : en->weak_observers) {
-                    if (is_alive(o)) kept.push_back(o);
+                    if (is_alive(o)) (kept << o);
                 }
-                en->weak_observers.swap(kept);
+                en->weak_observers = kept;
             }
         } else if (cur->tag == ObjTag::HashTable) {
             auto* ht = static_cast<HashTableObj*>(cur);
@@ -669,26 +668,26 @@ void Heap::sweep() {
     freed += symbol_pool_.sweep();
 
     // Prune dead weak containers, guardians & ports while gc_mark bits are still intact
-    if (!weak_containers_.empty()) {
+    if (!(N(weak_containers_) == 0)) {
         size_t w = 0;
-        for (size_t i = 0; i < weak_containers_.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(weak_containers_)); ++i) {
             if (weak_containers_[i]->gc_mark) weak_containers_[w++] = weak_containers_[i];
         }
-        weak_containers_.resize(w);
+        gcpp_resize(weak_containers_, w);
     }
-    if (!guardians_.empty()) {
+    if (!(N(guardians_) == 0)) {
         size_t w = 0;
-        for (size_t i = 0; i < guardians_.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(guardians_)); ++i) {
             if (guardians_[i]->gc_mark) guardians_[w++] = guardians_[i];
         }
-        guardians_.resize(w);
+        gcpp_resize(guardians_, w);
     }
-    if (!ports_.empty()) {
+    if (!(N(ports_) == 0)) {
         size_t w = 0;
-        for (size_t i = 0; i < ports_.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(ports_)); ++i) {
             if (ports_[i]->gc_mark) ports_[w++] = ports_[i];
         }
-        ports_.resize(w);
+        gcpp_resize(ports_, w);
     }
 
     Obj** pp = &head_;
@@ -719,17 +718,19 @@ void Heap::collect() {
     ++vm().mod_cache_epoch;
     auto t0 = std::chrono::steady_clock::now();
 
-    std::vector<Obj*> worklist;
-    worklist.reserve(2048);
+    array<Obj*> worklist;
+    wl_top_ = 0;
+    wl_cap_ = 0;
+    (void) 0;
 
     // Build sorted address table for non-slab objects once per GC
-    non_slab_ptrs_.clear();
+    gcpp_clear(non_slab_ptrs_);
     for (Obj* cur = head_; cur; cur = cur->gc_next) {
-        non_slab_ptrs_.push_back(reinterpret_cast<uintptr_t>(cur));
+        (non_slab_ptrs_ << reinterpret_cast<uintptr_t>(cur));
     }
-    std::sort(non_slab_ptrs_.begin(), non_slab_ptrs_.end());
-    uintptr_t ns_lo = non_slab_ptrs_.empty() ? UINTPTR_MAX : non_slab_ptrs_.front();
-    uintptr_t ns_hi = non_slab_ptrs_.empty() ? 0 : non_slab_ptrs_.back();
+    std::sort(begin(non_slab_ptrs_), end(non_slab_ptrs_));
+    uintptr_t ns_lo = (N(non_slab_ptrs_) == 0) ? UINTPTR_MAX : non_slab_ptrs_[0];
+    uintptr_t ns_hi = (N(non_slab_ptrs_) == 0) ? 0 : non_slab_ptrs_[N(non_slab_ptrs_) - 1];
 
     auto is_valid_heap_ptr = [&](uintptr_t w) noexcept -> bool {
         if (pair_pool_.contains_live(w)) return true;
@@ -746,7 +747,7 @@ void Heap::collect() {
         if (string_pool_.contains_live(w)) return true;
         if (symbol_pool_.contains_live(w)) return true;
         if (w >= ns_lo && w <= ns_hi) {
-            return std::binary_search(non_slab_ptrs_.begin(), non_slab_ptrs_.end(), w);
+            return std::binary_search(begin(non_slab_ptrs_), end(non_slab_ptrs_), w);
         }
         return false;
     };

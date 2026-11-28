@@ -1,6 +1,5 @@
 #include "guile_cpp/vm.hpp"
 #include <algorithm>
-#include <vector>
 
 namespace guile {
 
@@ -26,26 +25,26 @@ void VM::init_sort() {
         if (is_pair(seq)) {
             ScmRootVec items(heap_);
             SCM cur = seq;
-            while (is_pair(cur)) { items.push_back(car(cur)); cur = cdr(cur); }
+            while (is_pair(cur)) { (items << car(cur)); cur = cdr(cur); }
             if (!cur.is_null()) wrong_type_arg("sort", 1, seq, "proper list");
             auto cmp = [&](SCM a, SCM b) { return call2(less, a, b).is_true(); };
-            if (stable) std::stable_sort(items.vec.begin(), items.vec.end(), cmp);
-            else std::sort(items.vec.begin(), items.vec.end(), cmp);
+            if (stable) std::stable_sort(begin(items.vec), end(items.vec), cmp);
+            else std::sort(begin(items.vec), end(items.vec), cmp);
             if (destructive) {
                 cur = seq;
-                for (size_t i = 0; i < items.size(); ++i) { set_car(cur, items[i]); cur = cdr(cur); }
+                for (size_t i = 0; i < static_cast<size_t>(N(items)); ++i) { set_car(cur, items[i]); cur = cdr(cur); }
                 return seq;
             }
-            return list_n(items.data(), items.size());
+            return list_n(gcpp_data(items), static_cast<size_t>(N(items)));
         }
         if (is_vector(seq)) {
             auto* v = as_obj<VectorObj>(seq);
             ScmRootVec items(heap_);
-            items.vec = v->elts;
+            items.vec = copy(v->elts);  // (sorted in place: a copy)
             items.sync();
             auto cmp = [&](SCM a, SCM b) { return call2(less, a, b).is_true(); };
-            if (stable) std::stable_sort(items.vec.begin(), items.vec.end(), cmp);
-            else std::sort(items.vec.begin(), items.vec.end(), cmp);
+            if (stable) std::stable_sort(begin(items.vec), end(items.vec), cmp);
+            else std::sort(begin(items.vec), end(items.vec), cmp);
             if (destructive) {
                 v->elts = items.vec;
                 return seq;
@@ -54,16 +53,16 @@ void VM::init_sort() {
         }
         if (is_array(seq)) {
             auto* ar = as_obj<ArrayObj>(seq);
-            if (ar->dims.size() == 1 && is_vector(ar->base_vec)) {
+            if (static_cast<size_t>(N(ar->dims)) == 1 && is_vector(ar->base_vec)) {
                 auto* v = as_obj<VectorObj>(ar->base_vec);
                 int64_t len = ar->dims[0].ubnd - ar->dims[0].lbnd + 1;
                 ScmRootVec items(heap_);
                 for (int64_t i = 0; i < len; ++i) {
-                    items.push_back(v->elts[static_cast<size_t>(ar->base_offset + i * ar->dims[0].inc)]);
+                    (items << (v->elts[static_cast<size_t>(ar->base_offset + i * ar->dims[0].inc)]));
                 }
                 auto cmp = [&](SCM a, SCM b) { return call2(less, a, b).is_true(); };
-                if (stable) std::stable_sort(items.vec.begin(), items.vec.end(), cmp);
-                else std::sort(items.vec.begin(), items.vec.end(), cmp);
+                if (stable) std::stable_sort(begin(items.vec), end(items.vec), cmp);
+                else std::sort(begin(items.vec), end(items.vec), cmp);
                 if (destructive) {
                     for (int64_t i = 0; i < len; ++i) {
                         v->elts[static_cast<size_t>(ar->base_offset + i * ar->dims[0].inc)] = items[static_cast<size_t>(i)];
@@ -86,8 +85,8 @@ void VM::init_sort() {
         auto* v = as_obj<VectorObj>(a[0]);
         int64_t start = scm_to_int64(a[2], "restricted-vector-sort!", 3);
         int64_t end = scm_to_int64(a[3], "restricted-vector-sort!", 4);
-        if (start < 0 || end < start || static_cast<size_t>(end) > v->elts.size()) out_of_range("restricted-vector-sort!", a[2]);
-        std::stable_sort(v->elts.begin() + start, v->elts.begin() + end,
+        if (start < 0 || end < start || static_cast<size_t>(end) > static_cast<size_t>(N(v->elts))) out_of_range("restricted-vector-sort!", a[2]);
+        std::stable_sort(begin(v->elts) + start, begin(v->elts) + end,
                          [&](SCM x, SCM y) { return call2(a[1], x, y).is_true(); });
         return a[0];
     });
@@ -104,14 +103,14 @@ void VM::init_sort() {
         }
         if (is_vector(a[0])) {
             auto* v = as_obj<VectorObj>(a[0]);
-            for (size_t i = 1; i < v->elts.size(); ++i) {
+            for (size_t i = 1; i < static_cast<size_t>(N(v->elts)); ++i) {
                 if (call2(a[1], v->elts[i], v->elts[i - 1]).is_true()) return SCM_BOOL_F;
             }
             return SCM_BOOL_T;
         }
         if (is_array(a[0])) {
             auto* ar = as_obj<ArrayObj>(a[0]);
-            if (ar->dims.size() == 1 && is_vector(ar->base_vec)) {
+            if (static_cast<size_t>(N(ar->dims)) == 1 && is_vector(ar->base_vec)) {
                 auto* v = as_obj<VectorObj>(ar->base_vec);
                 int64_t len = ar->dims[0].ubnd - ar->dims[0].lbnd + 1;
                 for (int64_t i = 1; i < len; ++i) {

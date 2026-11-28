@@ -12,19 +12,19 @@ namespace guile {
 struct ScopedTZ {
     bool changed = false;
     bool had_old = false;
-    std::string old_tz;
+    string old_tz;
     ScopedTZ(SCM zone_arg) {
         if (!zone_arg.is_undefined() && is_string(zone_arg)) {
             const char* cur = std::getenv("TZ");
             if (cur) { had_old = true; old_tz = cur; }
-            ::setenv("TZ", as_obj<StringObj>(zone_arg)->to_std_string().c_str(), 1);
+            ::setenv("TZ", ((char*) c_string(as_obj<StringObj>(zone_arg)->str())), 1);
             ::tzset();
             changed = true;
         }
     }
     ~ScopedTZ() {
         if (changed) {
-            if (had_old) ::setenv("TZ", old_tz.c_str(), 1);
+            if (had_old) ::setenv("TZ", ((char*) c_string(old_tz)), 1);
             else ::unsetenv("TZ");
             ::tzset();
         }
@@ -50,7 +50,7 @@ static SCM tm_to_vector(const struct tm& t, long gmtoff, const char* zone) {
 }
 
 static struct tm vector_to_tm(SCM vec, const char* subr) {
-    if (!is_vector(vec) || as_obj<VectorObj>(vec)->elts.size() < 9) {
+    if (!is_vector(vec) || static_cast<size_t>(N(as_obj<VectorObj>(vec)->elts)) < 9) {
         vm().wrong_type_arg(subr, 1, vec, "tm vector");
     }
     auto* v = as_obj<VectorObj>(vec);
@@ -129,24 +129,24 @@ void VM::init_stime() {
     define_proc("strftime", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("strftime", 1, a[0], "string");
         struct tm t = vector_to_tm(a[1], "strftime");
-        std::string fmt = as_obj<StringObj>(a[0])->to_std_string();
+        string fmt = as_obj<StringObj>(a[0])->str();
         char buf[1024];
-        size_t n = std::strftime(buf, sizeof(buf), fmt.c_str(), &t);
-        return make_string(std::string(buf, n));
+        size_t n = std::strftime(buf, sizeof(buf), ((char*) c_string(fmt)), &t);
+        return make_string(string(buf, n));
     });
     define_proc("strptime", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_string(a[0])) wrong_type_arg("strptime", 1, a[0], "string");
         if (!is_string(a[1])) wrong_type_arg("strptime", 2, a[1], "string");
-        std::string fmt = as_obj<StringObj>(a[0])->to_std_string();
-        std::string str = as_obj<StringObj>(a[1])->to_std_string();
+        string fmt = as_obj<StringObj>(a[0])->str();
+        string str = as_obj<StringObj>(a[1])->str();
         struct tm t{};
         t.tm_isdst = -1;
         ::tzset();
-        char* end = ::strptime(str.c_str(), fmt.c_str(), &t);
+        char* end = ::strptime(((char*) c_string(str)), ((char*) c_string(fmt)), &t);
         if (!end) misc_error("strptime", "failed to parse time string");
         long gmtoff = t.tm_gmtoff;
         const char* zone = t.tm_zone;
-        if (fmt.find("%s") != std::string::npos) {
+        if (str_find(fmt, "%s") != static_cast<size_t>(-1)) {
             // Ensure localtime fields & gmtoff reflect current TZ for GNU %s
             time_t tt = ::mktime(&t);
             struct tm lt{};
@@ -155,7 +155,7 @@ void VM::init_stime() {
             gmtoff = lt.tm_gmtoff;
             zone = lt.tm_zone;
         }
-        return cons(tm_to_vector(t, gmtoff, zone), make_integer(end - str.c_str()));
+        return cons(tm_to_vector(t, gmtoff, zone), make_integer(end - ((char*) c_string(str))));
     });
     define_proc("tzset", 0, 0, false, [](const SCM*, size_t) -> SCM {
         ::tzset();
@@ -165,10 +165,10 @@ void VM::init_stime() {
     // tm:* accessors/mutators (also defined in ice-9/boot-9.scm, safe to have here too)
     const char* fields[] = {"sec", "min", "hour", "mday", "mon", "year", "wday", "yday", "isdst", "gmtoff", "zone"};
     for (int i = 0; i < 11; ++i) {
-        define_proc(std::string("tm:") + fields[i], 1, 0, false, [i](const SCM* a, size_t) -> SCM {
+        define_proc(string("tm:") * fields[i], 1, 0, false, [i](const SCM* a, size_t) -> SCM {
             return as_obj<VectorObj>(a[0])->elts[static_cast<size_t>(i)];
         });
-        define_proc(std::string("set-tm:") + fields[i], 2, 0, false, [i](const SCM* a, size_t) -> SCM {
+        define_proc(string("set-tm:") * fields[i], 2, 0, false, [i](const SCM* a, size_t) -> SCM {
             as_obj<VectorObj>(a[0])->elts[static_cast<size_t>(i)] = a[1];
             return SCM_UNSPECIFIED;
         });

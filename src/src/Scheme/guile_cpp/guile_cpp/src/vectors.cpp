@@ -20,17 +20,17 @@ void VM::init_vectors() {
 
     define_proc("vector", 0, 0, true, [this](const SCM* args, size_t nargs) -> SCM {
         SCM lst = nargs > 0 ? args[0] : SCM_EOL;
-        std::vector<SCM> elts;
+        array<SCM> elts;
         while (is_pair(lst)) {
-            elts.push_back(car(lst));
+            (elts << car(lst));
             lst = cdr(lst);
         }
         return heap_.alloc_scm<VectorObj>(std::move(elts));
     });
 
     define_proc("vector-length", 1, 0, false, [this](const SCM* args, size_t) -> SCM {
-        if (is_vector(args[0])) return make_integer(static_cast<int64_t>(as_obj<VectorObj>(args[0])->elts.size()));
-        if (is_weak_vector(args[0])) return make_integer(static_cast<int64_t>(as_obj<WeakVectorObj>(args[0])->elts.size()));
+        if (is_vector(args[0])) return make_integer(static_cast<int64_t>(static_cast<size_t>(N(as_obj<VectorObj>(args[0])->elts))));
+        if (is_weak_vector(args[0])) return make_integer(static_cast<int64_t>(static_cast<size_t>(N(as_obj<WeakVectorObj>(args[0])->elts))));
         wrong_type_arg("vector-length", 1, args[0], "vector");
     });
 
@@ -38,12 +38,12 @@ void VM::init_vectors() {
         int64_t k = scm_to_int64(args[1], "vector-ref", 2);
         if (is_vector(args[0])) {
             auto* v = as_obj<VectorObj>(args[0]);
-            if (k < 0 || static_cast<size_t>(k) >= v->elts.size()) out_of_range("vector-ref", args[1]);
+            if (k < 0 || static_cast<size_t>(k) >= static_cast<size_t>(N(v->elts))) out_of_range("vector-ref", args[1]);
             return v->elts[static_cast<size_t>(k)];
         }
         if (is_weak_vector(args[0])) {
             auto* v = as_obj<WeakVectorObj>(args[0]);
-            if (k < 0 || static_cast<size_t>(k) >= v->elts.size()) out_of_range("vector-ref", args[1]);
+            if (k < 0 || static_cast<size_t>(k) >= static_cast<size_t>(N(v->elts))) out_of_range("vector-ref", args[1]);
             return v->elts[static_cast<size_t>(k)];
         }
         wrong_type_arg("vector-ref", 1, args[0], "vector");
@@ -53,13 +53,13 @@ void VM::init_vectors() {
         int64_t k = scm_to_int64(args[1], "vector-set!", 2);
         if (is_vector(args[0])) {
             auto* v = as_obj<VectorObj>(args[0]);
-            if (k < 0 || static_cast<size_t>(k) >= v->elts.size()) out_of_range("vector-set!", args[1]);
+            if (k < 0 || static_cast<size_t>(k) >= static_cast<size_t>(N(v->elts))) out_of_range("vector-set!", args[1]);
             v->elts[static_cast<size_t>(k)] = args[2];
             return SCM_UNSPECIFIED;
         }
         if (is_weak_vector(args[0])) {
             auto* v = as_obj<WeakVectorObj>(args[0]);
-            if (k < 0 || static_cast<size_t>(k) >= v->elts.size()) out_of_range("vector-set!", args[1]);
+            if (k < 0 || static_cast<size_t>(k) >= static_cast<size_t>(N(v->elts))) out_of_range("vector-set!", args[1]);
             v->elts[static_cast<size_t>(k)] = args[2];
             return SCM_UNSPECIFIED;
         }
@@ -70,18 +70,18 @@ void VM::init_vectors() {
         if (is_vector(args[0])) {
             auto* v = as_obj<VectorObj>(args[0]);
             SCM res = SCM_EOL;
-            for (size_t i = v->elts.size(); i > 0; --i) res = cons(v->elts[i - 1], res);
+            for (size_t i = static_cast<size_t>(N(v->elts)); i > 0; --i) res = cons(v->elts[i - 1], res);
             return res;
         }
         if (is_weak_vector(args[0])) {
             auto* v = as_obj<WeakVectorObj>(args[0]);
             SCM res = SCM_EOL;
-            for (size_t i = v->elts.size(); i > 0; --i) res = cons(v->elts[i - 1], res);
+            for (size_t i = static_cast<size_t>(N(v->elts)); i > 0; --i) res = cons(v->elts[i - 1], res);
             return res;
         }
         if (is_array(args[0])) {
             auto* ar = as_obj<ArrayObj>(args[0]);
-            if (ar->dims.size() == 1 && ar->dims[0].lbnd == 0 && is_vector(ar->base_vec)) {
+            if (static_cast<size_t>(N(ar->dims)) == 1 && ar->dims[0].lbnd == 0 && is_vector(ar->base_vec)) {
                 auto* v = as_obj<VectorObj>(ar->base_vec);
                 SCM res = SCM_EOL;
                 for (int64_t i = ar->dims[0].ubnd; i >= 0; --i) {
@@ -97,11 +97,11 @@ void VM::init_vectors() {
     define_proc("list->vector", 1, 0, false, [this](const SCM* args, size_t) -> SCM {
         int64_t n = scm_ilength(args[0]);
         if (n < 0) wrong_type_arg("list->vector", 1, args[0], "proper list");
-        std::vector<SCM> elts;
-        elts.reserve(static_cast<size_t>(n));
+        array<SCM> elts;
+        (void) 0;
         SCM cur = args[0];
         while (is_pair(cur)) {
-            elts.push_back(car(cur));
+            (elts << car(cur));
             cur = cdr(cur);
         }
         return heap_.alloc_scm<VectorObj>(std::move(elts));
@@ -124,7 +124,7 @@ void VM::init_vectors() {
     define_proc("vector-copy", 1, 0, false, [this](const SCM* args, size_t) -> SCM {
         if (!is_vector(args[0])) wrong_type_arg("vector-copy", 1, args[0], "vector");
         auto* v = as_obj<VectorObj>(args[0]);
-        return heap_.alloc_scm<VectorObj>(v->elts);
+        return heap_.alloc_scm<VectorObj>(copy(v->elts));  // (a copy: not shared)
     });
 
     define_proc("vector-move-left!", 5, 0, false, [this](const SCM* args, size_t) -> SCM {
@@ -135,8 +135,8 @@ void VM::init_vectors() {
         int64_t s1 = scm_to_int64(args[1], "vector-move-left!", 2);
         int64_t e1 = scm_to_int64(args[2], "vector-move-left!", 3);
         int64_t s2 = scm_to_int64(args[4], "vector-move-left!", 5);
-        if (s1 < 0 || e1 < s1 || static_cast<size_t>(e1) > v1->elts.size() ||
-            s2 < 0 || static_cast<size_t>(s2 + (e1 - s1)) > v2->elts.size()) {
+        if (s1 < 0 || e1 < s1 || static_cast<size_t>(e1) > static_cast<size_t>(N(v1->elts)) ||
+            s2 < 0 || static_cast<size_t>(s2 + (e1 - s1)) > static_cast<size_t>(N(v2->elts))) {
             out_of_range("vector-move-left!", args[1]);
         }
         for (int64_t i = s1, j = s2; i < e1; ++i, ++j) {
@@ -154,8 +154,8 @@ void VM::init_vectors() {
         int64_t e1 = scm_to_int64(args[2], "vector-move-right!", 3);
         int64_t s2 = scm_to_int64(args[4], "vector-move-right!", 5);
         int64_t len = e1 - s1;
-        if (s1 < 0 || len < 0 || static_cast<size_t>(e1) > v1->elts.size() ||
-            s2 < 0 || static_cast<size_t>(s2 + len) > v2->elts.size()) {
+        if (s1 < 0 || len < 0 || static_cast<size_t>(e1) > static_cast<size_t>(N(v1->elts)) ||
+            s2 < 0 || static_cast<size_t>(s2 + len) > static_cast<size_t>(N(v2->elts))) {
             out_of_range("vector-move-right!", args[1]);
         }
         for (int64_t i = e1 - 1, j = s2 + len - 1; i >= s1; --i, --j) {
@@ -195,13 +195,13 @@ void VM::init_vectors() {
         define_proc("weak-vector?", 1, 0, false, [](const SCM* args, size_t) -> SCM {
             return SCM::from_bool(is_weak_vector(args[0]) && as_obj<WeakVectorObj>(args[0])->kind == WeakKind::Vector);
         });
-        auto reg_alist_vec = [this](const std::string& name, WeakKind wk) {
-            define_proc("make-" + name, 1, 0, false, [this, name, wk](const SCM* args, size_t) -> SCM {
-                int64_t n = scm_to_int64(args[0], ("make-" + name).c_str(), 1);
-                if (n < 0) out_of_range(("make-" + name).c_str(), args[0]);
+        auto reg_alist_vec = [this](string name, WeakKind wk) {
+            define_proc("make-" * name, 1, 0, false, [this, name, wk](const SCM* args, size_t) -> SCM {
+                int64_t n = scm_to_int64(args[0], ((char*) c_string(("make-" * name))), 1);
+                if (n < 0) out_of_range(((char*) c_string(("make-" * name))), args[0]);
                 return heap_.alloc_scm<WeakVectorObj>(static_cast<size_t>(n), SCM_EOL, wk);
             });
-            define_proc(name + "?", 1, 0, false, [wk](const SCM* args, size_t) -> SCM {
+            define_proc(name * "?", 1, 0, false, [wk](const SCM* args, size_t) -> SCM {
                 return SCM::from_bool(is_weak_vector(args[0]) && as_obj<WeakVectorObj>(args[0])->kind == wk);
             });
         };

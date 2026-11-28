@@ -3,10 +3,10 @@
 
 namespace guile {
 
-uint64_t scm_hash_string(std::string_view s) {
+uint64_t scm_hash_string(const char* s, size_t n) {
     uint64_t h = 14695981039346656037ULL;
-    for (unsigned char c : s) {
-        h ^= c;
+    for (size_t i = 0; i < n; i++) {
+        h ^= static_cast<unsigned char>(s[i]);
         h *= 1099511628211ULL;
     }
     return h;
@@ -74,7 +74,7 @@ static uint64_t hash_equal_rec(SCM obj, int depth) {
     case ObjTag::Symbol:
         return as_obj<SymbolObj>(obj)->hash;
     case ObjTag::String:
-        return scm_hash_string(as_obj<StringObj>(obj)->view());
+        return scm_hash_string(as_obj<StringObj>(obj)->chars(), as_obj<StringObj>(obj)->len);
     case ObjTag::Pair: {
         // Iterative cdr walk (bounded to 16 elements) for O(1) stack & fast list hashing
         uint64_t h = 0x9e3779b97f4a7c15ULL;
@@ -90,8 +90,8 @@ static uint64_t hash_equal_rec(SCM obj, int depth) {
     }
     case ObjTag::Vector: {
         auto* v = as_obj<VectorObj>(obj);
-        uint64_t h = v->elts.size();
-        size_t lim = std::min<size_t>(v->elts.size(), 16);
+        uint64_t h = static_cast<size_t>(N(v->elts));
+        size_t lim = std::min<size_t>(static_cast<size_t>(N(v->elts)), 16);
         for (size_t i = 0; i < lim; ++i) {
             h = h * 31ULL + hash_equal_rec(v->elts[i], depth + 1);
         }
@@ -99,8 +99,8 @@ static uint64_t hash_equal_rec(SCM obj, int depth) {
     }
     case ObjTag::WeakVector: {
         auto* v = as_obj<WeakVectorObj>(obj);
-        uint64_t h = v->elts.size();
-        size_t lim = std::min<size_t>(v->elts.size(), 16);
+        uint64_t h = static_cast<size_t>(N(v->elts));
+        size_t lim = std::min<size_t>(static_cast<size_t>(N(v->elts)), 16);
         for (size_t i = 0; i < lim; ++i) {
             h = h * 31ULL + hash_equal_rec(v->elts[i], depth + 1);
         }
@@ -108,7 +108,7 @@ static uint64_t hash_equal_rec(SCM obj, int depth) {
     }
     case ObjTag::CharSet: {
         auto* cs = as_obj<CharSetObj>(obj);
-        return scm_hash_string(std::string_view(reinterpret_cast<const char*>(cs->bits), sizeof(cs->bits)));
+        return scm_hash_string(string(reinterpret_cast<const char*>(cs->bits), sizeof(cs->bits)));
     }
     case ObjTag::Values:
         return hash_equal_rec(as_obj<ValuesObj>(obj)->values, depth + 1) ^ 0x12345678ULL;
@@ -162,8 +162,8 @@ SCM VM::make_hashtable(size_t nbuckets, WeakKind weak) {
 }
 
 static void rehash_table(HashTableObj* ht, int mode) {
-    size_t new_n = next_prime_bucket_size(ht->buckets.size() + 1);
-    std::vector<SCM> nb(new_n, SCM_EOL);
+    size_t new_n = next_prime_bucket_size(static_cast<size_t>(N(ht->buckets)) + 1);
+    array<SCM> nb = array_fill<SCM>(new_n, SCM_EOL);
     for (SCM b : ht->buckets) {
         SCM cur = b;
         while (is_pair(cur)) {
@@ -178,7 +178,7 @@ static void rehash_table(HashTableObj* ht, int mode) {
             cur = nxt;
         }
     }
-    ht->buckets.swap(nb);
+    ht->buckets = nb;
 }
 
 static inline bool key_match(SCM a, SCM b, int mode) {
@@ -191,7 +191,7 @@ static inline bool key_match(SCM a, SCM b, int mode) {
     // Fast-path for mode == 3 (equal?): symbols & immediates only equal themselves (already failed a == b)!
     if (!b.is_heap() || is_symbol(b)) return false;
     if (is_string(b)) {
-        return is_string(a) && as_obj<StringObj>(a)->view() == as_obj<StringObj>(b)->view();
+        return is_string(a) && string_obj_equal(as_obj<StringObj>(a), as_obj<StringObj>(b));
     }
     return scm_equal(a, b);
 }
@@ -202,7 +202,7 @@ static uint64_t key_hash(SCM k, size_t n, int mode) {
     return scm_ihash(k, n);
 }
 
-static std::vector<SCM>* get_table_buckets(SCM table, const char* subr) {
+static array<SCM>* get_table_buckets(SCM table, const char* subr) {
     if (is_hashtable(table)) return &as_obj<HashTableObj>(table)->buckets;
     if (is_weak_vector(table)) return &as_obj<WeakVectorObj>(table)->elts;
     if (is_vector(table)) return &as_obj<VectorObj>(table)->elts;
@@ -211,8 +211,8 @@ static std::vector<SCM>* get_table_buckets(SCM table, const char* subr) {
 
 SCM hash_get_handle(SCM table, SCM key, int mode) {
     auto* buckets = get_table_buckets(table, "hash-get-handle");
-    if (buckets->empty()) return SCM_BOOL_F;
-    uint64_t idx = key_hash(key, buckets->size(), mode);
+    if ((N(*buckets) == 0)) return SCM_BOOL_F;
+    uint64_t idx = key_hash(key, static_cast<size_t>(N(*buckets)), mode);
     SCM cur = (*buckets)[idx];
     while (is_pair(cur)) {
         SCM entry = car(cur);
@@ -224,8 +224,8 @@ SCM hash_get_handle(SCM table, SCM key, int mode) {
 
 SCM hash_create_handle(SCM table, SCM key, SCM init, int mode) {
     auto* buckets = get_table_buckets(table, "hash-create-handle!");
-    if (buckets->empty()) vm().out_of_range("hash-create-handle!", table);
-    uint64_t idx = key_hash(key, buckets->size(), mode);
+    if ((N(*buckets) == 0)) vm().out_of_range("hash-create-handle!", table);
+    uint64_t idx = key_hash(key, static_cast<size_t>(N(*buckets)), mode);
     SCM cur = (*buckets)[idx];
     while (is_pair(cur)) {
         SCM entry = car(cur);
@@ -237,7 +237,7 @@ SCM hash_create_handle(SCM table, SCM key, SCM init, int mode) {
     if (is_hashtable(table)) {
         auto* ht = as_obj<HashTableObj>(table);
         ++ht->count;
-        if (ht->count > ht->buckets.size() * 9 / 10) {
+        if (ht->count > static_cast<size_t>(N(ht->buckets)) * 9 / 10) {
             rehash_table(ht, mode);
         }
         if (mode == 1 && ht->is_module_obarray) {
@@ -267,8 +267,8 @@ SCM hash_set(SCM table, SCM key, SCM val, int mode) {
 
 SCM hash_remove(SCM table, SCM key, int mode) {
     auto* buckets = get_table_buckets(table, "hash-remove!");
-    if (buckets->empty()) return SCM_BOOL_F;
-    uint64_t idx = key_hash(key, buckets->size(), mode);
+    if ((N(*buckets) == 0)) return SCM_BOOL_F;
+    uint64_t idx = key_hash(key, static_cast<size_t>(N(*buckets)), mode);
     SCM prev = SCM_EOL;
     SCM cur = (*buckets)[idx];
     while (is_pair(cur)) {
@@ -337,21 +337,21 @@ void VM::init_hashtab() {
         return SCM::from_bool(is_hashtable(a[0]) && as_obj<HashTableObj>(a[0])->weak == WeakKind::DoublyWeakAlist);
     });
 
-    auto reg_ht_ops = [this](const std::string& pfx, int mode) {
-        define_proc(pfx + "-get-handle", 2, 0, false, [mode](const SCM* a, size_t) -> SCM {
+    auto reg_ht_ops = [this](string pfx, int mode) {
+        define_proc(pfx * "-get-handle", 2, 0, false, [mode](const SCM* a, size_t) -> SCM {
             return hash_get_handle(a[0], a[1], mode);
         });
-        define_proc(pfx + "-create-handle!", 3, 0, false, [mode](const SCM* a, size_t) -> SCM {
+        define_proc(pfx * "-create-handle!", 3, 0, false, [mode](const SCM* a, size_t) -> SCM {
             return hash_create_handle(a[0], a[1], a[2], mode);
         });
-        define_proc(pfx + "-ref", 2, 1, false, [mode](const SCM* a, size_t nargs) -> SCM {
+        define_proc(pfx * "-ref", 2, 1, false, [mode](const SCM* a, size_t nargs) -> SCM {
             SCM dflt = (nargs >= 3 && !a[2].is_undefined()) ? a[2] : SCM_BOOL_F;
             return hash_ref(a[0], a[1], dflt, mode);
         });
-        define_proc(pfx + "-set!", 3, 0, false, [mode](const SCM* a, size_t) -> SCM {
+        define_proc(pfx * "-set!", 3, 0, false, [mode](const SCM* a, size_t) -> SCM {
             return hash_set(a[0], a[1], a[2], mode);
         });
-        define_proc(pfx + "-remove!", 2, 0, false, [mode](const SCM* a, size_t) -> SCM {
+        define_proc(pfx * "-remove!", 2, 0, false, [mode](const SCM* a, size_t) -> SCM {
             return hash_remove(a[0], a[1], mode);
         });
     };
@@ -364,15 +364,15 @@ void VM::init_hashtab() {
         // (hashx-get-handle hash assoc table key)
         if (!is_hashtable(a[2])) wrong_type_arg("hashx-get-handle", 3, a[2], "hash table");
         auto* ht = as_obj<HashTableObj>(a[2]);
-        SCM idx_scm = call2(a[0], a[3], make_uinteger(ht->buckets.size()));
-        size_t idx = static_cast<size_t>(scm_to_uint64(idx_scm, "hashx-get-handle", 1) % ht->buckets.size());
+        SCM idx_scm = call2(a[0], a[3], make_uinteger(static_cast<size_t>(N(ht->buckets))));
+        size_t idx = static_cast<size_t>(scm_to_uint64(idx_scm, "hashx-get-handle", 1) % static_cast<size_t>(N(ht->buckets)));
         return call2(a[1], a[3], ht->buckets[idx]);
     });
     define_proc("hashx-create-handle!", 5, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_hashtable(a[2])) wrong_type_arg("hashx-create-handle!", 3, a[2], "hash table");
         auto* ht = as_obj<HashTableObj>(a[2]);
-        SCM idx_scm = call2(a[0], a[3], make_uinteger(ht->buckets.size()));
-        size_t idx = static_cast<size_t>(scm_to_uint64(idx_scm, "hashx-create-handle!", 1) % ht->buckets.size());
+        SCM idx_scm = call2(a[0], a[3], make_uinteger(static_cast<size_t>(N(ht->buckets))));
+        size_t idx = static_cast<size_t>(scm_to_uint64(idx_scm, "hashx-create-handle!", 1) % static_cast<size_t>(N(ht->buckets)));
         SCM h = call2(a[1], a[3], ht->buckets[idx]);
         if (h.is_true()) return h;
         SCM entry = cons(a[3], a[4]);
@@ -384,27 +384,27 @@ void VM::init_hashtab() {
         SCM dflt = (nargs >= 5 && !a[4].is_undefined()) ? a[4] : SCM_BOOL_F;
         if (!is_hashtable(a[2])) wrong_type_arg("hashx-ref", 3, a[2], "hash table");
         auto* ht = as_obj<HashTableObj>(a[2]);
-        SCM idx_scm = call2(a[0], a[3], make_uinteger(ht->buckets.size()));
-        size_t idx = static_cast<size_t>(scm_to_uint64(idx_scm, "hashx-ref", 1) % ht->buckets.size());
+        SCM idx_scm = call2(a[0], a[3], make_uinteger(static_cast<size_t>(N(ht->buckets))));
+        size_t idx = static_cast<size_t>(scm_to_uint64(idx_scm, "hashx-ref", 1) % static_cast<size_t>(N(ht->buckets)));
         SCM h = call2(a[1], a[3], ht->buckets[idx]);
         return is_pair(h) ? cdr(h) : dflt;
     });
     define_proc("hashx-set!", 5, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_hashtable(a[2])) wrong_type_arg("hashx-set!", 3, a[2], "hash table");
         auto* ht = as_obj<HashTableObj>(a[2]);
-        SCM idx_scm = call2(a[0], a[3], make_uinteger(ht->buckets.size()));
-        size_t idx = static_cast<size_t>(scm_to_uint64(idx_scm, "hashx-set!", 1) % ht->buckets.size());
+        SCM idx_scm = call2(a[0], a[3], make_uinteger(static_cast<size_t>(N(ht->buckets))));
+        size_t idx = static_cast<size_t>(scm_to_uint64(idx_scm, "hashx-set!", 1) % static_cast<size_t>(N(ht->buckets)));
         SCM h = call2(a[1], a[3], ht->buckets[idx]);
         if (is_pair(h)) { set_cdr(h, a[4]); return a[4]; }
         if (!h.is_false()) wrong_type_arg("hashx-set!", 2, h, "pair or #f");
         SCM entry = cons(a[3], a[4]);
         ht->buckets[idx] = cons(entry, ht->buckets[idx]);
         ++ht->count;
-        if (ht->count > ht->buckets.size() * 9 / 10) {
-            size_t new_n = next_prime_bucket_size(ht->buckets.size() + 1);
-            std::vector<SCM> old_buckets;
-            old_buckets.swap(ht->buckets);
-            ht->buckets.assign(new_n, SCM_EOL);
+        if (ht->count > static_cast<size_t>(N(ht->buckets)) * 9 / 10) {
+            size_t new_n = next_prime_bucket_size(static_cast<size_t>(N(ht->buckets)) + 1);
+            array<SCM> old_buckets;
+            old_buckets = ht->buckets;
+            gcpp_assign(ht->buckets, new_n, SCM_EOL);
             for (SCM b : old_buckets) {
                 for (SCM p = b; is_pair(p); p = cdr(p)) {
                     SCM e = car(p);
@@ -421,8 +421,8 @@ void VM::init_hashtab() {
         // (hashx-remove! hash assoc table key)
         if (!is_hashtable(a[2])) wrong_type_arg("hashx-remove!", 3, a[2], "hash table");
         auto* ht = as_obj<HashTableObj>(a[2]);
-        SCM idx_scm = call2(a[0], a[3], make_uinteger(ht->buckets.size()));
-        size_t idx = static_cast<size_t>(scm_to_uint64(idx_scm, "hashx-remove!", 1) % ht->buckets.size());
+        SCM idx_scm = call2(a[0], a[3], make_uinteger(static_cast<size_t>(N(ht->buckets))));
+        size_t idx = static_cast<size_t>(scm_to_uint64(idx_scm, "hashx-remove!", 1) % static_cast<size_t>(N(ht->buckets)));
         SCM h = call2(a[1], a[3], ht->buckets[idx]);
         if (h.is_false()) return SCM_BOOL_F;
         SCM prev = SCM_EOL, cur = ht->buckets[idx];
@@ -449,11 +449,11 @@ void VM::init_hashtab() {
         for (SCM b : ht->buckets) {
             SCM cur = b;
             while (is_pair(cur)) {
-                entries.push_back(car(cur));
+                (entries << car(cur));
                 cur = cdr(cur);
             }
         }
-        for (size_t i = 0; i < entries.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(entries)); ++i) {
             SCM e = entries[i];
             if (is_pair(e)) acc = call3(a[0], car(e), cdr(e), acc);
         }
@@ -466,9 +466,9 @@ void VM::init_hashtab() {
         ScmRootVec entries(heap_);
         for (SCM b : ht->buckets) {
             SCM cur = b;
-            while (is_pair(cur)) { entries.push_back(car(cur)); cur = cdr(cur); }
+            while (is_pair(cur)) { (entries << car(cur)); cur = cdr(cur); }
         }
-        for (size_t i = 0; i < entries.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(entries)); ++i) {
             SCM e = entries[i];
             if (is_pair(e)) call2(a[0], car(e), cdr(e));
         }
@@ -481,9 +481,9 @@ void VM::init_hashtab() {
         ScmRootVec entries(heap_);
         for (SCM b : ht->buckets) {
             SCM cur = b;
-            while (is_pair(cur)) { entries.push_back(car(cur)); cur = cdr(cur); }
+            while (is_pair(cur)) { (entries << car(cur)); cur = cdr(cur); }
         }
-        for (size_t i = 0; i < entries.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(entries)); ++i) {
             call1(a[0], entries[i]);
         }
         return SCM_UNSPECIFIED;
@@ -495,10 +495,10 @@ void VM::init_hashtab() {
         ScmRootVec entries(heap_);
         for (SCM b : ht->buckets) {
             SCM cur = b;
-            while (is_pair(cur)) { entries.push_back(car(cur)); cur = cdr(cur); }
+            while (is_pair(cur)) { (entries << car(cur)); cur = cdr(cur); }
         }
         SCM res = SCM_EOL;
-        for (size_t i = 0; i < entries.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(entries)); ++i) {
             SCM e = entries[i];
             if (is_pair(e)) res = cons(call2(a[0], car(e), cdr(e)), res);
         }
@@ -522,9 +522,9 @@ void VM::init_hashtab() {
         ScmRootVec entries(heap_);
         for (SCM b : ht->buckets) {
             SCM cur = b;
-            while (is_pair(cur)) { entries.push_back(car(cur)); cur = cdr(cur); }
+            while (is_pair(cur)) { (entries << car(cur)); cur = cdr(cur); }
         }
-        for (size_t i = 0; i < entries.size(); ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(N(entries)); ++i) {
             SCM e = entries[i];
             if (is_pair(e) && call2(a[0], car(e), cdr(e)).is_true()) ++cnt;
         }
