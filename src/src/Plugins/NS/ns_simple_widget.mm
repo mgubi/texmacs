@@ -247,6 +247,54 @@ ns_bench_now () {
 }
 @end
 
+/* The pixels per point of a canvas (its factor) are those of the screen of
+ its window (#989), and the code which converts between the coordinates of
+ TeXmacs and the pixels of a store reads them from the global retina_factor
+ (the zoom of the renderers: set_zoom_factor, reset_zoom_factor; the cache
+ of the pictures; the editor) and from the shared renderer the_ns_renderer
+ (its pixel, set by its last reset). So every entry point of a canvas which
+ does such a conversion runs in this scope: the global set to the factor of
+ the canvas and the shared renderer reset to it, both put back after (the
+ default factor outside: the images of the widgets, Scheme). They are:
+ repaint_invalid_regions (all the painting: get_renderer, the shadows, the
+ zoom transition) and impress (at the default). The rest uses the member
+ factor (send SLOT_INVALIDATE: ns_store_pixels; store sizes, scrolls,
+ invalidate_all, draw_backing_store, the snapshots) or points (the
+ events). */
+// a rectangle of TeXmacs (x1, y1, x2, y2: SI, y up) to the pixels of a
+// store of k pixels per point whose origin is at (ox, oy): what
+// renderer_rep::outer_round and decode do for a renderer reset at that
+// factor (pixel PIXEL / k, retina_pixel PIXEL)
+void
+ns_store_pixels (int k, SI ox, SI oy, SI& x1, SI& y1, SI& x2, SI& y2) {
+  SI pix= PIXEL / max (k, 1), rpix= PIXEL;
+  auto rnd= [rpix] (SI x) {
+    return x >= 0 ? (x / rpix) * rpix : ((x - rpix + 1) / rpix) * rpix; };
+  x1= rnd (x1 + ox) - ox;
+  y1= rnd (y1 + oy) - oy;
+  x2= rnd (x2 + ox + pix - 1) - ox;
+  y2= rnd (y2 + oy + pix - 1) - oy;
+  auto dec= [pix, ox, oy] (SI& x, SI& y) {
+    x += ox; y += oy;
+    if (x >= 0) x= x / pix; else x= (x - pix + 1) / pix;
+    if (y >= 0) y= -(y / pix); else y= -((y - pix + 1) / pix);
+  };
+  dec (x1, y1);
+  dec (x2, y2);
+}
+
+struct ns_canvas_scope {
+  int saved;
+  ns_canvas_scope (int f): saved (retina_factor) {
+    retina_factor= f;
+    the_ns_renderer ()->reset_zoom_factor ();
+  }
+  ~ns_canvas_scope () {
+    retina_factor= saved;
+    the_ns_renderer ()->reset_zoom_factor ();
+  }
+};
+
 ns_simple_widget_rep::ns_simple_widget_rep ()
 : ns_widget_rep (simple_widget),  sequencer (0), view (nil), doc (nil),
   backingPixmap (nil), ring (0), cring (0), gpu_ren (NULL), gpu_layer (NULL),
@@ -660,17 +708,13 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
       coord4 p= open_box<coord4> (val);
       
       {
-        ns_renderer_rep* ren = the_ns_renderer ();
-        {
-          coord2 pt_or = from_nspoint (backing_pos);
-          SI ox = -pt_or.x1;
-          SI oy = -pt_or.x2;
-          ren->set_origin (ox,oy);
-        }
+        // in the pixels of the store of this canvas (its factor), as the
+        // renderer of the canvas would round and decode them, but without
+        // the shared renderer, whose pixel is that of its last reset (#989)
+        int k= factor > 0 ? factor : canvas_factor ();
+        coord2 pt_or = from_nspoint (backing_pos);
         SI x1 = p.x1, y1 = p.x2, x2 = p.x3, y2 = p.x4;
-        ren->outer_round (x1, y1, x2, y2);
-        ren->decode (x1, y1);
-        ren->decode (x2, y2);
+        ns_store_pixels (k, -pt_or.x1, -pt_or.x2, x1, y1, x2, y2);
         invalidate_rect (x1, y2, x2, y1);
       }
     }
@@ -925,6 +969,8 @@ NSBitmapImageRep*
 ns_simple_widget_rep::impress () {
   SI width, height;
   handle_get_size_hint (width, height);
+  // (at the default factor, the renderer reset to it: ns_canvas_scope)
+  ns_canvas_scope scope (current_default_factor ());
   NSSize s = to_nssize (coord2 (width, height));
   NSInteger pw= max ((NSInteger) ceil (s.width * retina_factor), (NSInteger) 1);
   NSInteger ph= max ((NSInteger) ceil (s.height * retina_factor), (NSInteger) 1);
@@ -1022,6 +1068,8 @@ ns_simple_widget_rep::get_renderer() {
   }
   ns_renderer_rep * ren = the_ns_renderer();
   ren->begin ([NSGraphicsContext graphicsContextWithBitmapImageRep: backingPixmap]);
+  // (at the factor of this canvas, which repaint_invalid_regions set)
+  ren->reset_zoom_factor ();
   return ren;
 }
 
@@ -1206,14 +1254,6 @@ ns_simple_widget_rep::draw_backing_store (NSRect rect) {
   CGImageRelease (img);
 }
 
-// the global retina_factor while a canvas is painted: its own (the
-// renderers, the pictures and the editor read the global)
-struct ns_factor_scope {
-  int saved;
-  ns_factor_scope (int f): saved (retina_factor) { retina_factor= f; }
-  ~ns_factor_scope () { retina_factor= saved; }
-};
-
 int  ns_simple_widget_rep::default_factor= 1;
 bool ns_simple_widget_rep::factor_fixed= false;
 
@@ -1223,11 +1263,23 @@ ns_canvas_factor_for (double backing_scale) {
   return backing_scale >= 1.5 ? 2 : 1;
 }
 
+// the default: fixed by the user, else the largest scale of the screens
+// attached now (that of the start when there is none: headless)
+int
+ns_simple_widget_rep::current_default_factor () {
+  if (factor_fixed) return default_factor;
+  int f= 0;
+  for (NSScreen* s in [NSScreen screens])
+    f= max (f, ns_canvas_factor_for ([s backingScaleFactor]));
+  return f > 0 ? f : default_factor;
+}
+
 int
 ns_simple_widget_rep::canvas_factor () {
   // (as it was, for a canvas which left its window for a while)
   if (factor_fixed) return default_factor;
-  if (!view || ![view window]) return factor > 0 ? factor : default_factor;
+  if (!view || ![view window])
+    return factor > 0 ? factor : current_default_factor ();
   return ns_canvas_factor_for ([[view window] backingScaleFactor]);
 }
 
@@ -1252,7 +1304,7 @@ ns_simple_widget_rep::repaint_invalid_regions () {
   double tr0= ns_bench_now ();
   int f= canvas_factor ();
   if (f != factor) set_factor (f);
-  ns_factor_scope scope (factor);
+  ns_canvas_scope scope (factor);
   // the zoom the editor starts with (the first one is not sent to the
   // widget): the smooth zoom needs the old zoom to scale from
   if (zoom_now == 0 && is_editor_widget ())

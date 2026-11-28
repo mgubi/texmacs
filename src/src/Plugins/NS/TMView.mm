@@ -318,13 +318,19 @@ initkeymap () {
 {
   [super viewDidChangeBackingProperties];
   if (!wid) return;
+  // (also when the view is put in a window of the same scale: nothing then;
+  // the update is asked for, not done here, since this may come within a
+  // command which builds or switches views)
   NS_ENTRY_BEGIN
     ns_simple_widget_rep* w= (ns_simple_widget_rep*) wid;
-    if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
-      fprintf (stderr, "CANVAS backing %.1f (factor %d)\n",
-               [[self window] backingScaleFactor], w->factor);
-    w->invalidate_all ();
-    if ([NSApp isRunning] && [self window]) the_gui->force_update ();
+    int f= w->canvas_factor ();
+    if (w->factor > 0 && f != w->factor) {
+      if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
+        fprintf (stderr, "CANVAS backing %.1f (factor %d -> %d)\n",
+                 [[self window] backingScaleFactor], w->factor, f);
+      w->invalidate_all ();
+      if (the_gui) the_gui->need_update ();
+    }
   NS_ENTRY_END ("-[TMView viewDidChangeBackingProperties]")
 }
 

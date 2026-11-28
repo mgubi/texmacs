@@ -108,6 +108,7 @@ public:
   static int              default_factor;
   static bool             factor_fixed; //!< by the user (retina-factor...)
   int canvas_factor ();                //!< what it should be now
+  static int current_default_factor (); //!< of the screens now
   void set_factor (int f);             //!< a new store, all repainted
   static bool gpu_mode ();
   bool has_store ();
@@ -192,5 +193,8 @@ int ns_wheel_mods (NSEvent* event);     // QT_WHEEL_..., latched (Qt)
 
 // the pixels of a canvas per point on a screen of this backingScaleFactor
 int ns_canvas_factor_for (double backing_scale);
+// a rectangle of TeXmacs to the pixels of a store of k pixels per point
+// whose origin is (ox, oy) (SLOT_INVALIDATE)
+void ns_store_pixels (int k, SI ox, SI oy, SI& x1, SI& y1, SI& x2, SI& y2);
 
 #endif // defined NS_SIMPLE_WIDGET_H

@@ -1318,7 +1318,7 @@ canvas_frame () {
       [w setFrame: frame0 display: YES];
       for (int i= 0; i < 5; i++) the_gui->force_update ();
     }
-    fprintf (stderr, "TEXMACS_NS_BENCH (ms a step; retina_factor %d, "
+    fprintf (stderr, "TEXMACS_NS_BENCH (ms a step; default retina_factor %d, "
              "canvas %.0fx%.0f points, glyphs %s)\n%s", retina_factor,
              cf.size.width, cf.size.height,
              get_env ("TEXMACS_NS_GLYPHS") == "bitmap"? "bitmap": "outline",

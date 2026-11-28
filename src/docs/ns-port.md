@@ -560,16 +560,22 @@ back. A canvas which is deleted releases its surfaces (`gpu_forget_layer`).
 own factor, the pixels of its store per point (`ns_simple_widget_rep::
 factor`): that of the screen of its window (`backingScaleFactor`, 1 or 2,
 `canvas_factor`). When the window goes to a screen of another scale
-(`-[TMView viewDidChangeBackingProperties]`), the next repaint makes a new
-store at the new factor and paints all of it (`set_factor`), so a window
+(`-[TMView viewDidChangeBackingProperties]`, which asks for an update only
+when the factor changes), the next repaint makes a new store at the new
+factor and paints all of it (`set_factor`), so a window
 dragged from a Retina screen to a screen of 1x and back is drawn at the
 pixels of each screen, never scaled; two windows on two screens each have
 theirs. The global `retina_factor`, which the renderers (their zoom), the
 pictures (their cache) and the editor read, is set to the factor of a
-canvas while it is painted (`repaint_invalid_regions`); otherwise it is the
-default: the largest scale of the screens, for the canvases in no window,
-the images of the widgets (`impress`), Scheme (`get-retina-factor`) and
-headless runs. It was taken once from `[NSScreen mainScreen]`, the screen of
+canvas while it is painted, with the shared renderer `the_ns_renderer`
+reset to it (`ns_canvas_scope`, in `repaint_invalid_regions` and, at the
+default, `impress`); the rectangles which the editor invalidates are turned
+into the pixels of the store from the factor of the canvas alone
+(`ns_store_pixels`), not from the state of the shared renderer. Otherwise
+the global is the default: the largest scale of the screens (of those
+attached at the start; the windowless canvases and `impress` take those
+attached now), for the canvases in no window, the images of the widgets,
+Scheme (`get-retina-factor`) and headless runs. It was taken once from `[NSScreen mainScreen]`, the screen of
 the window with the keyboard focus, so that TeXmacs started from a terminal
 on a screen of 1x drew all its canvases at 1x, scaled up and blurred on the
 Retina screen; a store of 2x shown on a screen of 1x, the other way, is
