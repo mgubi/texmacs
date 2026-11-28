@@ -31,7 +31,6 @@
 #include "iterator.hpp"
 #include "scheme.hpp"
 #include "converter.hpp"
-#include "tree_traverse.hpp"
 
 class pdf_tagger_rep: public tagger_rep {
   tree   body;     // the body of the document
@@ -45,6 +44,8 @@ class pdf_tagger_rep: public tagger_rep {
   array<int> open_ranks;             // the ranks of the headings above
   int    appendix_rank;              // that of an appendix: chapter or section
   hashmap<string,hashset<int> > covered;  // the cells a span covers, by table
+  array<path> no_alt;   // the pictures drawn with no alternative text of
+                        // the user's, in the order met (pdf-tag-check)
 
 public:
   pdf_tagger_rep (tree body, path rp, string lang, string title);
@@ -52,6 +53,7 @@ public:
   array<tag_node> row_cells (path pos);
   string language () { return lang; }
   string title () { return ttl; }
+  array<path> pictures_without_alt () { return no_alt; }
 
 private:
   bool   child (tree t, int i, tree& c);
@@ -128,6 +130,8 @@ pdf_tagger_rep::alt_of (string key, tree t, string role, array<tree> above,
           return r;
         }
     }
+    // (once per picture: the alternative text is kept, alts)
+    if (is_compound (t, "image")) no_alt << cur;
     for (int k= N(above) - 1; k >= 0; k--) {
       tree f= above[k];
       if (!is_compound (f) || N(f) < 2) continue;
@@ -469,72 +473,4 @@ pdf_tagger_rep::row_cells (path pos) {
 tagger_rep*
 make_pdf_tagger (tree body, path rp, string lang, string title) {
   return tm_new<pdf_tagger_rep> (body, rp, lang, title);
-}
-
-/******************************************************************************
-* The pictures without an alternative text (pdf-tag-check, tm-print.scm)
-******************************************************************************/
-
-// Whether the child i of t is typeset when the document is printed, as far
-// as its source says: what the cursor may enter (the DRD: not the body of
-// a folded or a hidden part, ignore, the definitions of macros), with the
-// exceptions of print: the content of specific for the printer or for
-// TeXmacs, the branch of an if which is not literally false, and the
-// hidden slides of screens (an exported presentation shows them all)
-static bool
-typeset_child (tree t, int i, bool in_screens) {
-  if (is_compound (t, "specific", 2)) {
-    if (i != 1 || !is_atomic (t[0])) return false;
-    string w= t[0]->label;
-    if (ends (w, "*")) w= w (0, N(w) - 1);
-    return w == "texmacs" || w == "image" || w == "printer" ||
-           w == "even" || w == "odd";
-  }
-  if ((is_compound (t, "if") || is_compound (t, "if*")) && N(t) >= 2) {
-    if (i == 0) return false;
-    if (t[0] == "false") return i != 1;
-    if (t[0] == "true") return i == 1;
-    return true;
-  }
-  if (in_screens && is_compound (t, "hidden")) return true;
-  return is_accessible_child (t, i);
-}
-
-// The images of t (at cur in the body) which the tagger makes Figures of
-// their own without an alternative text of the user's: those which a
-// tagged PDF describes by a caption or a file name. Each is resolved as
-// the export resolves what it draws, so that the check and the export
-// agree (an image in a formula or a drawing is not a Figure of its own).
-// What is not typeset (typeset_child), inactive markup, raw data and the
-// includes (checked in their own files) are not looked into.
-static void
-pictures_without_alt (pdf_tagger_rep& tg, tree t, path cur, bool in_screens,
-                      array<path>& r) {
-  if (is_atomic (t)) return;
-  if (is_compound (t, "inactive") || is_compound (t, "inactive*") ||
-      is_compound (t, "var-inactive") || is_compound (t, "raw-data") ||
-      is_compound (t, "include"))
-    return;
-  if (is_compound (t, "image")) {
-    path pos;
-    array<tag_node> a= tg.resolve (reverse (cur), pos);
-    if (N(a) > 0) {
-      tag_node nd= a[N(a)-1];
-      if (nd.role == "Figure" && nd.picture && !nd.own_alt && nd.pos == cur)
-        r << cur;
-    }
-    return;
-  }
-  bool scr= in_screens || is_compound (t, "screens");
-  for (int i=0; i<N(t); i++)
-    if (typeset_child (t, i, scr))
-      pictures_without_alt (tg, t[i], cur * i, scr, r);
-}
-
-array<path>
-pdf_tag_pictures_without_alt (tree body) {
-  pdf_tagger_rep tg (body, path (), "", "");
-  array<path> r;
-  pictures_without_alt (tg, body, path (), false, r);
-  return r;
 }

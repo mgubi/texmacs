@@ -523,11 +523,27 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(pdf-tag-pictures-without-alt <scm-arg|tree>)>
+    <scm|(pdf-tag-printed?)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|pdf_tag_pictures_without_alt> which
-    returns <scm|array_path>.
+    Calls the <c++> function <cpp|pdf_tag_printed> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-tag-printed-places)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_tag_printed_places> which returns
+    <scm|array_path>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-tag-printed-images)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_tag_printed_images> which returns
+    <scm|array_tree>.
   </explain>
 
   <\explain>

@@ -22,15 +22,15 @@ have the details, and the problems go to the
   tagged but warns of nothing (the notes on the fonts of pictures are
   debugging output now). *Tools → Accessibility → Check for a tagged PDF*
   says what the document lacks for an accessible PDF: the pictures without
-  an alternative text (found by the tagger of the export, among what is
-  printed: not in folded or hidden parts, `ignore`, content for the screen
-  or macro definitions; a condition which is computed counts both
-  branches), those of the included files, a missing title and a language
-  which a PDF cannot name, or that nothing is missing; *Next picture
-  without alternative text* goes to each of them in turn, for *Focus →
-  Alternative text...*, which now also works on the picture in focus when
-  the cursor is next to it. A drawing is not reported (it cannot be given
-  an alternative text).
+  an alternative text, exactly those which the tagged PDF describes by a
+  caption or a file name (the check prints the document as the export
+  does, to a file of its own), those of the included files and those drawn
+  by macros or in the slides made of a presentation, a missing title and
+  a language which a PDF cannot name, or that nothing is missing; *Next
+  picture without alternative text* goes to each of them in turn, for
+  *Focus → Alternative text...*, which now also works on the picture in
+  focus when the cursor is next to it. A drawing is not reported (it
+  cannot be given an alternative text).
 - **Builds with femtolisp** (`--with-scheme=femtolisp`) work again: since
   the Chez backend (21 November) the compiler flags of the vendored
   femtolisp were set only in Chez builds, and `fl_core.c` did not find

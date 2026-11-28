@@ -283,6 +283,19 @@ edit_main_rep::nr_pages () {
 
 tagger_rep* make_pdf_tagger (tree body, path rp, string lang, string title);
 
+// what the last tagged PDF drew (pdf-tag-check, tm-print.scm, prints the
+// document as Export does, to a file of its own, and reads them): the
+// pictures without an alternative text of the user's, their places in the
+// body printed (the body with its includes expanded, or the copy of a
+// presentation with its slides made) and the pictures themselves
+static bool        tag_printed= false;
+static array<path> tag_places;
+static array<tree> tag_images;
+
+bool pdf_tag_printed () { return tag_printed; }
+array<path> pdf_tag_printed_places () { return tag_places; }
+array<tree> pdf_tag_printed_images () { return tag_images; }
+
 // The tables the typesetting writes (the references, the auxiliary data,
 // the attributes of the buffer or its project), put back as they were
 // after a tagged PDF: what the expanded body gives (labels without the
@@ -584,6 +597,9 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   
   // a tagged PDF (PDF/UA, docs/pdf-tagging.md): the structure of the body
   tagger_rep* tagger= NULL;
+  tag_printed= false;
+  tag_places = array<path> ();
+  tag_images = array<tree> ();
   if (ok && want_tags && ren->supports_tagging ()) {
     string lan= as_string (call ("pdf-tag-language",
                                  object (env->get_string (LANGUAGE))));
@@ -612,7 +628,15 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   if (tagger != NULL) {
     // (no warning of the pictures without an alternative text: the export
     // says nothing of what the document lacks for accessibility, which
-    // Tools > Accessibility > Check for a tagged PDF reports, pdf-tag-check)
+    // Tools > Accessibility > Check for a tagged PDF reports, pdf-tag-check,
+    // from what is kept here)
+    tag_printed= true;
+    array<path> a= tagger->pictures_without_alt ();
+    for (int i=0; i<N(a); i++)
+      if (has_subtree (body, a[i])) {
+        tag_places << a[i];
+        tag_images << copy (subtree (body, a[i]));
+      }
     tm_delete (tagger);
   }
   delete_typesetter (ttt);

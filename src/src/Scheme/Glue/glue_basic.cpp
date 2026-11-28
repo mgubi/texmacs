@@ -673,16 +673,30 @@ tmg_mupdf_writes_pdfP () {
 }
 
 tmscm
-tmg_pdf_tag_pictures_without_alt (tmscm arg1) {
-  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "pdf-tag-pictures-without-alt");
-
-  tree in1= tmscm_to_tree (arg1);
-
+tmg_pdf_tag_printedP () {
   // TMSCM_DEFER_INTS;
-  array_path out= pdf_tag_pictures_without_alt (in1);
+  bool out= pdf_tag_printed ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_pdf_tag_printed_places () {
+  // TMSCM_DEFER_INTS;
+  array_path out= pdf_tag_printed_places ();
   // TMSCM_ALLOW_INTS;
 
   return array_path_to_tmscm (out);
+}
+
+tmscm
+tmg_pdf_tag_printed_images () {
+  // TMSCM_DEFER_INTS;
+  array_tree out= pdf_tag_printed_images ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_tree_to_tmscm (out);
 }
 
 tmscm
@@ -13287,7 +13301,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("cpp-error",  tmg_cpp_error, 0, 0, 0);
   tmscm_install_procedure ("supports-native-pdf?",  tmg_supports_native_pdfP, 0, 0, 0);
   tmscm_install_procedure ("mupdf-writes-pdf?",  tmg_mupdf_writes_pdfP, 0, 0, 0);
-  tmscm_install_procedure ("pdf-tag-pictures-without-alt",  tmg_pdf_tag_pictures_without_alt, 1, 0, 0);
+  tmscm_install_procedure ("pdf-tag-printed?",  tmg_pdf_tag_printedP, 0, 0, 0);
+  tmscm_install_procedure ("pdf-tag-printed-places",  tmg_pdf_tag_printed_places, 0, 0, 0);
+  tmscm_install_procedure ("pdf-tag-printed-images",  tmg_pdf_tag_printed_images, 0, 0, 0);
   tmscm_install_procedure ("supports-ghostscript?",  tmg_supports_ghostscriptP, 0, 0, 0);
   tmscm_install_procedure ("gs-executable",  tmg_gs_executable, 0, 0, 0);
   tmscm_install_procedure ("rescue-mode?",  tmg_rescue_modeP, 0, 0, 0);

@@ -311,57 +311,66 @@ a font could not be embedded) are warnings as before.
 `tm-print.scm`) says what is missing, in a dialog, and puts the cursor on
 the first picture without an alternative text; *Next picture without
 alternative text* (`pdf-tag-next-picture`) goes to the next one, then to
-the first again. The next one is the one after the picture in focus (the
-one it went to: the editor moves a cursor put before an image in a line
-to the end of the text before it, and one put in a specific out of it),
-else the first one at or after the cursor. The image in focus is also the
-one which *Focus → Alternative text...* sets when the cursor is not in an
-image (`current-image`, `embedded-edit.scm`). What the check finds is
-`(pdf-tag-check)`, an association list, for scripts and the tests:
+the first again.
 
-* `pictures`: the places of the images which the tagged PDF describes by
-  a caption or a file name. They are found by the tagger itself
-  (`pdf_tag_pictures_without_alt`, `edit_tagger.cpp`, the glue
-  `pdf-tag-pictures-without-alt` of a body): each `image` is resolved as
-  the export resolves what it draws, and is counted when it is a Figure of
-  its own (`picture`) without an alternative text of the user's
-  (`own_alt`), so that an image in a formula, which is no Figure, is not;
-  the rules of `image-alt` are those of `alt_of`, in one place.
-  The export resolves only what it draws, the check walks the source:
-  it looks only into what is typeset when the document is printed, as the
-  source says it (`typeset_child`): the children which the cursor may
-  enter (the DRD: not the body of a folded part, of `ignore`, of a hidden
-  branch, nor the definitions of macros, `assign`, `macro`, `xmacro`), the
-  content of `specific` for the printer, TeXmacs or an image (not the
-  screen), both branches of an `if` but the one its literal `true` or
-  `false` excludes, the hidden slides of `screens` (an exported
-  presentation has them all); not inactive markup and raw data, as
-  `expand_includes`. It is approximate where the source does not say what
-  is drawn: an `if` or a `case` of a computed condition (both branches
-  counted), the arguments of a macro of a style or of the user which the
-  DRD says to be hidden or shown otherwise than the macro draws them.
-  `convert-more` checks that on a document of these cases the pictures
-  reported are those of which the export makes Figures.
-* `included`: the included files (and theirs) which have such pictures,
-  with how many: they are checked in their own file, where the cursor can
-  go to them.
+**Exact by construction.** The check prints the document as *Export as
+PDF* does (`wrapped-print-to-file`, which makes the slides of a
+presentation in a copy), tagged whatever the preference, to a file of its
+own which it removes (`pdf-tag-render`). The tagger notes each picture it
+meets without an alternative text of the user's (`no_alt`, in `alt_of`:
+once per picture, when it is drawn), and `print_doc` keeps their places in
+the body it printed and the pictures themselves (`pdf-tag-printed?`,
+`pdf-tag-printed-places`, `pdf-tag-printed-images`). So the pictures
+reported are those which the PDF describes by a caption or a file name,
+whatever decides what is printed (folds, conditions, notes in the margin,
+styles, macros), with no rules of its own. A picture which is itself a
+tagged PDF is reported too: its structure describes it, but not as the
+author would. It costs an export (half a second for a document of 3000
+pictures, on a recent Mac); the buffer is left as it was (the expanded
+body is swapped back, the copy of a presentation closed).
+
+`(pdf-tag-check)` gives an association list, for scripts and the tests:
+
+* `tagged`: whether a tagged PDF could be made (a native PDF writer).
+* `drawn`: how many pictures the PDF describes by a caption or a file name.
+* `pictures`: the places of those in the body, in their order. A place of
+  the printed body is the same in the buffer, except through an include,
+  which the printed body expands: the picture there, when it is the same
+  image, is the one. For a presentation, whose slides were made in a copy,
+  it is the first equal image of the body not taken yet.
+* `included`: the `(file . n)` of those drawn from included files (their
+  place is in the file, where the check finds them).
+* `elsewhere`: how many have no place of their own: drawn by a macro, or
+  the copies of a picture in the slides which a fold of a presentation
+  makes.
 * `title`: whether the document has a title of its own (`get-metadata`
   gives the name of the file otherwise, which becomes the title of the
   PDF).
 * `language`: the language of the document when `language_to_locale`
   does not know it (the PDF then says `en-US`), else `#f`.
 
+*Next picture* steps through the pictures of the last check of the buffer,
+kept as trees, which follow the edits: those still in the buffer and still
+without an alternative text (an `image-alt` around them), checking again
+when there is none. The next one is the one after the picture in focus
+(the one it went to: the editor moves a cursor put before an image in a
+line to the end of the text before it, and one put in a specific out of
+it), else the first one at or after the cursor. The image in focus is
+also the one which *Focus → Alternative text...* sets when the cursor is
+not in an image (`current-image`, `embedded-edit.scm`).
+
 A drawing (`graphics`) is a Figure of Alt "Image": it is not reported,
 and *Alternative text...* cannot give it one (the Focus menu has it for
 images only). The tables have no header rows to check (TeXmacs has no
 markup for them, see *Left*), and what only the writer finds (the fonts
-of the pictures) is for veraPDF. `convert-more` checks the report of a
-small document (two pictures without alternative text, one with, one in a
-formula, one in an included file), the pictures of a document of hidden
-and conditional parts against the Figures of its export, the steps through
-pictures in lines of text with the editor typesetting between them, the
-alternative text set from the focus, and that a tagged export adds no
-message to the window of the errors.
+of the pictures) is for veraPDF. `convert-more` checks, on documents of
+folded, hidden, conditional and specific parts, notes in the margin,
+macro definitions, includes and a presentation with a fold, that the
+pictures reported are those which the tagged export describes as "Image
+f.png", that the buffer is not modified, the steps through pictures in
+lines of text with the editor typesetting between them, the alternative
+text set from the focus, and that a tagged export adds no message to the
+window of the errors.
 
 ## Checking it
 

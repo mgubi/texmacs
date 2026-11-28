@@ -463,57 +463,117 @@
 ;; warns of nothing (docs/pdf-tagging.md).
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (pdf-tag-includes t)
-  ;; the files of the includes of @t, in their order, outside the markup
-  ;; which a tagged PDF does not expand (edit_main.cpp, expand_includes)
-  (cond ((tree-atomic? t) '())
-        ((tree-in? t '(inactive inactive* var-inactive raw-data)) '())
-        ((and (tree-is? t 'include) (tree-atomic? (tree-ref t 0)))
-         (list (tree->string (tree-ref t 0))))
-        (else (append-map pdf-tag-includes (tree-children t)))))
+;; The check prints the document as Export as PDF does (wrapped-print-to-file,
+;; which makes the slides of a presentation), tagged, to a file of its own,
+;; and reads the pictures which the tagger met without an alternative text
+;; of the user's (pdf-tag-printed-places, print_doc): exactly those which
+;; the PDF describes by a caption or a file name.
 
-(define (pdf-tag-included-pictures base t seen)
-  ;; the (file . count) of the included files of @t (relative to @base),
-  ;; and of theirs, which have pictures without an alternative text
-  (append-map
-   (lambda (f)
-     (let ((u (url-relative base f)))
-       (if (or (in? (url->string u) seen) (not (url-exists? u))) '()
-           (let* ((d (catch #t (lambda () (tree-import u "texmacs"))
-                       (lambda args #f)))
-                  (b (and d (tmfile-get d 'body))))
-             (if (not (tree? b)) '()
-                 (let ((n (length (pdf-tag-pictures-without-alt b)))
-                       (more (pdf-tag-included-pictures
-                              u b (cons (url->string u) seen))))
-                   (if (> n 0) (cons (cons f n) more) more)))))))
-   (pdf-tag-includes t)))
+(define (pdf-tag-render)
+  ;; #t when a tagged PDF of the document was made
+  (let ((pdf (url-append (url-temp-dir) "pdf-tag-check.pdf"))
+        (env (getenv "TEXMACS_PDF_TAGGED")))
+    (system-setenv "TEXMACS_PDF_TAGGED" "1")
+    (catch #t (lambda () (wrapped-print-to-file pdf)) (lambda args #f))
+    (system-setenv "TEXMACS_PDF_TAGGED" (or env ""))
+    (when (url-exists? pdf) (system-remove pdf))
+    (pdf-tag-printed?)))
+
+(define (pdf-tag-tree-at t p)
+  ;; the subtree of @t at @p, or #f
+  (cond ((null? p) t)
+        ((and (tree-compound? t) (< (car p) (tree-arity t)))
+         (pdf-tag-tree-at (tree-ref t (car p)) (cdr p)))
+        (else #f)))
+
+(define (pdf-tag-include-at t p)
+  ;; the file of the include on the way to @p in @t, or #f
+  (cond ((tree-is? t 'include)
+         (and (tree-atomic? (tree-ref t 0)) (tree->string (tree-ref t 0))))
+        ((or (null? p) (not (tree-compound? t)) (>= (car p) (tree-arity t)))
+         #f)
+        (else (pdf-tag-include-at (tree-ref t (car p)) (cdr p)))))
+
+(define (pdf-tag-images t)
+  ;; the images of @t, in their order
+  (cond ((tree-atomic? t) '())
+        ((tree-is? t 'image) (list t))
+        (else (append-map pdf-tag-images (tree-children t)))))
+
+(define (pdf-tag-locate places images slides?)
+  ;; the images of the buffer which were printed as @images at @places of
+  ;; the body printed, or #f for each which has none: the image at the same
+  ;; place (the printed body differs from the body only by the expanded
+  ;; includes); for a presentation, whose slides were made in a copy, the
+  ;; first equal image of the body not taken yet
+  (let* ((body (buffer-tree))
+         (all (if slides? (pdf-tag-images body) '()))
+         (taken '()))
+    (map (lambda (p img)
+           (let ((same? (lambda (t) (== (tree->stree t) (tree->stree img)))))
+             (if slides?
+                 (with t (list-find all (lambda (t) (and (nin? t taken)
+                                                         (same? t))))
+                   (when t (set! taken (cons t taken)))
+                   t)
+                 (with t (pdf-tag-tree-at body p)
+                   (and t (tree-is? t 'image) (same? t) t)))))
+         places images)))
+
+(define (pdf-tag-count l)
+  ;; the (x . n) of the elements x of @l, in their order
+  (let loop ((l l) (r '()))
+    (cond ((null? l) (reverse r))
+          ((assoc (car l) r)
+           (loop (cdr l) (map (lambda (x) (if (== (car x) (car l))
+                                              (cons (car x) (+ (cdr x) 1)) x))
+                              r)))
+          (else (loop (cdr l) (cons (cons (car l) 1) r))))))
 
 (define (pdf-tag-known-language? lan)
   ;; (pdf-tag-language gives en-US for a language it does not know)
   (or (in? lan '("english" "american"))
       (!= (language-to-locale lan) "en_US")))
 
+(define pdf-tag-found '())   ; the buffer and its pictures, of the last check
+
 (tm-define (pdf-tag-check)
   (:synopsis "What the current document lacks for an accessible tagged PDF")
-  ;; an association list: the places of the pictures which a tagged PDF
-  ;; describes by a caption or a file name (as the export does, through
-  ;; the tagger: pdf-tag-pictures-without-alt), the included files which
-  ;; have such pictures and how many, whether the document has a title
-  ;; of its own (else the PDF has the name of the file), and the language
-  ;; of the document when a PDF cannot say it (else #f)
-  (let* ((body (buffer-tree))
+  ;; an association list:
+  ;;   tagged: whether a tagged PDF could be made (a native PDF writer);
+  ;;   drawn: how many pictures it describes by a caption or a file name;
+  ;;   pictures: the places of those in the body, in their order;
+  ;;   included: the (file . n) of those drawn from included files;
+  ;;   elsewhere: how many have no place of their own (drawn by a macro,
+  ;;     or a copy of a picture in the slides made of a presentation);
+  ;;   title: whether the document has a title of its own (else the PDF
+  ;;     has the name of the file);
+  ;;   language: its language when a PDF cannot say it, else #f
+  (let* ((buf (current-buffer))
+         (body (buffer-tree))
          (rp (tree->path body))
-         (pics (map (lambda (p) (append rp p))
-                    (pdf-tag-pictures-without-alt body)))
-         (buf (current-buffer))
-         (incl (pdf-tag-included-pictures buf body (list (url->string buf))))
+         (slides? (screens-buffer?))
+         (tagged? (pdf-tag-render))
+         (places (if tagged? (pdf-tag-printed-places) '()))
+         (images (if tagged? (pdf-tag-printed-images) '()))
+         (found (pdf-tag-locate places images slides?))
+         (trees (list-filter found identity))
+         (paths (sort (map tree->path trees) path-inf?))
+         (files (if slides? '()
+                    (list-filter
+                     (map (lambda (p t) (and (not t) (pdf-tag-include-at body p)))
+                          places found)
+                     identity)))
          (ttl (get-metadata "title"))
          (own-title? (and (!= ttl "")
                           (!= ttl (utf8->cork (url->string (url-tail buf))))))
          (lan (get-init "language")))
-    (list (cons 'pictures pics)
-          (cons 'included incl)
+    (set! pdf-tag-found (list buf trees))
+    (list (cons 'tagged tagged?)
+          (cons 'drawn (length places))
+          (cons 'pictures paths)
+          (cons 'included (pdf-tag-count files))
+          (cons 'elsewhere (- (length places) (length trees) (length files)))
           (cons 'title own-title?)
           (cons 'language (and (not (pdf-tag-known-language? lan)) lan)))))
 
@@ -521,10 +581,15 @@
   (:synopsis "The lines which say what the check @r of pdf-tag-check found")
   (let* ((pics (length (assoc-ref r 'pictures)))
          (incl (assoc-ref r 'included))
+         (else-n (assoc-ref r 'elsewhere))
          (lan (assoc-ref r 'language))
          (plural (lambda (n one many)
-                   (string-append (number->string n) " " (if (== n 1) one many))))
+                   (string-append (number->string n) " "
+                                  (if (== n 1) one many))))
          (l (append
+             (if (assoc-ref r 'tagged) '()
+                 (list "No tagged PDF can be made here (a native PDF writer"
+                       "  is needed): the pictures were not checked"))
              (if (> pics 0)
                  (list (string-append
                         (plural pics "picture has" "pictures have")
@@ -539,6 +604,13 @@
                                    (plural (cdr x) "picture" "pictures")
                                    " without alternative text"))
                   incl)
+             (if (> else-n 0)
+                 (list (string-append
+                        (plural else-n "picture" "pictures")
+                        " without alternative text drawn by macros or"
+                        " in the slides made")
+                       "  of the presentation, with no place of their own")
+                 '())
              (if (assoc-ref r 'title) '()
                  (list (string-append "No title (Document > Metadata > Title,"
                                       " or a title in the document):")
@@ -550,7 +622,32 @@
     (if (null? l) (list "Nothing is missing for an accessible tagged PDF")
         l)))
 
-(define pdf-tag-last-picture #f)   ; where pdf-tag-go-to went last
+(define (pdf-tag-own-alt? t)
+  ;; whether an image-alt of the user's is around the image @t now
+  (let loop ((u (tree-up t)))
+    (and u
+         (or (and (tree-is? u 'with)
+                  (let scan ((i 0))
+                    (and (< (+ i 1) (tree-arity u))
+                         (or (and (== (tree->string (tree-ref u i)) "image-alt")
+                                  (tree-atomic? (tree-ref u (+ i 1)))
+                                  (!= (tree->string (tree-ref u (+ i 1))) ""))
+                             (scan (+ i 2))))))
+             (loop (tree-up u))))))
+
+(define (pdf-tag-pictures)
+  ;; the places of the pictures of the last check of the current buffer
+  ;; which are still in it and still have no alternative text (the trees
+  ;; follow the edits), checking it again when there is none
+  (when (or (null? pdf-tag-found) (!= (car pdf-tag-found) (current-buffer)))
+    (pdf-tag-check))
+  (let* ((trees (cadr pdf-tag-found))
+         (ok (list-filter trees (lambda (t) (and (tree->path t)
+                                                 (tree-is? t 'image)
+                                                 (not (pdf-tag-own-alt? t)))))))
+    (sort (map tree->path ok) path-inf?)))
+
+(define pdf-tag-last-picture #f)   ; the picture pdf-tag-go-to went to
 
 (define (pdf-tag-go-to p)
   ;; the cursor before the picture at @p (shown if it is in hidden markup,
@@ -558,8 +655,8 @@
   (go-to (rcons p 0))
   (cursor-show-if-hidden)
   (with t (path->tree p)
-    (when (tree? t) (tree-focus t)))
-  (set! pdf-tag-last-picture p))
+    (when (tree? t) (tree-focus t))
+    (set! pdf-tag-last-picture t)))
 
 (define (pdf-tag-at-picture? cur p)
   ;; whether the cursor @cur is at the picture at @p: in it, or where the
@@ -581,13 +678,15 @@
 
 (tm-define (pdf-tag-next-picture)
   (:synopsis "Go to the next picture without an alternative text")
-  ;; the one after the picture in focus or which the cursor is at (the
-  ;; last one gone to: the editor may move the cursor out of it, before an
-  ;; image in a line or a specific), else the first one at or after the
-  ;; cursor, else the first one; #f when there is none
-  (let* ((l (assoc-ref (pdf-tag-check) 'pictures))
+  ;; among those of the last check (pdf-tag-pictures): the one after the
+  ;; picture in focus or which the cursor is at (the last one gone to: the
+  ;; editor may move the cursor out of it, before an image in a line or a
+  ;; specific), else the first one at or after the cursor, else the first
+  ;; one; #f when there is none
+  (let* ((l (pdf-tag-pictures))
          (cur (cursor-path))
-         (last pdf-tag-last-picture)
+         (lt pdf-tag-last-picture)
+         (last (and lt (tree->path lt)))
          (ft (focus-tree))
          (fp (and (tree? ft) (tree->path ft)))
          (here (or (and fp (member fp l))

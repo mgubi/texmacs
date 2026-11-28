@@ -71,11 +71,17 @@ public:
   virtual array<tag_node> row_cells (path pos) = 0;
   virtual string language () = 0;   // of the document, as en or de-CH
   virtual string title () = 0;
+  // the places of the pictures drawn without an alternative text of the
+  // user's, in the body (they are described by a caption or a file name)
+  virtual array<path> pictures_without_alt () { return array<path> (); }
 };
 
-// the places in body of the pictures which a tagged PDF of it describes by
-// no alternative text of the user's (edit_tagger.cpp, pdf-tag-check)
-array<path> pdf_tag_pictures_without_alt (tree body);
+// What the last tagged PDF drew (print_doc, for pdf-tag-check): whether a
+// tagged PDF was made, the places of its pictures without an alternative
+// text of the user's in the body which it printed, and those pictures
+bool        pdf_tag_printed ();
+array<path> pdf_tag_printed_places ();
+array<tree> pdf_tag_printed_images ();
 
 class renderer_rep {
 public:

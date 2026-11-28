@@ -46,7 +46,7 @@
 * shim also records the routine name (current_glue_proc) for the messages of
 * chez_tm.hpp.
 *
-* 1407 routines.
+* 1409 routines.
 ******************************************************************************/
 
 #include "chez_tm.hpp"
@@ -238,7 +238,9 @@ extern tmscm tmg_win32_display (tmscm);
 extern tmscm tmg_cpp_error ();
 extern tmscm tmg_supports_native_pdfP ();
 extern tmscm tmg_mupdf_writes_pdfP ();
-extern tmscm tmg_pdf_tag_pictures_without_alt (tmscm);
+extern tmscm tmg_pdf_tag_printedP ();
+extern tmscm tmg_pdf_tag_printed_places ();
+extern tmscm tmg_pdf_tag_printed_images ();
 extern tmscm tmg_supports_ghostscriptP ();
 extern tmscm tmg_gs_executable ();
 extern tmscm tmg_rescue_modeP ();
@@ -1751,7 +1753,9 @@ TMG_GUARDED_1 ("win32-display", tmg_win32_display)
 TMG_GUARDED_0 ("cpp-error", tmg_cpp_error)
 TMG_GUARDED_0 ("supports-native-pdf?", tmg_supports_native_pdfP)
 TMG_GUARDED_0 ("mupdf-writes-pdf?", tmg_mupdf_writes_pdfP)
-TMG_GUARDED_1 ("pdf-tag-pictures-without-alt", tmg_pdf_tag_pictures_without_alt)
+TMG_GUARDED_0 ("pdf-tag-printed?", tmg_pdf_tag_printedP)
+TMG_GUARDED_0 ("pdf-tag-printed-places", tmg_pdf_tag_printed_places)
+TMG_GUARDED_0 ("pdf-tag-printed-images", tmg_pdf_tag_printed_images)
 TMG_GUARDED_0 ("supports-ghostscript?", tmg_supports_ghostscriptP)
 TMG_GUARDED_0 ("gs-executable", tmg_gs_executable)
 TMG_GUARDED_0 ("rescue-mode?", tmg_rescue_modeP)
@@ -3277,7 +3281,9 @@ static const tmg_entry tmg_entries[]= {
   { "cpp-error", 0, (void*) tmgc_tmg_cpp_error },
   { "supports-native-pdf?", 0, (void*) tmgc_tmg_supports_native_pdfP },
   { "mupdf-writes-pdf?", 0, (void*) tmgc_tmg_mupdf_writes_pdfP },
-  { "pdf-tag-pictures-without-alt", 1, (void*) tmgc_tmg_pdf_tag_pictures_without_alt },
+  { "pdf-tag-printed?", 0, (void*) tmgc_tmg_pdf_tag_printedP },
+  { "pdf-tag-printed-places", 0, (void*) tmgc_tmg_pdf_tag_printed_places },
+  { "pdf-tag-printed-images", 0, (void*) tmgc_tmg_pdf_tag_printed_images },
   { "supports-ghostscript?", 0, (void*) tmgc_tmg_supports_ghostscriptP },
   { "gs-executable", 0, (void*) tmgc_tmg_gs_executable },
   { "rescue-mode?", 0, (void*) tmgc_tmg_rescue_modeP },
