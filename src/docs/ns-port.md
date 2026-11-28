@@ -558,7 +558,8 @@ others, which no longer blocks anything. The snapshots still read the store
 back. A canvas which is deleted releases its surfaces (`gpu_forget_layer`).
 Should three IOSurfaces in a row fail to be made, TeXmacs says so and goes
 back to the drawables (`metal_backend::surface_failed`; the layer of a
-canvas is replaced by a `CAMetalLayer`).
+canvas is replaced by a `CAMetalLayer`; a frame which could not be shown is
+tried again by the display link, a few times).
 
 `TEXMACS_NS_PRESENT=metal` goes back to the drawables: the view hosts a
 `CAMetalLayer`, and a repaint only marks the canvas (`show_gpu_store`): its

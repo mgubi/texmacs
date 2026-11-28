@@ -198,8 +198,7 @@ struct quad_uniforms { float size[2]; float porig[2]; float ptile[2]; int mode; 
 // a surface which a present replaced: in use until the transaction of that
 // present is committed (the completion block of the transaction gives the
 // use count up, and those of the presents before, since the transactions
-// are committed in order); should a block not run, until a later one has
-// run and it is 250 ms old, or until it is 5 s old
+// are committed in order); should no block run, until it is 1 s old
 struct replaced_surface {
   IOSurfaceRef s= NULL;            // retained until released
   double since= 0;                 // ms of CACurrentMediaTime
@@ -207,7 +206,6 @@ struct replaced_surface {
 };
 struct replaced_list {
   std::vector<std::shared_ptr<replaced_surface>> v;
-  double committed= 0;             // since of the last one whose block ran
 };
 
 class metal_backend;
@@ -932,16 +930,15 @@ release_replaced (replaced_surface& p) {
 int
 metal_backend::take_surface (surface_ring& r, int w, int h) {
   if (w <= 0 || h <= 0 || too_large (w, h)) return -1;
-  // the surfaces replaced long ago are no longer in use, if a completion
-  // block did not run (not merely 250 ms ago: the pass of the run loop of
-  // the Cocoa port, whose end commits, may last longer); those released
-  // are forgotten
+  // the surfaces replaced long ago are no longer in use, should no
+  // completion block have run (1 s: longer than a pass of the run loop of
+  // the Cocoa port, whose end commits, normally lasts); those released are
+  // forgotten
   double now= media_ms ();
   std::vector<std::shared_ptr<replaced_surface>>& pv= r.pending->v;
   for (int i= (int) pv.size () - 1; i >= 0; i--) {
     replaced_surface& e= *pv[i];
-    if (!e.done && ((e.since < r.pending->committed && now - e.since > 250) ||
-                    now - e.since > 5000)) {
+    if (!e.done && now - e.since > 1000) {
       if (debug_surfaces ())
         fprintf (stderr, "SURFACE %.3f released late\n", now);
       release_replaced (e);
@@ -987,11 +984,16 @@ metal_backend::take_surface (surface_ring& r, int w, int h) {
   }
   if (pick < 0) {
     // (max_surfaces held by the compositor, which should not happen: one
-    // of them is drawn into anyway, which may show half drawn: the one
-    // replaced last, which no transaction committed yet may have shown)
-    for (int k= (int) pv.size () - 1; k >= 0 && pick < 0; k--)
+    // of them is drawn into anyway, which may show half drawn: in the
+    // Cocoa port the one replaced last, which no transaction committed
+    // yet may have shown; in the Vue port, whose presents commit at once,
+    // the one replaced first, the longest gone from the screen)
+    int nk= (int) pv.size ();
+    for (int j= 0; j < nk && pick < 0; j++) {
+      int k= r.own_transaction ? j : nk - 1 - j;
       for (int i= 0; i < (int) r.s.size (); i++)
         if (i != r.front && r.s[i].s == pv[k]->s) { pick= i; break; }
+    }
     for (int i= 0; i < (int) r.s.size () && pick < 0; i++)
       if (i != r.front) pick= i;
     if (debug_surfaces ())
@@ -1075,7 +1077,6 @@ metal_backend::present_surface () {
     std::shared_ptr<replaced_list> l= r.pending;
     l->v.push_back (p);
     [CATransaction setCompletionBlock: ^{
-      l->committed= max (l->committed, p->since);
       for (auto& e: l->v) if (e->since <= p->since) release_replaced (*e);
     }];
   }

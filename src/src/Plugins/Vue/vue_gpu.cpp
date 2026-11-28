@@ -1901,7 +1901,7 @@ gpu_show_picture (void* layer, picture p, int dw, int dh, bool in_transaction) {
              NULL, dw, dh, 0, 0, dw, dh);
   if (in_transaction) G.B->present_in_transaction ();
   else G.B->present (NULL);
-  return true;
+  return G.B->last_shown ();
 }
 
 bool

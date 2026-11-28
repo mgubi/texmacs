@@ -88,6 +88,7 @@ bool is_gpu_renderer (renderer ren);
 // (premultiplied RGBA, rows from the top: the snapshots, which draw the
 // views)
 bool gpu_layers_enabled ();
+// (false: nothing was shown)
 bool gpu_show_picture (void* metal_layer, picture p, int dw, int dh,
                        bool in_transaction= false);
 bool gpu_read_picture (picture p, unsigned char* rgba);

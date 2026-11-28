@@ -179,6 +179,7 @@ ns_bench_now () {
   ns_simple_widget_rep* wid;
   id link;              // a CADisplayLink (macOS 14), or nil
   NSTimer* timer;       // else
+  int retries;          // presents which showed nothing, in a row
 }
 - (void) wake;
 - (void) stop;
@@ -229,7 +230,11 @@ ns_bench_now () {
   double t= ns_bench_now ();
   bool done= false;
   NS_ENTRY_BEGIN
-    if (wid->present_gpu_store ()) { wid->gpu_dirty= false; [self sleep]; }
+    if (wid->present_gpu_store ()) {
+      retries= 0; wid->gpu_dirty= false; [self sleep]; }
+    else if (++retries >= 4) {
+      // (given up until the next repaint)
+      retries= 0; wid->gpu_dirty= false; [self sleep]; }
     done= true;
   NS_ENTRY_END ("the presentation of a canvas drawn by the GPU")
   if (!done) {
@@ -373,10 +378,11 @@ ns_simple_widget_rep::show_gpu_store () {
     gpu_sync= false;
     if (!sync || gpu_scroll_sync ()) {
       double t= ns_bench_now ();
-      present_gpu_store ();
-      gpu_dirty= false;
+      bool done= present_gpu_store ();
       ns_bench_display += ns_bench_now () - t;
-      return;
+      if (done) { gpu_dirty= false; return; }
+      // (not shown: no surface could be made; tried again at the next
+      // refresh, by drawables once they are used instead)
     }
   }
   // With TEXMACS_NS_PRESENT=metal, the drawables of a CAMetalLayer:
@@ -447,7 +453,10 @@ ns_simple_widget_rep::present_gpu_store (bool in_transaction) {
   // other changes of the views, the move of a scroll) rather than at the
   // next pass of the run loop, which Core Animation may throttle
   if (shown && gpu_presents_at_once ()) [[view window] setViewsNeedDisplay: YES];
-  return true;
+  // (not shown, by IOSurfaces: tried again by the presenter, a few times,
+  // which after three failures presents by drawables, see
+  // metal_backend::surface_failed)
+  return shown || !gpu_presents_at_once ();
 }
 
 NSRect
