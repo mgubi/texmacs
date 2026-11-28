@@ -1,5 +1,4 @@
 #include "guile_cpp/vm.hpp"
-#include <unordered_map>
 
 namespace guile {
 
@@ -247,7 +246,7 @@ void VM::init_options() {
         return r;
     });
     define_proc("gc-live-object-stats", 0, 0, false, [this](const SCM*, size_t) -> SCM {
-        std::unordered_map<std::string, size_t> counts;
+        hashmap<string, int> counts(0);
         for (Obj* cur = heap_.all_objects(); cur; cur = cur->gc_next) {
             const char* nm = "object";
             switch (cur->tag) {
@@ -264,15 +263,17 @@ void VM::init_options() {
             case ObjTag::EvalClosure: nm = "eval-closure"; break;
             default: nm = "other"; break;
             }
-            counts[nm]++;
+            counts(nm)++;
         }
-        if (heap_.pair_live() > 0) counts["pair"] += heap_.pair_live();
-        if (heap_.closure_live() > 0) counts["closure"] += heap_.closure_live();
-        if (heap_.var_live() > 0) counts["variable"] += heap_.var_live();
-        if (heap_.eval_closure_live() > 0) counts["eval-closure"] += heap_.eval_closure_live();
+        if (heap_.pair_live() > 0) counts("pair") += static_cast<int>(heap_.pair_live());
+        if (heap_.closure_live() > 0) counts("closure") += static_cast<int>(heap_.closure_live());
+        if (heap_.var_live() > 0) counts("variable") += static_cast<int>(heap_.var_live());
+        if (heap_.eval_closure_live() > 0) counts("eval-closure") += static_cast<int>(heap_.eval_closure_live());
         SCM r = SCM_EOL;
-        for (auto& [k, v] : counts) {
-            r = cons(cons(make_string(k), make_uinteger(v)), r);
+        iterator<string> it = iterate(counts);
+        while (it->busy()) {
+            string k = it->next();
+            r = cons(cons(make_string(std::string_view(&k[0], N(k))), make_uinteger(counts[k])), r);
         }
         return r;
     });

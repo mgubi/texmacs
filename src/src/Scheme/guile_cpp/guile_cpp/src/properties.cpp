@@ -14,9 +14,9 @@ SCM VM::source_properties(SCM obj) {
     if (!is_pair(obj)) return SCM_EOL;
     SCM h = hash_get_handle(src_props_table, obj, 1);
     if (is_pair(h)) return cdr(h);
-    auto it = src_pos_map.find(obj.to_obj());
-    if (it != src_pos_map.end()) {
-        const auto& e = it->second;
+    SrcPosEntry* found = src_pos_map->find(obj);
+    if (found != nullptr) {
+        const SrcPosEntry& e = *found;
         return list3(
             cons(sym_filename, e.filename),
             cons(sym_line, make_integer(e.line)),
@@ -27,13 +27,13 @@ SCM VM::source_properties(SCM obj) {
 
 void VM::set_source_properties(SCM obj, SCM props) {
     if (!is_pair(obj)) return;
-    src_pos_map.erase(obj.to_obj());
+    src_pos_map->reset(obj);
     hash_set(src_props_table, obj, props, 1);
 }
 
 void VM::set_source_position(SCM pair_obj, SCM filename, int32_t line, int32_t col) {
     if (!is_pair(pair_obj)) return;
-    src_pos_map[pair_obj.to_obj()] = {filename, line, col};
+    src_pos_map(pair_obj) = {filename, line, col};
 }
 
 SCM VM::source_property(SCM obj, SCM key) {
@@ -43,11 +43,11 @@ SCM VM::source_property(SCM obj, SCM key) {
         SCM pair = scm_assq(key, cdr(h));
         return is_pair(pair) ? cdr(pair) : SCM_BOOL_F;
     }
-    auto it = src_pos_map.find(obj.to_obj());
-    if (it != src_pos_map.end()) {
-        if (key == sym_line) return make_integer(it->second.line);
-        if (key == sym_column) return make_integer(it->second.col);
-        if (key == sym_filename) return it->second.filename;
+    SrcPosEntry* found = src_pos_map->find(obj);
+    if (found != nullptr) {
+        if (key == sym_line) return make_integer(found->line);
+        if (key == sym_column) return make_integer(found->col);
+        if (key == sym_filename) return found->filename;
     }
     return SCM_BOOL_F;
 }

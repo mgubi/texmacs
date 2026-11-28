@@ -1746,11 +1746,13 @@ SCM run_cek(VM& v, CekState& st) {
                     auto* g = as_obj<GuardianObj>(proc);
                     if (g->destroyed) v.misc_error("guardian", "Guardian is destroyed");
                     if (nargs == 0) {
-                        if (g->zombies.empty()) {
+                        int nz = N(g->zombies);
+                        if (nz == 0) {
                             st.val = SCM_BOOL_F;
                         } else {
-                            st.val = g->zombies.front();
-                            g->zombies.pop_front();
+                            st.val = g->zombies[0];
+                            for (int i = 1; i < nz; i++) g->zombies[i - 1] = g->zombies[i];
+                            g->zombies->resize(nz - 1);
                         }
                     } else if (nargs == 1) {
                         if (st.args[0].is_heap()) {

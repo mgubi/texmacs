@@ -7,11 +7,12 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include <deque>
 #include <memory>
+#include "hashmap.hpp"
+#include "hashset.hpp"
+#include "iterator.hpp"
 #include <type_traits>
 #include "basic.hpp"
-#include <unordered_map>
 #include <optional>
 #include <variant>
 #include <regex.h>
@@ -605,7 +606,7 @@ struct HookObj : Obj {
 
 struct GuardianObj : Obj {
     std::vector<SCM> live;
-    std::deque<SCM> zombies;
+    array<SCM> zombies;  // (TeXmacs: a queue, small)
     bool greedy = false;
     bool destroyed = false;
     explicit GuardianObj(bool g = false) noexcept : Obj(ObjTag::Guardian), greedy(g) {}
@@ -875,11 +876,11 @@ struct ContinuationEscape {
 
 } // namespace guile
 
-namespace std {
-template <>
-struct hash<guile::SCM> {
-    size_t operator()(guile::SCM x) const noexcept {
-        return std::hash<uint64_t>{}(x.bits);
-    }
-};
-} // namespace std
+namespace guile {
+// TeXmacs: the hash of the keys of hashmap and hashset (found by ADL)
+inline int hash(SCM x) {
+    uint64_t h = x.bits;
+    h ^= h >> 31; h *= 0x7fb5d329728ea185ULL; h ^= h >> 27;
+    return static_cast<int>(h);
+}
+} // namespace guile

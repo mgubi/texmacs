@@ -1,5 +1,4 @@
 #include "guile_cpp/vm.hpp"
-#include <unordered_set>
 
 namespace guile {
 
@@ -156,7 +155,7 @@ SCM scm_memq(SCM key, SCM lst) {
     return SCM_BOOL_F;
 }
 
-static SCM copy_tree_rec(SCM obj, std::unordered_set<uint64_t>& visiting, int depth) {
+static SCM copy_tree_rec(SCM obj, hashset<SCM>& visiting, int depth) {
     if (depth > 4096) {
         vm().error(vm().make_symbol("stack-overflow"), "copy-tree", "Stack overflow");
     }
@@ -166,15 +165,16 @@ static SCM copy_tree_rec(SCM obj, std::unordered_set<uint64_t>& visiting, int de
         SCM cur = obj;
         SCM slow = obj;
         size_t step = 0;
-        std::vector<uint64_t> spine_visited;
+        array<SCM> spine_visited;
         bool track_set = (depth > 32);
         while (is_pair(cur)) {
             if (track_set) {
-                if (!visiting.insert(cur.bits).second) {
-                    for (uint64_t b : spine_visited) visiting.erase(b);
+                if (visiting->contains(cur)) {
+                    for (int i = 0; i < N(spine_visited); i++) visiting->remove(spine_visited[i]);
                     vm().error(vm().sym_syntax_error, "copy-tree", "Bad expression: circular list");
                 }
-                spine_visited.push_back(cur.bits);
+                visiting->insert(cur);
+                spine_visited << cur;
             } else {
                 if (++step > 1 && cur == slow) {
                     vm().error(vm().sym_syntax_error, "copy-tree", "Bad expression: circular list");
@@ -190,13 +190,14 @@ static SCM copy_tree_rec(SCM obj, std::unordered_set<uint64_t>& visiting, int de
         if (!cur.is_null()) {
             set_cdr(tail, copy_tree_rec(cur, visiting, depth + 1));
         }
-        for (uint64_t b : spine_visited) visiting.erase(b);
+        for (int i = 0; i < N(spine_visited); i++) visiting->remove(spine_visited[i]);
         return head;
     }
     if (is_vector(obj)) {
-        if (!visiting.insert(obj.bits).second) {
+        if (visiting->contains(obj)) {
             vm().error(vm().sym_syntax_error, "copy-tree", "Bad expression: circular vector");
         }
+        visiting->insert(obj);
         auto* vec = as_obj<VectorObj>(obj);
         size_t n = vec->elts.size();
         SCM nv = vm().make_vector(n, SCM_UNSPECIFIED);
@@ -204,7 +205,7 @@ static SCM copy_tree_rec(SCM obj, std::unordered_set<uint64_t>& visiting, int de
         for (size_t i = 0; i < n; ++i) {
             nvec->elts[i] = copy_tree_rec(vec->elts[i], visiting, depth + 1);
         }
-        visiting.erase(obj.bits);
+        visiting->remove(obj);
         return nv;
     }
     return obj;
@@ -214,7 +215,7 @@ static SCM copy_tree_rec(SCM obj, std::unordered_set<uint64_t>& visiting, int de
 static SCM copy_tree_fast(SCM obj, int depth) {
     if (is_pair(obj)) {
         if (depth > 32) {
-            std::unordered_set<uint64_t> visiting;
+            hashset<SCM> visiting;
             return copy_tree_rec(obj, visiting, depth);
         }
         SCM head = SCM_EOL;
@@ -229,7 +230,7 @@ static SCM copy_tree_fast(SCM obj, int depth) {
             if ((step & 1) == 0 && is_pair(slow)) slow = cdr(slow);
             SCM ca = car(cur);
             SCM a = is_pair(ca) ? copy_tree_fast(ca, depth + 1)
-                  : is_vector(ca) ? ([&]() { std::unordered_set<uint64_t> v; return copy_tree_rec(ca, v, depth + 1); })()
+                  : is_vector(ca) ? ([&]() { hashset<SCM> v; return copy_tree_rec(ca, v, depth + 1); })()
                   : ca;
             SCM cell = vm().cons(a, SCM_EOL);
             if (head.is_null()) head = tail = cell;
@@ -242,7 +243,7 @@ static SCM copy_tree_fast(SCM obj, int depth) {
         return head;
     }
     if (is_vector(obj)) {
-        std::unordered_set<uint64_t> visiting;
+        hashset<SCM> visiting;
         return copy_tree_rec(obj, visiting, depth);
     }
     return obj;

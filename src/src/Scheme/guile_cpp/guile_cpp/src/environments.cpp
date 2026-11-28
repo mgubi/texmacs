@@ -1,4 +1,5 @@
 #include "guile_cpp/vm.hpp"
+#include "ntuple.hpp"
 #include <algorithm>
 #include <vector>
 
@@ -186,7 +187,7 @@ void env_set_op(SCM env_scm, SCM sym, SCM val) {
 }
 
 // Collect all (sym . val) bindings of an environment without duplicates (preserving shadowing)
-void env_collect_bindings(SCM env_scm, std::vector<std::pair<SCM, SCM>>& out, std::vector<SCM>& seen) {
+void env_collect_bindings(SCM env_scm, std::vector<::pair<SCM, SCM>>& out, std::vector<SCM>& seen) {
     auto* en = as_obj<EnvironmentObj>(env_scm);
     auto has_seen = [&](SCM sym) {
         for (SCM s : seen) if (s == sym) return true;
@@ -223,7 +224,7 @@ void env_collect_bindings(SCM env_scm, std::vector<std::pair<SCM, SCM>>& out, st
         break;
     }
     case EnvKind::Export: {
-        std::vector<std::pair<SCM, SCM>> sub_out;
+        std::vector<::pair<SCM, SCM>> sub_out;
         std::vector<SCM> sub_seen;
         env_collect_bindings(en->local, sub_out, sub_seen);
         for (auto& [sym, val] : sub_out) {
@@ -238,7 +239,7 @@ void env_collect_bindings(SCM env_scm, std::vector<std::pair<SCM, SCM>>& out, st
 }
 
 SCM env_fold_op(SCM env_scm, SCM proc, SCM init) {
-    std::vector<std::pair<SCM, SCM>> bindings;
+    std::vector<::pair<SCM, SCM>> bindings;
     std::vector<SCM> seen;
     env_collect_bindings(env_scm, bindings, seen);
     SCM acc = init;

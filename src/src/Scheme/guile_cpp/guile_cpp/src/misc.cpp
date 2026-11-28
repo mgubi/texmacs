@@ -6,13 +6,15 @@
 namespace guile {
 
 void VM::register_extension(const std::string& lib, const std::string& init_fn, void (*fn)()) {
-    extensions[lib + ":" + init_fn] = fn;
+    std::string key = lib + ":" + init_fn;
+    extensions(string(key.data(), static_cast<int>(key.size()))) = (pointer) fn;
 }
 
 void VM::load_extension(const std::string& lib, const std::string& init_fn) {
-    auto it = extensions.find(lib + ":" + init_fn);
-    if (it != extensions.end()) {
-        it->second();
+    std::string key = lib + ":" + init_fn;
+    pointer fn = extensions[string(key.data(), static_cast<int>(key.size()))];
+    if (fn != nullptr) {
+        reinterpret_cast<void (*)()>(fn)();
         return;
     }
     // Fallback to dynamic linking via dlopen

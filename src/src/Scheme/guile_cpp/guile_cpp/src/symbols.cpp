@@ -3,14 +3,12 @@
 namespace guile {
 
 SCM VM::make_symbol(std::string_view name) {
-    std::string key(name);
-    auto it = symbol_table.find(key);
-    if (it != symbol_table.end()) {
-        return it->second;
-    }
+    string key(name.data(), static_cast<int>(name.size()));
+    SCM* found = symbol_table->find(key);
+    if (found != nullptr) return *found;
     uint64_t h = scm_hash_string(name);
-    SCM sym = heap_.alloc_scm<SymbolObj>(key, h, true);
-    symbol_table.emplace(std::move(key), sym);
+    SCM sym = heap_.alloc_scm<SymbolObj>(std::string(name), h, true);
+    symbol_table(key) = sym;
     return sym;
 }
 

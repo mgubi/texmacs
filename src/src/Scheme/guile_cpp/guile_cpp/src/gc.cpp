@@ -354,7 +354,7 @@ void Heap::trace_obj(Obj* obj, std::vector<Obj*>& worklist) {
     case ObjTag::Guardian: {
         auto* g = static_cast<GuardianObj*>(obj);
         // Only zombies are strongly marked; live entries are checked in process_guardians()
-        for (SCM z : g->zombies) mark_scm(z, worklist);
+        for (int i = 0; i < N(g->zombies); i++) mark_scm(g->zombies[i], worklist);
         break;
     }
     case ObjTag::Arbiter: {
@@ -526,7 +526,7 @@ void Heap::process_guardians(std::vector<Obj*>& worklist) {
             still_live.reserve(g->live.size());
             for (SCM item : g->live) {
                 if (!is_alive(item)) {
-                    g->zombies.push_back(item);
+                    g->zombies << item;
                     new_zombies.push_back(item);
                 } else {
                     still_live.push_back(item);
@@ -543,11 +543,14 @@ void Heap::process_guardians(std::vector<Obj*>& worklist) {
     }
 
     // Mark filename SCM strings for live entries in compact native src_pos_map
-    auto& spm = vm().src_pos_map;
-    if (!spm.empty()) {
-        for (const auto& kv : spm) {
-            if (kv.first->gc_mark && kv.second.filename.is_heap()) {
-                Obj* fo = kv.second.filename.to_obj();
+    hashmap<SCM, VM::SrcPosEntry>& spm = vm().src_pos_map;
+    if (N(spm) > 0) {
+        iterator<SCM> it = iterate(spm);
+        while (it->busy()) {
+            SCM key = it->next();
+            VM::SrcPosEntry e = spm[key];
+            if (key.to_obj()->gc_mark && e.filename.is_heap()) {
+                Obj* fo = e.filename.to_obj();
                 if (fo && !fo->gc_mark) {
                     fo->gc_mark = 1;
                     worklist.push_back(fo);
@@ -636,18 +639,21 @@ void Heap::clear_weak_refs() {
 void Heap::sweep() {
     // Prune dead entries from native src_pos_map BEFORE pair_pool_.sweep() clears gc_mark!
     {
-        auto& spm = vm().src_pos_map;
-        if (!spm.empty()) {
-            for (auto it = spm.begin(); it != spm.end(); ) {
-                if (!it->first->gc_mark) it = spm.erase(it);
-                else ++it;
+        hashmap<SCM, VM::SrcPosEntry>& spm = vm().src_pos_map;
+        if (N(spm) > 0) {
+            array<SCM> dead;
+            iterator<SCM> it = iterate(spm);
+            while (it->busy()) {
+                SCM key = it->next();
+                if (!key.to_obj()->gc_mark) dead << key;
             }
+            for (int i = 0; i < N(dead); i++) spm->reset(dead[i]);
         }
     }
 
     size_t freed = 0;
     freed += pair_pool_.sweep();
-    vm().goops_cmethod_closures.clear();
+    if (N(vm().goops_cmethod_closures) > 0) vm().goops_cmethod_closures->clear();
 
     freed += cont_pool_.sweep();
     freed += closure_pool_.sweep();

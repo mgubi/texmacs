@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <new>
 #include <type_traits>
-#include <unordered_map>
 #include <vector>
 #include <string>
 #include <string_view>
@@ -578,7 +577,7 @@ public:
         int32_t line;
         int32_t col;
     };
-    std::unordered_map<const Obj*, SrcPosEntry> src_pos_map;
+    hashmap<SCM, SrcPosEntry> src_pos_map;  // (key: the pair)
     SCM struct_table = SCM_BOOL_F;
     SCM required_vtable_fields = SCM_BOOL_F;
     SCM vtable_vtable_no_extra = SCM_BOOL_F;
@@ -776,15 +775,15 @@ public:
     }
 
     // Fast builtin VariableObj handles (populated after subsystem init)
-    std::unordered_map<SCM, uint8_t> fast_builtin_vars; // VariableObj raw bits -> FastOp tag
-    std::unordered_map<SCM, SCM> goops_cmethod_closures; // cmethod -> ClosureObj (cleared on GC)
+    hashmap<SCM, int> fast_builtin_vars{-1}; // VariableObj -> FastOp tag (-1: none)
+    hashmap<SCM, SCM> goops_cmethod_closures{SCM_BOOL_F}; // cmethod -> ClosureObj (cleared on GC)
     void init_bytecode_builtins();
 
     std::vector<SCM> permanent_roots;
     SCM permanent_object(SCM x) { permanent_roots.push_back(x); return x; }
 
-    std::unordered_map<std::string, SCM> symbol_table;
-    std::unordered_map<std::string, void (*)()> extensions;
+    hashmap<string, SCM> symbol_table{SCM_BOOL_F};
+    hashmap<string, pointer> extensions{(pointer) nullptr};  // (void (*)())
     std::vector<SmobTypeInfo> smob_types_;
 
     // Subsystem initializers

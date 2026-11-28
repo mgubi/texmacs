@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <unordered_map>
-#include <unordered_set>
 
 namespace guile {
 
@@ -55,7 +53,7 @@ void VM::init_bytecode_builtins() {
         SCM var = lookup(name);
         if (is_variable(var)) {
             as_obj<VariableObj>(var)->flags |= flag;
-            fast_builtin_vars[var] = static_cast<uint8_t>(id);
+            fast_builtin_vars(var) = static_cast<int>(id);
         }
     };
     reg("+", FB_ADD, VAR_FLAG_FAST_ARITH);
@@ -328,9 +326,9 @@ struct FnCompiler {
         if (!is_symbol(sym) || is_lexically_bound(sym)) return FB_NONE;
         SCM var = vm().sym2var(sym, eval_closure, false);
         if (!is_variable(var)) return FB_NONE;
-        auto it = vm().fast_builtin_vars.find(var);
-        if (it == vm().fast_builtin_vars.end()) return FB_NONE;
-        return static_cast<FastBuiltinId>(it->second);
+        int id = vm().fast_builtin_vars[var];
+        if (id < 0) return FB_NONE;
+        return static_cast<FastBuiltinId>(id);
     }
 
     // Pre-scan AST to find all mutated symbols and symbols captured by inner lambdas.

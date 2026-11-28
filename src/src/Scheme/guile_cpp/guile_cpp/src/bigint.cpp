@@ -1,4 +1,5 @@
 #include "guile_cpp/bigint.hpp"
+#include "basic.hpp"
 #include "guile_cpp/compat.hpp"
 #include <vector>
 #include <array>
@@ -258,14 +259,17 @@ static LimbPool g_limb_pool;
 
 struct ScratchArena {
     struct Chunk {
-        std::unique_ptr<uint64_t[]> data;
+        uint64_t* data;  // TeXmacs: owned, tm_new_array / tm_delete_array
         size_t cap = 0;
         size_t used = 0;
     };
     std::vector<Chunk> chunks;
 
     ScratchArena() {
-        chunks.push_back({std::make_unique<uint64_t[]>(131072), 131072, 0});
+        chunks.push_back({tm_new_array<uint64_t>(131072), 131072, 0});
+    }
+    ~ScratchArena() {
+        for (Chunk& ch : chunks) tm_delete_array(ch.data);
     }
 
     struct Mark {
@@ -284,6 +288,7 @@ struct ScratchArena {
         }
         chunks[m.chunk_idx].used = m.used;
         while (chunks.size() > m.chunk_idx + 1 && chunks.back().cap > 131072) {
+            tm_delete_array(chunks.back().data);
             chunks.pop_back();
         }
     }
@@ -293,15 +298,15 @@ struct ScratchArena {
         for (size_t i = chunks.size(); i > 0; --i) {
             auto& ch = chunks[i - 1];
             if (ch.used + n <= ch.cap) {
-                uint64_t* p = ch.data.get() + ch.used;
+                uint64_t* p = ch.data + ch.used;
                 ch.used += n;
                 return p;
             }
             if (ch.used > 0) break;
         }
         size_t new_cap = std::max(n * 2, size_t(131072));
-        chunks.push_back({std::make_unique<uint64_t[]>(new_cap), new_cap, n});
-        return chunks.back().data.get();
+        chunks.push_back({tm_new_array<uint64_t>(new_cap), new_cap, n});
+        return chunks.back().data;
     }
 };
 
@@ -1086,7 +1091,7 @@ struct FFTPlan {
 };
 
 struct FFTCache {
-    std::array<FFTPlan, 22> plans;
+    FFTPlan plans[22];
     std::vector<double> ar, ai;
     std::vector<double> br, bi;
 

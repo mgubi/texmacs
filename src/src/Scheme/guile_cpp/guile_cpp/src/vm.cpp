@@ -233,9 +233,8 @@ void VM::mark_roots(const Marker& mark) {
     bytecode_mark_roots(mark);
 
     // Symbol intern table
-    for (auto& [k, v] : symbol_table) {
-        mark(v);
-    }
+    iterator<string> it = iterate(symbol_table);
+    while (it->busy()) mark(symbol_table[it->next()]);
 }
 
 void VM::run_after_gc_hook() {

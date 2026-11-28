@@ -1,7 +1,6 @@
 #include "guile_cpp/vm.hpp"
 #include <algorithm>
 #include <random>
-#include <unordered_set>
 
 namespace guile {
 
@@ -1277,16 +1276,16 @@ SCM goops_apply_generic(SCM gf, const SCM* args, size_t nargs) {
     }
     // cmethod is (ENV FORMALS . BODY)
     SCM clo = SCM_BOOL_F;
-    auto it = v.goops_cmethod_closures.find(cmethod);
-    if (it != v.goops_cmethod_closures.end()) {
-        clo = it->second;
+    SCM* found = v.goops_cmethod_closures->find(cmethod);
+    if (found != nullptr) {
+        clo = *found;
     } else {
         SCM env = car(cmethod);
         SCM code = cdr(cmethod);
         SCM formals = car(code);
         SCM body = cdr(code);
         clo = v.make_closure(formals, body, env);
-        v.goops_cmethod_closures[cmethod] = clo;
+        v.goops_cmethod_closures(cmethod) = clo;
     }
     // Populate monomorphic inline cache for 1-arg / 2-arg GOOPS instance dispatches!
     if (is_pair(gso->entity_proc)) {
