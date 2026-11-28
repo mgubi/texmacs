@@ -69,7 +69,7 @@ LDVUE = @VUE_LDFLAGS@
 LDQTWK = $(LDQT)
 LDGUI = $(LD@CONFIG_GUI@)
 LDGNUTLS= @GNUTLS_LDFLAGS@
-LDFREETYPE= @FREETYPE_LDFLAGS@ @FREETYPE_LIBS@
+LDFREETYPE= @FREETYPE_LIBS@
 LDLIBCURL= @LIBCURL_LDFLAGS@
 LDRESVG = @RESVG_LDFLAGS@ @RESVG_LIBS@
 
@@ -550,7 +550,8 @@ TEXMACS_OPEN_objects := $(texmacs_open_obj) Objects/tm_ostream.o Objects/fast_al
 # (6.11) exports the functions of its own FreeType, and the linker of macOS
 # binds each symbol to the first library which has it: TeXmacs then used
 # that FreeType for most functions and its own for the others, and found no
-# emoji (the suite emoji, #972); $(LIBS) still has it, for the other linkers
+# emoji (the suite emoji, #972); $(LIBS) still has it, for the other linkers;
+# only its -l options: its -L stay in $(LDFLAGS), after those of $(LDGUI)
 link_options:=-L$(tmsrc)/lib -lm $(LDFREETYPE) $(LDGUI) $(LDICONV) $(CXXFLAGS)\
    $(LDAXEL) $(LDCAIRO) $(LDSQLITE3) $(LDGNUTLS) $(LDLIBCURL) $(LDRESVG) @SPARKLE_LDFLAGS@
 

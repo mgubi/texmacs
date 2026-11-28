@@ -359,8 +359,10 @@ jobs:
   # GnuTLS; the ones of the Vue port are not linked), the official binaries
   # of Qt (universal; Qt 6.11, the newest for macOS 13: 6.12 needs 14.4,
   # QT_SUPPORTED_MIN_MACOS_VERSION of qtbase/.cmake.conf; installed by
-  # aqtinstall, its wheel checked against its SHA-256) and no library of Homebrew, which only runs on the macOS of
-  # its bottles (15 on these runners). configure --with-osx=MIN_MACOS gives
+  # aqtinstall, which with its dependencies is checked against the hashes
+  # of .github/fixes/aqtinstall-requirements.txt) and no library of
+  # Homebrew, which only runs on the macOS of its bottles (15 on these
+  # runners). configure --with-osx=MIN_MACOS gives
   # the flags of the compilers and the LSMinimumSystemVersion of Info.plist,
   # which the step "Minimum macOS" checks against every bundled file. Qt's
   # own modules: base (with svg, printsupport, network, concurrent),
@@ -372,8 +374,6 @@ jobs:
     timeout-minutes: 60
     env:
       QT_VERSION: 6.11.3
-      AQT_VERSION: 3.3.0
-      AQT_SHA256: e88dbd87226f276fdd5d05347a44578d390d93a7f176e9476fbda0a7c9635f69
       QT_MODULES: qtwebsockets qtimageformats
     defaults:
       run:
@@ -402,18 +402,15 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ${{ runner.tool_cache }}/texmacs-qt
-          key: texmacs-qt-${{ env.QT_VERSION }}-${{ env.QT_MODULES }}-aqt${{ env.AQT_VERSION }}
+          key: texmacs-qt-${{ env.QT_VERSION }}-${{ env.QT_MODULES }}-${{ hashFiles('.github/fixes/aqtinstall-requirements.txt') }}
 
       - name: Qt
         run: |
           qt="$RUNNER_TOOL_CACHE/texmacs-qt"
           if [ ! -x "$qt/$QT_VERSION/macos/bin/qmake" ]; then
             python3 -m venv "$RUNNER_TEMP/aqt"
-            "$RUNNER_TEMP/aqt/bin/pip" download -q --no-deps -d "$RUNNER_TEMP/aqt-wheel" "aqtinstall==$AQT_VERSION"
-            whl="$RUNNER_TEMP/aqt-wheel/aqtinstall-$AQT_VERSION-py3-none-any.whl"
-            [ "$(shasum -a 256 "$whl" | cut -d' ' -f1)" = "$AQT_SHA256" ] ||
-              { echo "error: wrong SHA-256 for aqtinstall"; exit 1; }
-            "$RUNNER_TEMP/aqt/bin/pip" install -q "$whl"
+            # aqtinstall and all its dependencies checked by their hashes
+            "$RUNNER_TEMP/aqt/bin/pip" install -q --require-hashes -r ../.github/fixes/aqtinstall-requirements.txt
             "$RUNNER_TEMP/aqt/bin/aqt" install-qt -O "$qt" mac desktop "$QT_VERSION" clang_64 -m $QT_MODULES
           fi
           echo "QT_ROOT_DIR=$qt/$QT_VERSION/macos" >> "$GITHUB_ENV"
@@ -429,8 +426,13 @@ jobs:
             QMAKE="$QT_ROOT_DIR/bin/qmake" \
             CPPFLAGS="-I$DEPS/include" LDFLAGS="-L$DEPS/lib"
 
+      # a static library made for a newer macOS than MIN_MACOS only gives a
+      # warning of the linker, which check-min-macos.sh cannot see
       - name: Build
-        run: make -j"$(sysctl -n hw.ncpu)"
+        run: |
+          set -o pipefail
+          make -j"$(sysctl -n hw.ncpu)" 2>&1 | tee "$RUNNER_TEMP/build.log"
+          if grep "built for newer macOS version" "$RUNNER_TEMP/build.log"; then exit 1; fi
 
       - name: Run the regression suites
         run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
@@ -485,10 +487,7 @@ jobs:
       - name: Minimum macOS
         run: |
           ../.github/fixes/check-min-macos.sh ../distr/*.app
-          bad=$(find ../distr/*.app/Contents -type f -exec sh -c \
-                  'file -b "$1" | grep -q Mach-O && otool -L "$1"' _ {} \; |
-                grep -E '^[[:space:]]+/(opt/homebrew|usr/local|Users)/' || true)
-          [ -z "$bad" ] || { echo "error: libraries outside the application:"; echo "$bad"; exit 1; }
+          python3 -I ../.github/fixes/check-app-libs.py ../distr/*.app
 
       - uses: actions/upload-artifact@v4
         with:
@@ -506,8 +505,6 @@ jobs:
     timeout-minutes: 75
     env:
       QT_VERSION: 6.11.3
-      AQT_VERSION: 3.3.0
-      AQT_SHA256: e88dbd87226f276fdd5d05347a44578d390d93a7f176e9476fbda0a7c9635f69
       QT_MODULES: qtwebsockets qtimageformats
       CHEZ_VERSION: 10.4.1
       CHEZ_SHA256: 2e74952db7bc177f0c3602e2217a341ba677d733eec4cd7726418c3a4e1ef308
@@ -564,18 +561,15 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ${{ runner.tool_cache }}/texmacs-qt
-          key: texmacs-qt-${{ env.QT_VERSION }}-${{ env.QT_MODULES }}-aqt${{ env.AQT_VERSION }}
+          key: texmacs-qt-${{ env.QT_VERSION }}-${{ env.QT_MODULES }}-${{ hashFiles('.github/fixes/aqtinstall-requirements.txt') }}
 
       - name: Qt
         run: |
           qt="$RUNNER_TOOL_CACHE/texmacs-qt"
           if [ ! -x "$qt/$QT_VERSION/macos/bin/qmake" ]; then
             python3 -m venv "$RUNNER_TEMP/aqt"
-            "$RUNNER_TEMP/aqt/bin/pip" download -q --no-deps -d "$RUNNER_TEMP/aqt-wheel" "aqtinstall==$AQT_VERSION"
-            whl="$RUNNER_TEMP/aqt-wheel/aqtinstall-$AQT_VERSION-py3-none-any.whl"
-            [ "$(shasum -a 256 "$whl" | cut -d' ' -f1)" = "$AQT_SHA256" ] ||
-              { echo "error: wrong SHA-256 for aqtinstall"; exit 1; }
-            "$RUNNER_TEMP/aqt/bin/pip" install -q "$whl"
+            # aqtinstall and all its dependencies checked by their hashes
+            "$RUNNER_TEMP/aqt/bin/pip" install -q --require-hashes -r ../.github/fixes/aqtinstall-requirements.txt
             "$RUNNER_TEMP/aqt/bin/aqt" install-qt -O "$qt" mac desktop "$QT_VERSION" clang_64 -m $QT_MODULES
           fi
           echo "QT_ROOT_DIR=$qt/$QT_VERSION/macos" >> "$GITHUB_ENV"
@@ -597,9 +591,12 @@ jobs:
 
       # the binary, then the Scheme modules compiled into TeXmacs/boot and
       # the boot image (docs/chez/01-build.md)
+      # (the warnings of the linker as in the job qt)
       - name: Build
         run: |
-          make -j"$(sysctl -n hw.ncpu)"
+          set -o pipefail
+          make -j"$(sysctl -n hw.ncpu)" 2>&1 | tee "$RUNNER_TEMP/build.log"
+          if grep "built for newer macOS version" "$RUNNER_TEMP/build.log"; then exit 1; fi
           make CHEZ_MODULES
           ls -l TeXmacs/boot/texmacs.boot
 
@@ -658,10 +655,7 @@ jobs:
       - name: Minimum macOS
         run: |
           ../.github/fixes/check-min-macos.sh ../distr/*.app
-          bad=$(find ../distr/*.app/Contents -type f -exec sh -c \
-                  'file -b "$1" | grep -q Mach-O && otool -L "$1"' _ {} \; |
-                grep -E '^[[:space:]]+/(opt/homebrew|usr/local|Users)/' || true)
-          [ -z "$bad" ] || { echo "error: libraries outside the application:"; echo "$bad"; exit 1; }
+          python3 -I ../.github/fixes/check-app-libs.py ../distr/*.app
 
       - uses: actions/upload-artifact@v4
         with:
