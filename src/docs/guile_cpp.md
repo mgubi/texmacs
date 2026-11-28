@@ -49,13 +49,13 @@ it left and is reported as `(misc-error ...)`.
 
 ## The containers
 
-guile_cpp is written with the standard library; on this branch
-`std::function`, the hash tables, `unique_ptr`, `deque` and `std::pair` are
-replaced by function pointers and the containers of TeXmacs, and the
-stacks of the bytecode VM are arrays. `std::string`, `std::string_view`
-and `std::vector` remain (about 500 uses): the vendored `README` says why
-(the sharing of TeXmacs strings and arrays on copy, the freeing of an
-array resized to 0) and what else of the standard library is used.
+guile_cpp is written with the standard library; on this branch its
+`std::function`, hash tables, `unique_ptr`, `deque`, `pair`, strings and
+vectors are function pointers and the strings, arrays, hashmaps and
+hashsets of TeXmacs. A copy of a TeXmacs string or array shares its
+contents: the vendored `README` lists every place where a `copy ()` was
+added or found unnecessary, and what remains of the standard library
+(`<algorithm>`, `<complex>`, `<random>`, `<chrono>`...).
 
 ## Open problems
 

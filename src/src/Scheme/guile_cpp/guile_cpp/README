@@ -76,19 +76,73 @@ Changes to guile_cpp
   arrays; the bindings of environments are TeXmacs pairs; bigint.cpp owns
   its scratch chunks with tm_new_array instead of unique_ptr.
 
+Strings and vectors
+-------------------
+
+The strings and vectors of guile_cpp are TeXmacs strings and arrays
+(std::string, std::string_view, std::vector and the shared_ptr<StringBuf>
+of the Scheme strings are gone). include/guile_cpp/tm_string.hpp has the
+helpers for the operations of std::string and std::vector which TeXmacs
+writes otherwise (str_append, str_sub, str_find, gcpp_data, gcpp_clear,
+gcpp_resize, array_from, array_fill, array_splice...), and begin / end
+for the range-for loops. The views of std::string_view are a pointer and a
+length: StringObj::chars () and len, view_sub, view_find.
+
+A copy of a TeXmacs string or array shares its characters or elements
+(there is no copy on write), where a copy of a std::string or std::vector
+had its own. Every site where a value is copied and then changed, or kept
+by an object which must own it, was checked:
+
+copy () added (the value is changed later, or must be owned):
+* SmallScmVec (the values of the frames of the evaluator): its copy
+  constructor and assignment copy the array; eval.cpp copies cf->vals and
+  then adds to the copy (4 places).
+* make-dynamic-state (fluids.cpp): the values of the parent state, which
+  fluid-set! changes.
+* vector-copy (vectors.cpp): the elements (they were shared).
+* sort of a vector (sort.cpp): the elements, sorted in place.
+* get_array_info (arrays.cpp): the dimensions of the array.
+* make_input_string_port (ports.cpp): the characters (seek, truncate).
+* VM::make_string (string): the characters, as std::string did;
+  make_symbol and make_uninterned_symbol: the name of a new symbol (a
+  lookup shares the name: no allocation).
+* the binding: string_to_tmscm and tmscm_to_string copy once (as before),
+  tmscm_to_symbol copies the name (the caller may change its string).
+
+No copy (checked):
+* make_string_owned (no copy) only for strings built locally and not
+  kept (string-append, string-join, string-pad, make-string, reader
+  tokens, read-line, numbers...: 21 places, the std::move of guile_cpp).
+* shared substrings share the characters of their string, by design.
+* the name of a symbol is shared by the symbol table (key) and the
+  symbol, and never changed; the names of subrs, the file names and modes
+  of ports, the patterns of regexps, the layouts of structs (struct.cpp,
+  gc.cpp, goops.cpp, arrays.cpp) and the fields of socket addresses are
+  only read.
+* no function changes a string or array parameter in place (all were
+  checked); assignments from locals which are no longer used replace the
+  swaps of std::vector.
+* clearing gives a new empty value (gcpp_clear), never resizes a value
+  which may be shared.
+* the views of the characters of a Scheme string stay valid: a StringObj
+  never reallocates its characters (string-set! writes in place).
+
+Speed: a TeXmacs array resizes its storage at each change of its size for
+small sizes, and A and N take the array by value (its count of references
+changes at each call). Measured on tak and the suites, the stacks which
+grow and shrink at each step got a count of their own over an array which
+never shrinks (the worklist of the collector, the active VM invocations),
+and the hot pointers of the bytecode VM are kept (the stacks, the code,
+the globals and the constants of the running bytecode); the string
+operations read the characters in place (StringObj::chars, sub) instead
+of copying the whole string.
+
 Still from the standard library
 -------------------------------
 
-The strings and vectors of guile_cpp (std::string about 240 uses,
-std::string_view 60, std::vector 200, the shared_ptr<StringBuf> of the
-strings) are not replaced yet: TeXmacs string and array share their
-representation when they are copied (no copy on write), so that every copy
-of a std::string or std::vector which is then changed needs copy (); and
-array<T>::resize (0) frees the storage, which the evaluator's argument
-buffers (CekState::args, cleared at each call) would reallocate at every
-call. They need a growable buffer in the style of TeXmacs (with a
-capacity) for the hot buffers, and an audit of the copies. Also left:
-<algorithm> (std::sort and std::stable_sort with comparators in sort.cpp,
-gc.cpp and vm.hpp; std::min / std::max on size_t and int64_t, for which
-TeXmacs has no overloads), std::move / std::swap, <complex>, <chrono>,
-<limits>, std::to_string / std::stoll / std::stod.
+<algorithm> (std::sort and std::stable_sort with comparators, std::min /
+std::max on size_t and int64_t, std::reverse, std::find,
+std::binary_search), std::move / std::forward / std::swap, <complex>,
+<cmath>, <chrono> (GC times), <random> (std::mt19937, std::random_device),
+<limits>, <type_traits>, <initializer_list>, std::exception (the binding
+catches it), and the C library (<cstring>, <cstdio>, <cctype>...).
