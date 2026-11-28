@@ -433,12 +433,12 @@ ns_simple_widget_rep::present_gpu_store (bool in_transaction) {
   NSSize sz= [view bounds].size;
   int dw= (int) ceil (sz.width * sc), dh= (int) ceil (sz.height * sc);
   // (a failure is not tried again before the next repaint)
-  gpu_show_picture (gpu_layer, gpu_store, dw, dh, in_transaction);
+  bool shown= gpu_show_picture (gpu_layer, gpu_store, dw, dh, in_transaction);
   // by IOSurfaces: as QCALayerBackingStore::flush, a display cycle of the
   // window, so that the transaction is committed with it (and with the
   // other changes of the views, the move of a scroll) rather than at the
   // next pass of the run loop, which Core Animation may throttle
-  if (gpu_presents_at_once ()) [[view window] setViewsNeedDisplay: YES];
+  if (shown && gpu_presents_at_once ()) [[view window] setViewsNeedDisplay: YES];
   return true;
 }
 

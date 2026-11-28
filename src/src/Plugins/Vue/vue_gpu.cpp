@@ -1836,6 +1836,11 @@ gpu_begin_screen (renderer ren, int w, int h, int dw, int dh) {
   gpu_flush_all ();
   G.screen.w= w; G.screen.h= h;
   G.screen.dw= dw; G.screen.dh= dh;
+  // (by IOSurfaces, the surface of the frame is taken now: the window of a
+  // CAMetalLayer takes its drawable when first drawn into, at the size
+  // which SDL gives the layer)
+  if (G.B != NULL && G.started && G.B->presents_at_once ())
+    G.B->begin_screen (dw, dh);
   G.frame_hash= 14695981039346656037ULL;
   int sz[2]= { w, h };
   feed (sz);

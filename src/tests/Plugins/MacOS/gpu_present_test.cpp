@@ -32,6 +32,14 @@ now_ms () {
   return ts.tv_sec * 1e3 + ts.tv_nsec * 1e-6;
 }
 
+// the transactions of the presents are committed by the run loop, whose
+// completion blocks give up the use count of the surfaces they replaced
+static void
+spin () {
+  CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0, true);
+  CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0, true);
+}
+
 static picture store;   // 64 x 32: its top half red, transparent below
 static void* layer= NULL;
 
@@ -88,12 +96,14 @@ static void
 test_ring () {
   if (!ready ()) SKIP ("no Metal, or TEXMACS_NS_PRESENT/TEXMACS_VUE_PRESENT=metal");
   // presents in a burst do not wait (no compositor here: the surface shown
-  // is the only one in use, and the frames alternate between two)
+  // is the only one in use once the transaction which replaced the one
+  // before is committed, and the frames alternate between two)
   double worst= 0;
   for (int i= 0; i < 30; i++) {
     double t= now_ms ();
     CHECK (gpu_show_picture (layer, store, 64, 32));
     worst= max (worst, now_ms () - t);
+    spin ();
   }
   CHECK_MSG (worst < 50, "a present waited");
   std::vector<unsigned char> img (64 * 32 * 4);
@@ -109,9 +119,9 @@ test_scaled () {
   // twice the pixels of the store (a retina_factor of 1 on a Retina
   // screen): the store is scaled into new surfaces, cleared first (the
   // copy at another scale is composed over them)
-  CHECK (gpu_show_picture (layer, store, 128, 64));
-  CHECK (gpu_show_picture (layer, store, 128, 64));
-  CHECK (gpu_show_picture (layer, store, 128, 64));
+  CHECK (gpu_show_picture (layer, store, 128, 64)); spin ();
+  CHECK (gpu_show_picture (layer, store, 128, 64)); spin ();
+  CHECK (gpu_show_picture (layer, store, 128, 64)); spin ();
   std::vector<unsigned char> img (128 * 64 * 4);
   int n= 0;
   CHECK (gpu_layer_pixels (layer, 128, 64, img.data (), n));
@@ -128,6 +138,54 @@ test_scaled () {
 }
 
 static void
+test_uncommitted () {
+  if (!ready ()) SKIP ("no Metal, or TEXMACS_NS_PRESENT/TEXMACS_VUE_PRESENT=metal");
+  // two presents before the transaction is committed (two repaints in one
+  // pass of the run loop): the second does not draw into the surface which
+  // the compositor still shows, so a third one is made
+  CHECK (gpu_show_picture (layer, store, 64, 32));
+  CHECK (gpu_show_picture (layer, store, 64, 32));
+  std::vector<unsigned char> img (64 * 32 * 4);
+  int n= 0;
+  CHECK (gpu_layer_pixels (layer, 64, 32, img.data (), n));
+  CHECK_EQ (n, 3);
+  spin ();
+  // committed: the next present takes a free surface again (three are
+  // kept)
+  CHECK (gpu_show_picture (layer, store, 64, 32));
+  spin ();
+  CHECK (gpu_layer_pixels (layer, 64, 32, img.data (), n));
+  CHECK_EQ (n, 3);
+  CHECK_EQ (px (img, 64, 10, 2, 0), 255);
+}
+
+static void
+test_screen () {
+  if (!ready ()) SKIP ("no Metal, or TEXMACS_NS_PRESENT/TEXMACS_VUE_PRESENT=metal");
+  // the route of the windows of the Vue port: the screen renderer draws
+  // into the surface which gpu_begin_screen takes, and vue_gpu_present
+  // shows it (the layer attached last, here by gpu_show_picture)
+  CHECK (gpu_show_picture (layer, store, 64, 32));
+  spin ();
+  renderer ren= gpu_screen_renderer (std_shrinkf);
+  gpu_begin_screen (ren, 64, 32, 64, 32);
+  SI p= ren->pixel;
+  ren->set_origin (0, 0);
+  ren->set_clipping (0, -32 * p, 64 * p, 0);
+  ren->set_pencil (rgb_color (0, 0, 255));
+  ren->fill (0, -32 * p, 64 * p, 0);
+  vue_gpu_present (NULL);
+  spin ();
+  tm_delete (ren);
+  std::vector<unsigned char> img (64 * 32 * 4);
+  int n= 0;
+  CHECK (gpu_layer_pixels (layer, 64, 32, img.data (), n));
+  CHECK_EQ (px (img, 64, 10, 2, 2), 255);
+  CHECK_EQ (px (img, 64, 10, 29, 2), 255);
+  CHECK_EQ (px (img, 64, 10, 29, 0), 0);
+}
+
+static void
 test_timing () {
   if (!ready ()) SKIP ("no Metal, or TEXMACS_NS_PRESENT/TEXMACS_VUE_PRESENT=metal");
   // a window of 1000 x 800 points on a Retina screen: a present (the copy
@@ -139,6 +197,7 @@ test_timing () {
     double t0= now_ms ();
     CHECK (gpu_show_picture (l, big, 2000, 1600));
     t.push_back (now_ms () - t0);
+    spin ();
   }
   std::sort (t.begin (), t.end ());
   cout << "TeXmacs] present of 2000x1600: median " << t[10] << " ms, worst "
@@ -167,6 +226,8 @@ main () {
   RUN (test_present);
   RUN (test_ring);
   RUN (test_scaled);
+  RUN (test_uncommitted);
+  RUN (test_screen);
   RUN (test_timing);
   RUN (test_forget);
   return test_report ();

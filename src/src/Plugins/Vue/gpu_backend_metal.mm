@@ -46,6 +46,7 @@ gpu_backend* gpu_metal_backend () { return NULL; }
 #import <CoreGraphics/CoreGraphics.h>
 #import <IOSurface/IOSurface.h>
 #include <unordered_map>
+#include <memory>
 #include <cmath>
 #include <time.h>
 #include <stdio.h>
@@ -194,6 +195,15 @@ struct quad_uniforms { float size[2]; float porig[2]; float ptile[2]; int mode; 
 * The backend
 ******************************************************************************/
 
+// a surface which a present replaced: in use until the transaction of that
+// present is committed (the completion block of the transaction gives the
+// use count up), or until it is 250 ms old (should a block not run)
+struct replaced_surface {
+  IOSurfaceRef s= NULL;            // retained until released
+  double since= 0;                 // ms of CACurrentMediaTime
+  bool done= false;
+};
+
 class metal_backend;
 static void metal_refresh (metal_backend* b, void* layer);
 
@@ -270,6 +280,7 @@ class metal_backend: public gpu_backend {
     int back= -1;                    // drawn into, for the next present
     bool fresh= false;               // back not cleared yet
     int made= 0;                     // surfaces allocated (the debug output)
+    std::vector<std::shared_ptr<replaced_surface>> pending;
   };
   std::unordered_map<void*, surface_ring> rings;  // by layer (Vue: of SDL)
   surface_ring* ring= NULL;          // of the window being drawn, or NULL
@@ -600,15 +611,19 @@ metal_backend::begin_screen (int dw, int dh) {
 
 static double now_ms ();
 
-// TEXMACS_VUE_DEBUG_PRESENT: each present (PRESENT: the time since the last
-// one of its layer, the wait in nextDrawable; GPU: when the GPU was done
-// with the frame, SHOWN: when the screen showed it, both in ms after the
-// present), each window not presented yet (DEFER), and the ticks of the
-// display links which wake the loop up (WAKE) or pause the link (PAUSE)
+// TEXMACS_VUE_DEBUG_PRESENT (or TEXMACS_NS_DEBUG_DRAW, the Cocoa port):
+// each present (PRESENT: the time since the last one of its layer, the wait
+// in nextDrawable; GPU: when the GPU was done with the frame, SHOWN: when
+// the screen showed it, and how long after the present), each window not
+// presented yet (DEFER), and the ticks of the display links which wake the
+// loop up (WAKE) or pause the link (PAUSE). The times are in ms of
+// CACurrentMediaTime, the clock of the events (the WHEEL lines of the
+// ports), so that the latency of the wheel can be read (issue #988)
 static bool
 debug_present () {
   static int on= -1;
-  if (on < 0) on= (getenv ("TEXMACS_VUE_DEBUG_PRESENT") != NULL);
+  if (on < 0) on= (getenv ("TEXMACS_VUE_DEBUG_PRESENT") != NULL ||
+                   getenv ("TEXMACS_NS_DEBUG_DRAW") != NULL);
   return on != 0;
 }
 static double drawable_wait= 0;
@@ -623,9 +638,7 @@ debug_visible (CAMetalLayer* l) {
 
 static double
 now_ms () {
-  struct timespec ts;
-  clock_gettime (CLOCK_MONOTONIC, &ts);
-  return ts.tv_sec * 1e3 + ts.tv_nsec * 1e-6;
+  return CACurrentMediaTime () * 1000.0;
 }
 
 void
@@ -662,8 +675,10 @@ metal_backend::present (SDL_Window* w) {
                  cb.GPUEndTime * 1000.0 - m0);
       }];
       [drawable addPresentedHandler: ^(id<MTLDrawable> d) {
-        fprintf (stderr, "SHOWN %.3f +%.2f\n", t0,
-                 d.presentedTime > 0 ? d.presentedTime * 1000.0 - m0 : -1.0);
+        if (d.presentedTime > 0)
+          fprintf (stderr, "SHOWN %.3f +%.2f\n", d.presentedTime * 1000.0,
+                   d.presentedTime * 1000.0 - m0);
+        else fprintf (stderr, "SHOWN %.3f (not shown)\n", t0);
       }];
     }
     [commands () presentDrawable: drawable];
@@ -694,6 +709,15 @@ metal_backend::present_in_transaction () {
   id<MTLCommandBuffer> c= commands ();
   flush ();
   [c waitUntilScheduled];
+  if (debug_present ()) {
+    double m0= now_ms ();
+    [d addPresentedHandler: ^(id<MTLDrawable> x) {
+      if (x.presentedTime > 0)
+        fprintf (stderr, "SHOWN %.3f +%.2f\n", x.presentedTime * 1000.0,
+                 x.presentedTime * 1000.0 - m0);
+      else fprintf (stderr, "SHOWN %.3f (not shown)\n", m0);
+    }];
+  }
   [d present];
   if (debug_present ())
     fprintf (stderr, "PRESENT %.3f with the transaction, layer %p\n",
@@ -813,7 +837,8 @@ metal_backend::detach (SDL_Window* w) {
 * one of its own for the Vue port. Nothing waits for the screen: a frame
 * goes to a surface which is neither shown (front) nor still used by the
 * compositor (IOSurfaceIsInUse; the surface shown holds a use count of
-* ours, as in Qt), another surface is made when they all are, and the free
+* ours, as in Qt, and the one it replaced keeps it until the transaction
+* is committed), another surface is made when they all are, and the free
 * ones beyond three are released. The only wait is for the GPU to be done
 * with the frame (waitUntilCompleted, a fraction of a millisecond), since
 * the compositor reads the surface as soon as the transaction commits.
@@ -869,9 +894,29 @@ metal_backend::use_ring (surface_ring* r) {
   ring= r;
 }
 
+// give up the use count of a surface replaced by a present (once)
+static void
+release_replaced (replaced_surface& p) {
+  if (p.done) return;
+  p.done= true;
+  IOSurfaceDecrementUseCount (p.s);
+  CFRelease (p.s);
+}
+
 int
 metal_backend::take_surface (surface_ring& r, int w, int h) {
   if (w <= 0 || h <= 0 || too_large (w, h)) return -1;
+  // the surfaces replaced long ago are no longer in use (if a completion
+  // block did not run), those released are forgotten
+  double now= media_ms ();
+  for (int i= (int) r.pending.size () - 1; i >= 0; i--) {
+    if (!r.pending[i]->done && now - r.pending[i]->since > 250) {
+      if (debug_surfaces ())
+        fprintf (stderr, "SURFACE %.3f released late\n", now);
+      release_replaced (*r.pending[i]);
+    }
+    if (r.pending[i]->done) r.pending.erase (r.pending.begin () + i);
+  }
   // those of another size go (not the one shown: it stays until replaced)
   for (int i= (int) r.s.size () - 1; i >= 0; i--)
     if (i != r.front && (r.s[i].w != w || r.s[i].h != h)) {
@@ -940,7 +985,9 @@ metal_backend::clear_back (surface_ring& r) {
   MTLRenderPassDescriptor* pd= [MTLRenderPassDescriptor renderPassDescriptor];
   pd.colorAttachments[0].texture= t;
   pd.colorAttachments[0].loadAction= MTLLoadActionClear;
-  pd.colorAttachments[0].clearColor= MTLClearColorMake (0, 0, 0, 0);
+  // (an opaque layer, Vue's, opaque black: its frames paint all anyway)
+  pd.colorAttachments[0].clearColor= r.host.opaque ? MTLClearColorMake (0, 0, 0, 1)
+                                                   : MTLClearColorMake (0, 0, 0, 0);
   pd.colorAttachments[0].storeAction= MTLStoreActionStore;
   [[commands () renderCommandEncoderWithDescriptor: pd] endEncoding];
 }
@@ -961,12 +1008,11 @@ metal_backend::present_surface () {
     [CATransaction setDisableActions: YES];
   }
   if (debug_surfaces ()) {
-    // (after the completion block of the transaction, if any)
-    void (^prev) (void)= [CATransaction completionBlock];
+    // (the blocks of a transaction are all called: the one which was set
+    // before, if any, is not replaced)
     double t= t1;
     [CATransaction setCompletionBlock: ^{
       fprintf (stderr, "COMMIT %.3f +%.2f\n", media_ms (), media_ms () - t);
-      if (prev != nil) prev ();
     }];
   }
   if (r.follow != nil) {
@@ -974,6 +1020,23 @@ metal_backend::present_surface () {
       r.host.frame= r.follow.bounds;
     if (r.host.contentsScale != r.follow.contentsScale)
       r.host.contentsScale= r.follow.contentsScale;
+  }
+  // the surface shown is in use until it is replaced (as in Qt), and the
+  // one it replaces until the transaction which replaces it is committed:
+  // in the Cocoa port that is at the end of the pass of the run loop, and
+  // another repaint in that pass must not draw into what the compositor
+  // still shows (the use count is given up by the completion block of the
+  // transaction, which runs once it is committed; Core Animation calls
+  // every block set in a transaction, so each present sets its own)
+  IOSurfaceIncrementUseCount (n.s);
+  int old= r.front;
+  if (old >= 0) {
+    std::shared_ptr<replaced_surface> p= std::make_shared<replaced_surface> ();
+    p->s= r.s[old].s;
+    CFRetain (p->s);
+    p->since= t1;
+    r.pending.push_back (p);
+    [CATransaction setCompletionBlock: ^{ release_replaced (*p); }];
   }
   r.host.contents= (__bridge id) n.s;
   if (r.own_transaction) {
@@ -983,10 +1046,6 @@ metal_backend::present_surface () {
     [CATransaction flush];
   }
   double t2= media_ms ();
-  // the surface shown is in use until it is replaced (as in Qt)
-  IOSurfaceIncrementUseCount (n.s);
-  int old= r.front;
-  if (old >= 0) IOSurfaceDecrementUseCount (r.s[old].s);
   if (debug_surfaces ()) {
     fprintf (stderr, "SURFACE %.3f wait %.2f set %.2f surfaces %d made %d "
              "%dx%d layer %p\n", t1, t1 - t0, t2 - t1, (int) r.s.size (),
@@ -1020,6 +1079,7 @@ metal_backend::drop_ring (void* key) {
   if (r.follow != nil) [r.host removeFromSuperlayer];
   [CATransaction commit];
   if (r.front >= 0) IOSurfaceDecrementUseCount (r.s[r.front].s);
+  for (auto& p: r.pending) release_replaced (*p);
   // (the commands which draw into them keep their textures)
   for (surface& x: r.s) if (x.s != NULL) CFRelease (x.s);
   rings.erase (it);

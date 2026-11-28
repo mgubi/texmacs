@@ -1082,7 +1082,8 @@ before (until 2026-10-05 the desktop needed `TEXMACS_VUE_GPU=1`).
   for 2000 x 1600 pixels on an M4), since the compositor reads the surface
   once the transaction is committed. A frame goes to a surface which is
   neither shown nor held by the compositor (`IOSurfaceIsInUse`; the one
-  shown has a use count of ours, as in Qt), another one is made when all
+  shown has a use count of ours, as in Qt, and the one it replaced until
+  the transaction is committed), another one is made when all
   are in use (up to eight), the free ones beyond three are released: no
   present waits for the screen, so the frames are neither paced nor put
   off (`ready_to_present` is always true, there is no display link, and the
@@ -1091,7 +1092,8 @@ before (until 2026-10-05 the desktop needed `TEXMACS_VUE_GPU=1`).
   wheel scrolled with less lag. The ring is in `gpu_backend_metal.mm`
   ("Presenting by IOSurfaces"; the Cocoa port uses it too, for its
   canvases, see *ns-port.md*); the surfaces are BGRA8 in sRGB, as the
-  `CAMetalLayer`, and cleared when first drawn into. A skipped frame (the
+  `CAMetalLayer`, and cleared when first drawn into; `gpu_begin_screen`
+  takes the surface of a frame. A skipped frame (the
   same hash) keeps its surface for the next one. `TEXMACS_VUE_DEBUG_PRESENT`
   prints, for each wheel event, when it was made and when AppKit handed it
   to SDL (`WHEEL event <t> now <t>`, `vue_mac.mm`), and for each present

@@ -541,7 +541,10 @@ The surfaces of a layer are a ring kept by the Metal backend
 (`metal_backend::take_surface`, `present_surface`; see the comment
 "Presenting by IOSurfaces" in `gpu_backend_metal.mm`). A frame goes to a
 surface which is neither shown nor still held by the compositor
-(`IOSurfaceIsInUse`; the surface shown has a use count of ours, as in Qt),
+(`IOSurfaceIsInUse`; the surface shown has a use count of ours, as in Qt,
+and the one it replaced keeps it until the transaction is committed, by a
+completion block: two repaints in one pass of the run loop do not draw
+into what the compositor still shows),
 another one is allocated when all of them are in use (up to eight), and the
 free ones beyond three are released, so that nothing waits for the screen.
 The surfaces are BGRA8, premultiplied, in sRGB (as the `CAMetalLayer` was),
