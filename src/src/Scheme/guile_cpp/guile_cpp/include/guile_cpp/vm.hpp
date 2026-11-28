@@ -8,7 +8,6 @@
 #include <vector>
 #include <string>
 #include <string_view>
-#include <functional>
 
 namespace guile {
 
@@ -257,11 +256,14 @@ public:
     const std::vector<PortObj*>& open_ports() const noexcept { return ports_; }
 
     // Custom mark callback for VM internal tables
-    std::function<void(std::function<void(SCM)>&)> vm_marker;
-    std::function<void()> after_gc_callback;
+    // (TeXmacs: function pointers, called with the VM)
+    void (*vm_marker)(void* data, const Marker& mark) = nullptr;
+    void (*after_gc_callback)(void* data) = nullptr;
+    void* callback_data = nullptr;
 
-private:
+    // (public for the callbacks of the collector, see gc.cpp)
     void mark_scm(SCM x, std::vector<Obj*>& worklist);
+private:
     void trace_obj(Obj* obj, std::vector<Obj*>& worklist);
     void drain_worklist(std::vector<Obj*>& worklist);
     void process_guardians(std::vector<Obj*>& worklist);
@@ -385,6 +387,8 @@ public:
     ~VM();
 
     void init(void* stack_base, bool load_boot = true);
+    void mark_roots(const Marker& mark);
+    void run_after_gc_hook();
     bool is_initialized() const noexcept { return initialized_; }
 
     Heap& heap() noexcept { return heap_; }
@@ -516,7 +520,7 @@ public:
     [[noreturn]] void num_overflow(const char* subr);
 
     // Extensions & SMOBs
-    void register_extension(const std::string& lib, const std::string& init_fn, std::function<void()> fn);
+    void register_extension(const std::string& lib, const std::string& init_fn, void (*fn)());
     void load_extension(const std::string& lib, const std::string& init_fn);
     size_t make_smob_type(const SmobTypeInfo& info);
     SmobTypeInfo& smob_info(size_t idx) { return smob_types_.at(idx); }
@@ -780,7 +784,7 @@ public:
     SCM permanent_object(SCM x) { permanent_roots.push_back(x); return x; }
 
     std::unordered_map<std::string, SCM> symbol_table;
-    std::unordered_map<std::string, std::function<void()>> extensions;
+    std::unordered_map<std::string, void (*)()> extensions;
     std::vector<SmobTypeInfo> smob_types_;
 
     // Subsystem initializers
@@ -1003,7 +1007,7 @@ void set_data_dirs(const char* library, const char* pkgdata, const char* site);
 bool bytecode_compile_closure(ClosureObj* cl);
 SCM bytecode_run_closure(ClosureObj* cl, const SCM* args, size_t nargs);
 SCM bytecode_resume_continuation(ContinuationObj* k, SCM ret_val);
-void bytecode_mark_roots(std::function<void(SCM)>& mark);
+void bytecode_mark_roots(const Marker& mark);
 
 // Native ARM64 JIT Compiler (jit_arm64.cpp, not part of the TeXmacs build:
 // GUILE_CPP_JIT is never defined there, see ../README)

@@ -5,8 +5,8 @@
 
 namespace guile {
 
-void VM::register_extension(const std::string& lib, const std::string& init_fn, std::function<void()> fn) {
-    extensions[lib + ":" + init_fn] = std::move(fn);
+void VM::register_extension(const std::string& lib, const std::string& init_fn, void (*fn)()) {
+    extensions[lib + ":" + init_fn] = fn;
 }
 
 void VM::load_extension(const std::string& lib, const std::string& init_fn) {

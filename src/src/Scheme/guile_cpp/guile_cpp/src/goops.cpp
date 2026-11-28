@@ -1608,12 +1608,12 @@ static SCM init_goops_builtins_impl() {
         if (!is_pure_generic(a[0])) {
             vm().wrong_type_arg("%invalidate-method-cache!", 1, a[0], "pure generic function");
         }
-        std::function<void(SCM)> invalidate = [&](SCM gf) {
+        auto invalidate = [&](auto& invalidate, SCM gf) -> void {
             SCM used_by = raw_slot(gf, SI_GF_USED_BY);
             if (used_by.is_true()) {
                 SCM methods = raw_slot(gf, SI_GF_METHODS);
                 for (SCM u = used_by; is_pair(u); u = cdr(u)) {
-                    invalidate(car(u));
+                    invalidate(invalidate, car(u));
                 }
                 clear_method_cache(gf);
                 for (SCM m = methods; is_pair(m); m = cdr(m)) {
@@ -1626,7 +1626,7 @@ static SCM init_goops_builtins_impl() {
                 set_car(cdr(cdr(cache)), n);
             }
         };
-        invalidate(a[0]);
+        invalidate(invalidate, a[0]);
         return SCM_UNSPECIFIED;
     });
     define_goops_proc("generic-capability?", 1, 0, false, [](const SCM* a, size_t) -> SCM {

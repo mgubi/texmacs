@@ -1,5 +1,4 @@
 #include "guile_cpp/vm.hpp"
-#include <functional>
 #include <unordered_set>
 
 namespace guile {

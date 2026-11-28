@@ -6,6 +6,17 @@
 
 namespace guile {
 
+// the callback which marks an object for the hooks of the collector
+struct MarkCtx {
+    Heap* heap;
+    std::vector<Obj*>* worklist;
+};
+
+static void mark_into(void* data, SCM x) {
+    MarkCtx* ctx = static_cast<MarkCtx*>(data);
+    ctx->heap->mark_scm(x, *ctx->worklist);
+}
+
 void Heap::destroy_obj(Obj* cur) {
     switch (cur->tag) {
     case ObjTag::Pair: delete static_cast<PairObj*>(cur); break;
@@ -371,7 +382,8 @@ void Heap::trace_obj(Obj* obj, std::vector<Obj*>& worklist) {
         auto* sm = static_cast<SmobObj*>(obj);
         auto& info = vm().smob_info(sm->smob_type);
         if (info.mark) {
-            std::function<void(SCM)> cb = [&](SCM s) { mark_scm(s, worklist); };
+            MarkCtx ctx = {this, &worklist};
+            Marker cb = {mark_into, &ctx};
             info.mark(SCM::from_obj(sm), cb);
         }
         break;
@@ -779,8 +791,9 @@ void Heap::collect() {
 
     // 3. VM internal roots
     if (vm_marker) {
-        std::function<void(SCM)> cb = [&](SCM s) { mark_scm(s, worklist); };
-        vm_marker(cb);
+        MarkCtx ctx = {this, &worklist};
+        Marker cb = {mark_into, &ctx};
+        vm_marker(callback_data, cb);
     }
 
     // 4. Mark transitive closure
@@ -805,7 +818,7 @@ void Heap::collect() {
     in_gc_ = false;
 
     if (after_gc_callback) {
-        after_gc_callback();
+        after_gc_callback(callback_data);
     }
 }
 

@@ -280,15 +280,15 @@ bool array_equal(SCM a, SCM b) {
     for (size_t i = 0; i < da.size(); ++i) {
         if (da[i].lbnd != db[i].lbnd || da[i].ubnd != db[i].ubnd) return false;
     }
-    std::function<bool(size_t, int64_t, int64_t)> cmp = [&](size_t d, int64_t pa, int64_t pb) -> bool {
+    auto cmp = [&](auto& cmp, size_t d, int64_t pa, int64_t pb) -> bool {
         if (d == da.size()) return scm_equal(base_vec_ref(ba, static_cast<size_t>(pa)), base_vec_ref(bb, static_cast<size_t>(pb)));
         for (int64_t i = da[d].lbnd; i <= da[d].ubnd; ++i) {
             int64_t off = i - da[d].lbnd;
-            if (!cmp(d + 1, pa + off * da[d].inc, pb + off * db[d].inc)) return false;
+            if (!cmp(cmp, d + 1, pa + off * da[d].inc, pb + off * db[d].inc)) return false;
         }
         return true;
     };
-    return cmp(0, oa, ob);
+    return cmp(cmp, 0, oa, ob);
 }
 
 void VM::init_arrays() {
@@ -609,15 +609,15 @@ void VM::init_arrays() {
     define_proc("array->list", 1, 0, false, [this](const SCM* a, size_t) -> SCM {
         SCM base; int64_t off; std::vector<ArrayDim> dims;
         get_array_info(a[0], base, off, dims);
-        std::function<SCM(size_t, int64_t)> build = [&](size_t d, int64_t pos) -> SCM {
+        auto build = [&](auto& build, size_t d, int64_t pos) -> SCM {
             if (d == dims.size()) return base_vec_ref(base, static_cast<size_t>(pos));
             SCM res = SCM_EOL;
             for (int64_t i = dims[d].ubnd; i >= dims[d].lbnd; --i) {
-                res = cons(build(d + 1, pos + (i - dims[d].lbnd) * dims[d].inc), res);
+                res = cons(build(build, d + 1, pos + (i - dims[d].lbnd) * dims[d].inc), res);
             }
             return res;
         };
-        return build(0, off);
+        return build(build, 0, off);
     });
 
     define_proc("list->typed-array", 3, 0, false, [this, make_typed_array_impl](const SCM* a, size_t) -> SCM {
@@ -642,16 +642,16 @@ void VM::init_arrays() {
         SCM arr = make_typed_array_impl(type_sym, SCM_UNDEFINED, bounds);
         SCM base; int64_t off; std::vector<ArrayDim> dims;
         get_array_info(arr, base, off, dims);
-        std::function<void(size_t, int64_t, SCM)> fill = [&](size_t d, int64_t pos, SCM cur) {
+        auto fill = [&](auto& fill, size_t d, int64_t pos, SCM cur) -> void {
             if (d == dims.size()) { base_vec_set(base, static_cast<size_t>(pos), cur); return; }
             SCM p = cur;
             for (int64_t i = dims[d].lbnd; i <= dims[d].ubnd; ++i) {
                 if (!is_pair(p)) wrong_type_arg("list->typed-array", 3, lst, "nested list");
-                fill(d + 1, pos + (i - dims[d].lbnd) * dims[d].inc, car(p));
+                fill(fill, d + 1, pos + (i - dims[d].lbnd) * dims[d].inc, car(p));
                 p = cdr(p);
             }
         };
-        fill(0, off, lst);
+        fill(fill, 0, off, lst);
         return arr;
     });
     define_proc("list->array", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
@@ -697,11 +697,11 @@ void VM::init_arrays() {
     define_proc("array-fill!", 2, 0, false, [](const SCM* a, size_t) -> SCM {
         SCM base; int64_t off; std::vector<ArrayDim> dims;
         get_array_info(a[0], base, off, dims);
-        std::function<void(size_t, int64_t)> go = [&](size_t d, int64_t pos) {
+        auto go = [&](auto& go, size_t d, int64_t pos) -> void {
             if (d == dims.size()) { base_vec_set(base, static_cast<size_t>(pos), a[1]); return; }
-            for (int64_t i = dims[d].lbnd; i <= dims[d].ubnd; ++i) go(d + 1, pos + (i - dims[d].lbnd) * dims[d].inc);
+            for (int64_t i = dims[d].lbnd; i <= dims[d].ubnd; ++i) go(go, d + 1, pos + (i - dims[d].lbnd) * dims[d].inc);
         };
-        go(0, off);
+        go(go, 0, off);
         return SCM_UNSPECIFIED;
     });
 
@@ -710,12 +710,12 @@ void VM::init_arrays() {
         get_array_info(a[0], b1, o1, d1);
         get_array_info(a[1], b2, o2, d2);
         if (d1.size() != d2.size()) misc_error("array-copy!", "arrays have different ranks");
-        std::function<void(size_t, int64_t, int64_t)> go = [&](size_t d, int64_t p1, int64_t p2) {
+        auto go = [&](auto& go, size_t d, int64_t p1, int64_t p2) -> void {
             if (d == d1.size()) { base_vec_set(b2, static_cast<size_t>(p2), base_vec_ref(b1, static_cast<size_t>(p1))); return; }
             int64_t len = d1[d].ubnd - d1[d].lbnd + 1;
-            for (int64_t i = 0; i < len; ++i) go(d + 1, p1 + i * d1[d].inc, p2 + i * d2[d].inc);
+            for (int64_t i = 0; i < len; ++i) go(go, d + 1, p1 + i * d1[d].inc, p2 + i * d2[d].inc);
         };
-        go(0, o1, o2);
+        go(go, 0, o1, o2);
         return SCM_UNSPECIFIED;
     });
 
@@ -723,7 +723,7 @@ void VM::init_arrays() {
         SCM base; int64_t off; std::vector<ArrayDim> dims;
         get_array_info(a[0], base, off, dims);
         std::vector<SCM> idxs(dims.size());
-        std::function<void(size_t, int64_t)> go = [&](size_t d, int64_t pos) {
+        auto go = [&](auto& go, size_t d, int64_t pos) -> void {
             if (d == dims.size()) {
                 SCM v = apply(a[1], idxs.data(), idxs.size());
                 base_vec_set(base, static_cast<size_t>(pos), v);
@@ -731,10 +731,10 @@ void VM::init_arrays() {
             }
             for (int64_t i = dims[d].lbnd; i <= dims[d].ubnd; ++i) {
                 idxs[d] = make_integer(i);
-                go(d + 1, pos + (i - dims[d].lbnd) * dims[d].inc);
+                go(go, d + 1, pos + (i - dims[d].lbnd) * dims[d].inc);
             }
         };
-        go(0, off);
+        go(go, 0, off);
         return SCM_UNSPECIFIED;
     });
 
@@ -764,7 +764,7 @@ void VM::init_arrays() {
         }
         std::vector<int64_t> offsets(srcs.size());
         for (size_t s = 0; s < srcs.size(); ++s) offsets[s] = srcs[s].off;
-        std::function<void(size_t, int64_t)> go = [&](size_t d, int64_t dpos) {
+        auto go = [&](auto& go, size_t d, int64_t dpos) -> void {
             if (d == dd.size()) {
                 std::vector<SCM> cargs(srcs.size());
                 for (size_t s = 0; s < srcs.size(); ++s) cargs[s] = base_vec_ref(srcs[s].base, static_cast<size_t>(offsets[s]));
@@ -776,11 +776,11 @@ void VM::init_arrays() {
             for (int64_t i = 0; i < len; ++i) {
                 std::vector<int64_t> saved = offsets;
                 for (size_t s = 0; s < srcs.size(); ++s) offsets[s] += i * srcs[s].dims[d].inc;
-                go(d + 1, dpos + i * dd[d].inc);
+                go(go, d + 1, dpos + i * dd[d].inc);
                 offsets = saved;
             }
         };
-        go(0, doff);
+        go(go, 0, doff);
         return SCM_UNSPECIFIED;
     });
 
@@ -798,7 +798,7 @@ void VM::init_arrays() {
         std::vector<int64_t> offsets(srcs.size());
         for (size_t s = 0; s < srcs.size(); ++s) offsets[s] = srcs[s].off;
         const auto& dd = srcs[0].dims;
-        std::function<void(size_t)> go = [&](size_t d) {
+        auto go = [&](auto& go, size_t d) -> void {
             if (d == dd.size()) {
                 std::vector<SCM> cargs(srcs.size());
                 for (size_t s = 0; s < srcs.size(); ++s) cargs[s] = base_vec_ref(srcs[s].base, static_cast<size_t>(offsets[s]));
@@ -809,11 +809,11 @@ void VM::init_arrays() {
             for (int64_t i = 0; i < len; ++i) {
                 std::vector<int64_t> saved = offsets;
                 for (size_t s = 0; s < srcs.size(); ++s) offsets[s] += i * srcs[s].dims[d].inc;
-                go(d + 1);
+                go(go, d + 1);
                 offsets = saved;
             }
         };
-        go(0);
+        go(go, 0);
         return SCM_UNSPECIFIED;
     });
 

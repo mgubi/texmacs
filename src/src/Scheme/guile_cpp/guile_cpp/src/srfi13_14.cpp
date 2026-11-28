@@ -27,7 +27,7 @@ bool match_char_pred(SCM pred, unsigned char c) {
     vm().wrong_type_arg("char-pred", 1, pred, "char, char-set, or procedure");
 }
 
-SCM make_cs_from_pred(std::function<bool(unsigned char)> p) {
+SCM make_cs_from_pred(bool (*p)(unsigned char)) {
     auto* cs = vm().heap().alloc<CharSetObj>();
     for (int i = 0; i < 256; ++i) {
         if (p(static_cast<unsigned char>(i))) cs->add(static_cast<uint8_t>(i));

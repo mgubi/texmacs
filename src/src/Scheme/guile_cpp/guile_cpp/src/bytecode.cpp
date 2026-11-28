@@ -744,14 +744,14 @@ struct FnCompiler {
                             is_lexically_bound(v.sym_quasiquote) || !v.fast_core_ok) {
                             failed = true; return false;
                         }
-                        std::function<bool(SCM)> is_const_qq = [&](SCM x) -> bool {
+                        auto is_const_qq = [&](auto& is_const_qq, SCM x) -> bool {
                             if (is_vector(x)) return false;
                             if (!is_pair(x)) return true;
                             SCM a = car(x);
                             if (a == v.sym_unquote || a == v.sym_unquote_splicing || a == v.sym_quasiquote) return false;
-                            return is_const_qq(a) && is_const_qq(cdr(x));
+                            return is_const_qq(is_const_qq, a) && is_const_qq(is_const_qq, cdr(x));
                         };
-                        std::function<bool(SCM)> emit_qq = [&](SCM x) -> bool {
+                        auto emit_qq = [&](auto& emit_qq, SCM x) -> bool {
                             if (is_vector(x)) { failed = true; return false; }
                             if (!is_pair(x)) {
                                 if (x.is_null()) emit(enc0(OP_NIL));
@@ -779,21 +779,21 @@ struct FnCompiler {
                                 uint16_t app_gi = add_global(v.make_symbol("append"));
                                 emit(enc_u24(OP_GLOBAL_REF, app_gi));
                                 if (!compile_expr(car(cdr(a)), false)) return false;
-                                if (!emit_qq(d)) return false;
+                                if (!emit_qq(emit_qq, d)) return false;
                                 emit(enc_u24(OP_CALL, 2));
                                 return true;
                             }
-                            if (is_const_qq(x)) {
+                            if (is_const_qq(is_const_qq, x)) {
                                 emit(enc_u24(OP_CONST, add_const(x)));
                                 return true;
                             }
-                            if (!emit_qq(a)) return false;
-                            if (!emit_qq(d)) return false;
+                            if (!emit_qq(emit_qq, a)) return false;
+                            if (!emit_qq(emit_qq, d)) return false;
                             uint16_t cons_gi = add_global(v.make_symbol("cons"));
                             emit(enc_ab(OP_CONS, 0, cons_gi));
                             return true;
                         };
-                        if (!emit_qq(car(arg_exprs))) return false;
+                        if (!emit_qq(emit_qq, car(arg_exprs))) return false;
                         if (tail) emit(enc0(OP_RETURN));
                         return true;
                     }
@@ -4030,7 +4030,7 @@ SCM bytecode_resume_continuation(ContinuationObj* k, SCM ret_val) {
     return run_bytecode_loop(nullptr, nullptr, 0, k, ret_val);
 }
 
-void bytecode_mark_roots(std::function<void(SCM)>& mark) {
+void bytecode_mark_roots(const Marker& mark) {
     auto& eng = bc_engine();
     mark(eng.foreach1_helper);
     mark(eng.map1_helper);

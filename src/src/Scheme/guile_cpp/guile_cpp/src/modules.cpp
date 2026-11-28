@@ -436,7 +436,7 @@ void VM::init_modules() {
 
     define_proc("module-import-interface", 2, 0, false, [this](const SCM* a, size_t) -> SCM {
         if (!is_module(a[0])) wrong_type_arg("module-import-interface", 1, a[0], "module");
-        std::function<SCM(SCM, SCM)> find_iface = [&](SCM mod, SCM sym) -> SCM {
+        auto find_iface = [&](auto& find_iface, SCM mod, SCM sym) -> SCM {
             SCM uses = mod_field(mod, MODULE_INDEX_USES);
             while (is_pair(uses)) {
                 SCM iface = car(uses);
@@ -448,13 +448,13 @@ void VM::init_modules() {
                 if (binder.is_true() && call3(binder, iface, sym, SCM_BOOL_F).is_true()) {
                     return iface;
                 }
-                SCM sub = find_iface(iface, sym);
+                SCM sub = find_iface(find_iface, iface, sym);
                 if (sub.is_true()) return sub;
                 uses = cdr(uses);
             }
             return SCM_BOOL_F;
         };
-        return find_iface(a[0], a[1]);
+        return find_iface(find_iface, a[0], a[1]);
     });
 }
 

@@ -9,7 +9,8 @@
 #include <vector>
 #include <deque>
 #include <memory>
-#include <functional>
+#include <type_traits>
+#include "basic.hpp"
 #include <unordered_map>
 #include <optional>
 #include <variant>
@@ -122,8 +123,72 @@ struct ComplexObj : Obj {
     ComplexObj(double r, double i) noexcept : Obj(ObjTag::Complex), real(r), imag(i) {}
 };
 
-// C++ primitive procedure
-using SubrFn = std::function<SCM(const SCM* args, size_t nargs)>;
+// C++ primitive procedure. TeXmacs: in place of std::function, a plain
+// function pointer, or for a lambda which captures (most capture the VM),
+// a copy of it on the heap, shared by reference counting, called through a
+// function pointer
+struct SubrClosure {
+    int ref_count;
+    SCM (*call)(SubrClosure* c, const SCM* args, size_t nargs);
+    void (*destroy)(SubrClosure* c);
+};
+
+template <typename F>
+struct SubrClosureOf : SubrClosure {
+    F f;
+    explicit SubrClosureOf(const F& g) : f(g) {
+        ref_count = 1;
+        call = &SubrClosureOf::call_it;
+        destroy = &SubrClosureOf::destroy_it;
+    }
+    static SCM call_it(SubrClosure* c, const SCM* args, size_t nargs) {
+        return static_cast<SubrClosureOf*>(c)->f(args, nargs);
+    }
+    static void destroy_it(SubrClosure* c) {
+        tm_delete(static_cast<SubrClosureOf*>(c));
+    }
+};
+
+class SubrFn {
+    RawSubrFn raw_ = nullptr;
+    SubrClosure* clo_ = nullptr;
+    void release() noexcept {
+        if (clo_ && --clo_->ref_count == 0) clo_->destroy(clo_);
+        clo_ = nullptr;
+    }
+public:
+    SubrFn() noexcept {}
+    SubrFn(RawSubrFn f) noexcept : raw_(f) {}
+    template <typename F,
+              typename = typename std::enable_if<
+                  !std::is_same<typename std::decay<F>::type, SubrFn>::value>::type>
+    SubrFn(const F& f) {
+        if constexpr (std::is_convertible<F, RawSubrFn>::value) raw_ = f;
+        else clo_ = tm_new<SubrClosureOf<F>>(f);
+    }
+    SubrFn(const SubrFn& o) noexcept : raw_(o.raw_), clo_(o.clo_) {
+        if (clo_) clo_->ref_count++;
+    }
+    SubrFn& operator=(const SubrFn& o) noexcept {
+        if (o.clo_) o.clo_->ref_count++;
+        release();
+        raw_ = o.raw_; clo_ = o.clo_;
+        return *this;
+    }
+    ~SubrFn() { release(); }
+    explicit operator bool() const noexcept { return raw_ != nullptr || clo_ != nullptr; }
+    SCM operator()(const SCM* args, size_t nargs) const {
+        return raw_ ? raw_(args, nargs) : clo_->call(clo_, args, nargs);
+    }
+};
+
+// TeXmacs: the callback of the collector (in place of
+// std::function<void(SCM)>): a function pointer and its data
+struct Marker {
+    void (*fn)(void* data, SCM x);
+    void* data;
+    void operator()(SCM x) const { fn(data, x); }
+};
 
 enum class SpecialSubr : uint8_t {
     None = 0,
@@ -637,10 +702,10 @@ struct EvalClosureObj : Obj {
 
 struct SmobTypeInfo {
     std::string name;
-    std::function<void(SCM, std::function<void(SCM)>&)> mark;
-    std::function<void(SCM)> free_fn;
-    std::function<void(SCM, SCM)> print;
-    std::function<SCM(SCM, SCM)> equalp;
+    void (*mark)(SCM, const Marker&) = nullptr;
+    void (*free_fn)(SCM) = nullptr;
+    void (*print)(SCM, SCM) = nullptr;
+    SCM (*equalp)(SCM, SCM) = nullptr;
     SubrFn apply;
     uint64_t (*hash_fn)(SCM) = nullptr;
 };
