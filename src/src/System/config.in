@@ -42,6 +42,9 @@
 /* Use Chez Scheme */
 #undef USE_CHEZ
 
+/* Use the guile_cpp Scheme interpreter */
+#undef USE_GUILE_CPP
+
 /* Use the Guile Scheme interpreter */
 #undef USE_GUILE
 
